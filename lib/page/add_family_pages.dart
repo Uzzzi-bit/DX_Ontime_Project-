@@ -95,7 +95,8 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
             children: [
               Text(
                 '가족 구성원 추가',
-                style: theme.textTheme.displaySmall?.copyWith(
+                style:
+                    theme.textTheme.displaySmall?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: const Color(0xFF000000),
                     ) ??
@@ -108,7 +109,8 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
               const SizedBox(height: 12),
               Text(
                 '가족 구성원을 추가하세요.\n필요 시 알람이 전송 됩니다.\n(복수 선택 가능)',
-                style: theme.textTheme.titleMedium?.copyWith(
+                style:
+                    theme.textTheme.titleMedium?.copyWith(
                       height: 1.3,
                       color: const Color(0xFF1E1E1E),
                     ) ??
@@ -148,9 +150,7 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
                     ),
                   ),
                   child: Text(
-                    _selectedIds.isEmpty
-                        ? '구성원을 선택해 주세요'
-                        : '${_selectedIds.length}명 추가하기',
+                    _selectedIds.isEmpty ? '구성원을 선택해 주세요' : '${_selectedIds.length}명 추가하기',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
