@@ -37,6 +37,10 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
   DateTime? _expectedDueDate = DateTime.now().add(const Duration(days: 120));
   final Set<String> _selectedAllergies = {'우유', '땅콩'};
 
+  void _handleSave() {
+    Navigator.pop(context, true);
+  }
+
   @override
   void dispose() {
     _heightController.dispose();
@@ -134,7 +138,7 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: () {},
+                  onPressed: _handleSave,
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     backgroundColor: const Color(0xFF5BB5C8),

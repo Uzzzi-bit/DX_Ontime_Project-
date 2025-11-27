@@ -54,6 +54,9 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
   ];
 
   final Set<String> _selectedIds = {'partner', 'father'};
+  void _handleSubmit() {
+    Navigator.pop(context, true);
+  }
 
   void _toggleSelection(String memberId) {
     setState(() {
@@ -141,7 +144,7 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: _selectedIds.isEmpty ? null : () {},
+                  onPressed: _selectedIds.isEmpty ? null : _handleSubmit,
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFF6750A4),
                     padding: const EdgeInsets.symmetric(vertical: 16),
