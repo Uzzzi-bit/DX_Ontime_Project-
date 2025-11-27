@@ -1,0 +1,39 @@
+name: prototype
+description: "prototype application"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
+  fonts:
+  - family: ProductSans
+    fonts:
+      - asset: assets/fonts/ProductSans-Black.ttf
+        weight: 900
+      - asset: assets/fonts/ProductSans-Bold.ttf
+        weight: 700
+      - asset: assets/fonts/ProductSans-Medium.ttf
+        weight: 500
+      - asset: assets/fonts/ProductSans-Regular.ttf
+        weight: 400
+      - asset: assets/fonts/ProductSans-Light.ttf
+        weight: 300
+      - asset: assets/fonts/ProductSans-Thin.ttf
+        weight: 100
