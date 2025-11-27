@@ -23,11 +23,13 @@ class _MomCareSettingScreenState extends State<MomCareSettingScreen> {
       title: '건강 정보 입력',
       subtitle: '개인 건강 정보를 통해 개인 맞춤 솔루션을 제공합니다.',
       icon: Icons.edit_square,
+      route: '/healthinfo',
     ),
     _MomCareMenuItem(
       title: '가족 구성원 추가',
       subtitle: '추가된 가족 구성원에게 필요 시 알람이 전송됩니다.',
       icon: Icons.people_outline_rounded,
+      route: '/addfamily',
     ),
   ];
 
@@ -251,43 +253,54 @@ class _MomCareMenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: ColorPalette.primary300,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(item.icon, color: ColorPalette.primary),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  style: theme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: ColorPalette.textPrimary,
-                  ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: item.route == null
+            ? null
+            : () {
+                Navigator.pushNamed(context, item.route!);
+              },
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: ColorPalette.primary300,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  item.subtitle,
-                  style: theme.bodySmall?.copyWith(
-                    color: ColorPalette.textSecondary,
-                  ),
+                child: Icon(item.icon, color: ColorPalette.primary),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: theme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: ColorPalette.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.subtitle,
+                      style: theme.bodySmall?.copyWith(
+                        color: ColorPalette.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const Icon(Icons.chevron_right, color: ColorPalette.textSecondary),
+            ],
           ),
-          const Icon(Icons.chevron_right, color: ColorPalette.textSecondary),
-        ],
+        ),
       ),
     );
   }
@@ -298,9 +311,11 @@ class _MomCareMenuItem {
     required this.title,
     required this.subtitle,
     required this.icon,
+    this.route,
   });
 
   final String title;
   final String subtitle;
   final IconData icon;
+  final String? route;
 }

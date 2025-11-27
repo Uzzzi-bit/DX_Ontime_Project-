@@ -60,7 +60,8 @@ class SettingsScreen extends StatelessWidget {
         title: '임산부 모드',
         subtitle: '연결된 디바이스 동기화',
         icon: Icons.child_friendly_outlined,
-      ), //mom_care_setting_page로 연결할 수 있게 기능 구현 필요!!!!!!!!!
+        route: '/momcaresetting',
+      ),
     ],
   );
 
@@ -288,11 +289,13 @@ class MenuItem {
     required this.title,
     required this.subtitle,
     required this.icon,
+    this.route,
   });
 
   final String title;
   final String subtitle;
   final IconData icon;
+  final String? route;
 }
 
 class _MenuSectionWidget extends StatelessWidget {
@@ -350,46 +353,57 @@ class _MenuItemTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: ColorPalette.surface,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              item.icon,
-              color: ColorPalette.textPrimary,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  style: theme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: ColorPalette.textPrimary,
-                  ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: item.route == null
+            ? null
+            : () {
+                Navigator.pushNamed(context, item.route!);
+              },
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: ColorPalette.surface,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  item.subtitle,
-                  style: theme.bodySmall?.copyWith(
-                    color: ColorPalette.textSecondary,
-                  ),
+                child: Icon(
+                  item.icon,
+                  color: ColorPalette.textPrimary,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: theme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: ColorPalette.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.subtitle,
+                      style: theme.bodySmall?.copyWith(
+                        color: ColorPalette.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: ColorPalette.textSecondary),
+            ],
           ),
-          const Icon(Icons.chevron_right, color: ColorPalette.textSecondary),
-        ],
+        ),
       ),
     );
   }
