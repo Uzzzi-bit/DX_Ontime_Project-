@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../widget/bottom_bar_widget.dart';
 import 'chat_pages.dart';
+import 'report_pages.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -317,7 +318,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     _SectionHeader(
                       title: '오늘 총 영양 요약',
                       actionLabel: '종합리포트 가기',
-                      onActionTap: () {},
+                      onActionTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ReportScreen(),
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
                     Container(

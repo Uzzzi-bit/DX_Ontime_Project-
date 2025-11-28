@@ -181,7 +181,9 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            Navigator.pushReplacementNamed(context, '/');
+          },
           icon: const Icon(Icons.keyboard_backspace, color: Color(0xFF000000)),
         ),
         title: const Text(
