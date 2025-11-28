@@ -9,8 +9,10 @@ import 'page/report_pages.dart';
 import 'page/home_pages.dart';
 import 'page/chat_pages.dart';
 import 'page/setting_pages.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
-void main() {
+Future<void> main() async {
+  await initializeDateFormatting();
   runApp(const HealthApp());
 }
 
