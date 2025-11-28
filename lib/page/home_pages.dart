@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import '../widget/bottom_bar_widget.dart';
+import 'chat_pages.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,7 +18,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final String _pregnancyWeekLabel = '임신 N 주차';
 
   final double _currentCalorie = 1000;
-  final double _targetCalorie = 1500;
+  final double _targetCalorie = 2000;
 
   // TODO(eunbee): 실제 영양제 1회 섭취 시 증가할 함량으로 치환해 주세요.
   static const double supplementValue = 30.0;
@@ -116,24 +117,27 @@ class _HomeScreenState extends State<HomeScreen> {
   void _handleAskSubmit() {
     final query = _qaController.text.trim();
     if (query.isEmpty) return;
-    // TODO(eunbee): GPT 연동 로직 추가 예정
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          initialText: query,
+        ),
+      ),
+    );
   }
 
   void _toggleSupplement(String supplementId) {
-    final option =
-        _supplements.firstWhere((element) => element.id == supplementId);
+    final option = _supplements.firstWhere((element) => element.id == supplementId);
 
     setState(() {
       if (_selectedSupplements.contains(supplementId)) {
         _selectedSupplements.remove(supplementId);
-        _nutrientProgress[option.nutrient] =
-            (_nutrientProgress[option.nutrient]! - supplementValue)
-                .clamp(0, 100);
+        _nutrientProgress[option.nutrient] = (_nutrientProgress[option.nutrient]! - supplementValue).clamp(0, 100);
       } else {
         _selectedSupplements.add(supplementId);
-        _nutrientProgress[option.nutrient] =
-            (_nutrientProgress[option.nutrient]! + supplementValue)
-                .clamp(0, 100);
+        _nutrientProgress[option.nutrient] = (_nutrientProgress[option.nutrient]! + supplementValue).clamp(0, 100);
       }
     });
   }
@@ -148,143 +152,157 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 120),
+          padding: const EdgeInsets.only(bottom: 100),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
+                clipBehavior: Clip.hardEdge,
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+                padding: const EdgeInsets.only(top: 20, bottom: 0),
                 decoration: const BoxDecoration(
                   color: Color(0xFFBCE7F0),
                   borderRadius: BorderRadius.vertical(
-                    bottom: Radius.circular(32),
+                    bottom: Radius.circular(5),
                   ),
                 ),
                 child: SizedBox(
-                  height: 400,
+                  height: 440,
                   child: Stack(
                     alignment: Alignment.topCenter,
                     children: [
-                      Align(
-                        alignment: Alignment.topCenter,
+                      Positioned(
+                        bottom: 0, // 바닥에 딱 붙이기
+                        left: 0, // 양옆 여백 (취향껏 조절 가능, 0으로 하면 꽉 참)
+                        right: 0,
                         child: Container(
-                          margin: const EdgeInsets.only(top: 88),
-                          width: 240,
-                          height: 240,
+                          height: 280, // 반원 높이 (아기 이미지 뒤에 깔릴 정도)
                           decoration: const BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(240),
-                              topRight: Radius.circular(240),
-                              bottomLeft: Radius.circular(40),
-                              bottomRight: Radius.circular(40),
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(260), // 둥글기 (높이보다 큰 값을 줘야 완만한 아치가 됨)
                             ),
                           ),
                         ),
                       ),
+                      // Positioned.fill 부분을 이걸로 통째로 바꾸세요
                       Positioned.fill(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                SizedBox(
-                                  width: 180,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '$_userName 홈',
-                                        style: textTheme.titleLarge?.copyWith(
-                                              fontWeight: FontWeight.w600,
-                                              letterSpacing: 0.5,
-                                            ) ??
-                                            const TextStyle(
-                                              fontSize: 24,
-                                              fontWeight: FontWeight.w600,
-                                              letterSpacing: 0.5,
-                                            ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        _pregnancyWeekLabel,
-                                        style: textTheme.titleMedium?.copyWith(
-                                              fontWeight: FontWeight.w500,
-                                              letterSpacing: 0.5,
-                                            ) ??
-                                            const TextStyle(
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.w500,
-                                              letterSpacing: 0.5,
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                SizedBox(
-                                  height: 24,
-                                  child: TextButton(
-                                    onPressed: () =>
-                                        Navigator.pushNamed(context, '/healthinfo'),
-                                    style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 2,
-                                      ),
-                                      backgroundColor: const Color(0xFF5BB5C8),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      foregroundColor: Colors.white,
+                        child: Padding(
+                          // ✅ 1. 여백 추가 (글자가 벽에 붙지 않게)
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            // ✅ 2. 전체를 '왼쪽 정렬'로 변경 (글자, 버튼을 위해)
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 40), // 상단 여백 (조절 가능)
+                              // 이름
+                              Text(
+                                '$_userName 홈',
+                                style:
+                                    textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.5,
+                                    ) ??
+                                    const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.5,
                                     ),
-                                    child: const Text(
-                                      '건강정보 업데이트',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w500,
-                                        letterSpacing: 0.5,
-                                      ),
+                              ),
+                              const SizedBox(height: 6),
+
+                              // 임신 주차
+                              Text(
+                                _pregnancyWeekLabel,
+                                style:
+                                    textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w500,
+                                      letterSpacing: 0.5,
+                                    ) ??
+                                    const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w500,
+                                      letterSpacing: 0.5,
                                     ),
+                              ),
+
+                              const SizedBox(height: 12), // 글자와 버튼 사이 간격
+                              // ✅ 3. Row를 없애고 버튼을 여기로 가져옴 (세로 배치)
+                              SizedBox(
+                                height: 28,
+                                child: TextButton(
+                                  onPressed: () => Navigator.pushNamed(context, '/healthinfo'),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 0,
+                                    ),
+                                    backgroundColor: const Color(0xFF5BB5C8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    foregroundColor: Colors.white,
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 28),
-                            SizedBox(
-                              width: 219,
-                              height: 219,
-                              child: CalorieArcGauge(
-                                current: _currentCalorie,
-                                target: _targetCalorie,
-                                gradientColors: const [
-                                  Color(0xFFFEF493),
-                                  Color(0xFFDDEDC1),
-                                  Color(0xFFBCE7F0),
-                                ],
-                                child: SizedBox(
-                                  height: 158,
-                                  width: 158,
-                                  child: Image.asset(
-                                    'assets/image/baby.png',
-                                    fit: BoxFit.contain,
+                                  child: const Text(
+                                    '건강정보 업데이트',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              '${_currentCalorie.toStringAsFixed(0)} Kcal',
-                              style: textTheme.displaySmall?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ) ??
-                                  const TextStyle(
-                                    fontSize: 40,
-                                    fontWeight: FontWeight.w700,
+
+                              // 아기 위쪽 여백 (화면 보면서 조절하세요)
+                              const SizedBox(height: 40),
+
+                              // ✅ 4. 아기랑 게이지는 '가운데 정렬'로 따로 설정 (Align 사용)
+                              Align(
+                                alignment: Alignment.center,
+                                child: SizedBox(
+                                  width: 195, // 300은 너무 큽니다. 195 추천
+                                  height: 195,
+                                  child: CalorieArcGauge(
+                                    current: _currentCalorie,
+                                    target: _targetCalorie,
+                                    gradientColors: const [
+                                      Color(0xFFFEF493),
+                                      Color(0xFFDDEDC1),
+                                      Color(0xFFBCE7F0),
+                                    ],
+                                    child: SizedBox(
+                                      height: 175,
+                                      width: 175,
+                                      child: Image.asset(
+                                        'assets/image/baby.png',
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ),
                                   ),
-                            ),
-                          ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 4),
+
+                              // ✅ 5. 칼로리 텍스트도 '가운데 정렬'
+                              Align(
+                                alignment: Alignment.center,
+                                child: Text(
+                                  '${_currentCalorie.toStringAsFixed(0)} Kcal',
+                                  style:
+                                      textTheme.displaySmall?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        height: 1.0,
+                                      ) ??
+                                      const TextStyle(
+                                        fontSize: 40, // 30보다 40 추천
+                                        fontWeight: FontWeight.w700,
+                                        height: 1.0,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -318,8 +336,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 height: 77,
                                 child: _NutrientProgressBar(
                                   definition: definition,
-                                  percent:
-                                      _nutrientProgress[definition.type] ?? 0,
+                                  percent: _nutrientProgress[definition.type] ?? 0,
                                 ),
                               ),
                             )
@@ -363,7 +380,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 32),
                     Text(
                       '먹어도 되나요?',
-                      style: textTheme.titleLarge?.copyWith(
+                      style:
+                          textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w600,
                           ) ??
                           const TextStyle(
@@ -401,7 +419,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           const SizedBox(width: 12),
                           InkWell(
                             onTap: _handleAskSubmit,
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(8),
                             child: Container(
                               width: 28,
                               height: 28,
@@ -422,7 +440,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 32),
                     Text(
                       '즐겨 찾는 제품',
-                      style: textTheme.titleMedium?.copyWith(
+                      style:
+                          textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                             letterSpacing: 0.5,
                           ) ??
@@ -510,7 +529,8 @@ class _CalorieArcPainter extends CustomPainter {
     final backgroundPaint = Paint()
       ..color = const Color(0xFFF7F7F7)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 20;
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 30;
 
     final arcRect = Rect.fromCircle(center: center, radius: radius - 10);
     canvas.drawArc(
@@ -530,7 +550,7 @@ class _CalorieArcPainter extends CustomPainter {
       ..shader = gradient.createShader(arcRect)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 20;
+      ..strokeWidth = 30;
 
     canvas.drawArc(
       arcRect,
@@ -543,8 +563,7 @@ class _CalorieArcPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CalorieArcPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.gradientColors != gradientColors;
+    return oldDelegate.progress != progress || oldDelegate.gradientColors != gradientColors;
   }
 }
 
@@ -567,9 +586,9 @@ class _SectionHeader extends StatelessWidget {
         Text(
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
         ),
         TextButton(
           onPressed: onActionTap,
@@ -625,9 +644,7 @@ class _NutrientProgressBar extends StatelessWidget {
             height: fillHeight,
             width: double.infinity,
             decoration: BoxDecoration(
-              color: clampedPercent > 0
-                  ? definition.activeColor
-                  : const Color(0xFFE7E1EA),
+              color: clampedPercent > 0 ? definition.activeColor : const Color(0xFFE7E1EA),
               borderRadius: const BorderRadius.only(
                 bottomLeft: Radius.circular(15),
                 bottomRight: Radius.circular(15),
@@ -644,9 +661,7 @@ class _NutrientProgressBar extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: clampedPercent > 0
-                      ? const Color(0xFF0F0F0F)
-                      : const Color(0xFFBABABA),
+                  color: clampedPercent > 0 ? const Color(0xFF0F0F0F) : const Color(0xFFBABABA),
                 ),
               ),
               const SizedBox(height: 4),

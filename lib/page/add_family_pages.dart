@@ -16,28 +16,24 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
       relation: '배우자',
       name: '남편',
       description: '긴급 알림을 가장 먼저 전달할 케어 메이트입니다.',
-      trailingLabel: '100+',
     ),
     const _FamilyMember(
       id: 'mother',
       relation: '부모님',
       name: '엄마',
       description: '기본 건강 리포트를 자동 공유해요.',
-      trailingLabel: '100+',
     ),
     const _FamilyMember(
       id: 'father',
       relation: '부모님',
       name: '아빠',
       description: '투약 알림 연동 시 알림을 함께 받습니다.',
-      trailingLabel: '100+',
     ),
     const _FamilyMember(
       id: 'aunt',
       relation: '가족',
       name: '이모',
       description: '케어 기록 열람만 가능한 뷰어 권한입니다.',
-      trailingLabel: '100+',
     ),
     const _FamilyMember(
       id: 'sibling',
