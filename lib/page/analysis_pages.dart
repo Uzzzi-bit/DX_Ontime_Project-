@@ -1,41 +1,558 @@
-import 'package:flutter/material.dart';
-import '../widget/bottom_bar_widget.dart';
+import 'dart:async';
+import 'dart:io';
 
-class AnalysisScreen extends StatelessWidget {
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
+enum _AnalysisStep { capture, analyzingImage, reviewFoods, nutrientAnalysis }
+
+class AnalysisScreen extends StatefulWidget {
   const AnalysisScreen({super.key});
+
+  @override
+  State<AnalysisScreen> createState() => _AnalysisScreenState();
+}
+
+class _AnalysisScreenState extends State<AnalysisScreen> {
+  final TextEditingController _foodController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
+
+  _AnalysisStep _currentStep = _AnalysisStep.capture;
+  final List<String> _foodItems = [];
+  File? _selectedImage;
+  bool _seededReviewData = false;
+
+  @override
+  void dispose() {
+    _foodController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleImageSelection(ImageSource source) async {
+    try {
+      final picked = await _picker.pickImage(source: source);
+      if (picked == null) return;
+      setState(() {
+        _selectedImage = File(picked.path);
+        _currentStep = _AnalysisStep.analyzingImage;
+      });
+      _simulateImageAnalysis();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('이미지를 불러오지 못했습니다: $e')),
+      );
+    }
+  }
+
+  void _simulateImageAnalysis() {
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        _currentStep = _AnalysisStep.reviewFoods;
+        if (!_seededReviewData) {
+          _foodItems
+            ..clear()
+            ..addAll(['김치찌개', '현미밥', '녹두전']);
+          _seededReviewData = true;
+        }
+      });
+    });
+  }
+
+  void _handleAddFood() {
+    final text = _foodController.text.trim();
+    if (text.isEmpty) return;
+    setState(() {
+      _foodItems.add(text);
+      _foodController.clear();
+    });
+  }
+
+  Future<void> _showEditDialog(int index) async {
+    final controller = TextEditingController(text: _foodItems[index]);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return _FoodDialog(
+          title: '음식 수정',
+          confirmLabel: '수정',
+          controller: controller,
+        );
+      },
+    );
+    if (result != null && result.trim().isNotEmpty) {
+      setState(() {
+        _foodItems[index] = result.trim();
+      });
+    }
+  }
+
+  Future<void> _showDeleteDialog(int index) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return _ConfirmDialog(
+          target: _foodItems[index],
+        );
+      },
+    );
+    if (shouldDelete == true) {
+      setState(() {
+        _foodItems.removeAt(index);
+      });
+    }
+  }
+
+  void _startNutrientAnalysis() {
+    setState(() {
+      _currentStep = _AnalysisStep.nutrientAnalysis;
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('분석이 완료되었습니다. 리포트로 돌아갑니다.')),
+      );
+      Navigator.pop(context);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        automaticallyImplyLeading: false, // 자동 leading 생성 방지
+        title: const Text('식단 분석'),
         leading: IconButton(
-          onPressed: () {
-            // 이전 화면으로 돌아가기 (pop 가능한 경우에만)
-            if (Navigator.canPop(context)) {
-              Navigator.of(context).pop();
-            } else {
-              // pop이 불가능한 경우 홈으로 이동
-              Navigator.pushReplacementNamed(context, '/');
-            }
-          },
-          icon: const Icon(Icons.keyboard_backspace),
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          '분석',
-          style: Theme.of(context).textTheme.bodyMedium, // 테마에서 불러오기
-        ),
-        backgroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Color(0xFF1E1E1E)),
       ),
-      body: Center(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildStepContent(),
+              const SizedBox(height: 24),
+              if (_currentStep != _AnalysisStep.nutrientAnalysis) _buildFoodInputSection(),
+              if (_currentStep != _AnalysisStep.nutrientAnalysis) const SizedBox(height: 12),
+              if (_currentStep != _AnalysisStep.nutrientAnalysis) _buildFoodList(),
+              const SizedBox(height: 24),
+              _buildActionButton(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStepContent() {
+    switch (_currentStep) {
+      case _AnalysisStep.capture:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildCaptureControls(),
+            const SizedBox(height: 20),
+            _buildImagePreview(),
+          ],
+        );
+      case _AnalysisStep.analyzingImage:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildImagePreview(showOverlay: true),
+            const SizedBox(height: 16),
+            const Center(
+              child: Text(
+                '음식 사진을 분석 중입니다',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      case _AnalysisStep.reviewFoods:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildImagePreview(),
+            const SizedBox(height: 16),
+            const Text(
+              '분석된 음식 목록',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        );
+      case _AnalysisStep.nutrientAnalysis:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildImagePreview(),
+            const SizedBox(height: 24),
+            const Text(
+              'AI가 사용자의 식단을 분석하고 있습니다.',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            LinearProgressIndicator(
+              minHeight: 8,
+              backgroundColor: const Color(0xFFE0E0E0),
+              valueColor: const AlwaysStoppedAnimation(Color(0xFF5BB5C8)),
+            ),
+            const SizedBox(height: 32),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE5F5F3),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Text(
+                'TIP. 점심에는 당뇨의 위험이 큽니다. 식단을 가볍게 조절해 보세요.',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        );
+    }
+  }
+
+  Widget _buildCaptureControls() {
+    return Row(
+      children: [
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: () => _handleImageSelection(ImageSource.camera),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            icon: const Icon(Icons.camera_alt_outlined),
+            label: const Text('바로 촬영'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: () => _handleImageSelection(ImageSource.gallery),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            icon: const Icon(Icons.photo_library_outlined),
+            label: const Text('사진 선택'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImagePreview({bool showOverlay = false}) {
+    final placeholder = Container(
+      height: 200,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAEAEA),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: const Center(
         child: Text(
-          '분석 화면이 준비 중입니다.',
-          style: Theme.of(context).textTheme.displayMedium, // 테마에서 불러오기
+          '음식 사진을 추가해 주세요',
+          style: TextStyle(color: Color(0xFF7A7A7A)),
         ),
       ),
-      bottomNavigationBar: const BottomBarWidget(currentRoute: '/analysis'),
+    );
+
+    if (_selectedImage == null) {
+      return placeholder;
+    }
+
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.file(
+            _selectedImage!,
+            height: 220,
+            width: double.infinity,
+            fit: BoxFit.cover,
+          ),
+        ),
+        if (showOverlay)
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildFoodInputSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '식단을 직접 입력해 주세요',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _foodController,
+                decoration: const InputDecoration(
+                  hintText: '음식명을 입력하세요',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                onSubmitted: (_) => _handleAddFood(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: _handleAddFood,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF5BB5C8),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.add, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFoodList() {
+    if (_foodItems.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Center(
+          child: Text(
+            '추가된 음식이 없습니다.',
+            style: TextStyle(color: Color(0xFF7A7A7A)),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: _foodItems.asMap().entries.map((entry) {
+          final index = entry.key;
+          final item = entry.value;
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () => _showDeleteDialog(index),
+                  icon: const Icon(Icons.close, size: 18),
+                ),
+                Expanded(
+                  child: Text(
+                    item,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => _showEditDialog(index),
+                  icon: const Icon(Icons.edit, size: 18),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildActionButton() {
+    final isDisabled = _foodItems.isEmpty || _currentStep == _AnalysisStep.analyzingImage;
+    final buttonLabel = _currentStep == _AnalysisStep.nutrientAnalysis ? '분석 중...' : '분석하기';
+
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton(
+        onPressed: isDisabled || _currentStep == _AnalysisStep.nutrientAnalysis
+            ? null
+            : () {
+                if (_currentStep == _AnalysisStep.capture || _currentStep == _AnalysisStep.reviewFoods) {
+                  _startNutrientAnalysis();
+                }
+              },
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          backgroundColor: const Color(0xFF5BB5C8),
+        ),
+        child: Text(
+          buttonLabel,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FoodDialog extends StatelessWidget {
+  const _FoodDialog({
+    required this.title,
+    required this.confirmLabel,
+    required this.controller,
+  });
+
+  final String title;
+  final String confirmLabel;
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xFFF7F7F7),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('취소'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(context, controller.text.trim()),
+                    child: Text(confirmLabel),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ConfirmDialog extends StatelessWidget {
+  const _ConfirmDialog({required this.target});
+
+  final String target;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xFFF7F7F7),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '\'${target}\'을 삭제하시겠어요?',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('취소'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('삭제'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

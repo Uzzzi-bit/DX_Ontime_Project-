@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../widget/bottom_bar_widget.dart';
 import 'recipe_pages.dart';
+import 'analysis_pages.dart';
 
 class MealRecord {
   final String mealType;
@@ -191,8 +192,12 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   void _navigateToMealRecord(String mealType) {
-    // TODO: 식단 등록 페이지로 이동
-    print('식단 등록: $mealType');
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AnalysisScreen(),
+      ),
+    );
   }
 
   bool _isToday(DateTime date) {
