@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:prototype/firebase_options.dart';
 import 'package:prototype/page/add_family_pages.dart';
 import 'package:prototype/page/analysis_pages.dart';
 import 'package:prototype/page/health_info_pages.dart';
@@ -12,7 +15,14 @@ import 'page/setting_pages.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 Future<void> main() async {
-  await initializeDateFormatting();
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  final auth = FirebaseAuth.instance;
+  if (auth.currentUser == null) {
+    await auth.signInAnonymously();
+  }
   runApp(const HealthApp());
 }
 

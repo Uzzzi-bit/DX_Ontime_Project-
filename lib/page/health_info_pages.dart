@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../widget/bottom_bar_widget.dart';
 
@@ -37,8 +38,48 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
   DateTime? _expectedDueDate = DateTime.now().add(const Duration(days: 120));
   final Set<String> _selectedAllergies = {'우유', '땅콩'};
 
-  void _handleSave() {
-    Navigator.pop(context, true);
+  /// 🔹 저장 버튼 눌렀을 때 Firestore에 쓰는 함수
+  Future<void> _handleSave() async {
+    final birthYear = _selectedBirthYear != null ? int.tryParse(_selectedBirthYear!) : null;
+    final height = double.tryParse(_heightController.text.trim());
+    final weight = double.tryParse(_weightController.text.trim());
+    final pregWeek = _selectedWeek;
+    final dueDate = _expectedDueDate;
+
+    if (birthYear == null || height == null || weight == null || dueDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('필수 정보를 모두 입력해 주세요.')),
+      );
+      return;
+    }
+
+    final allergies = _selectedAllergies.toList();
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('PREGNANCY') // 컬렉션 이름
+          .doc('member_id') // 콘솔에서 보고 있는 문서 ID
+          .set({
+            'birthYear': birthYear,
+            'heightCm': height,
+            'weightKg': weight,
+            'dueDate': Timestamp.fromDate(dueDate),
+            'pregWeek': pregWeek,
+            'gestationalDiabetes': _hasGestationalDiabetes,
+            'allergies': allergies,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('건강 정보가 저장되었습니다.')),
+      );
+
+      Navigator.pop(context, true);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('저장 실패: $e')),
+      );
+    }
   }
 
   @override
@@ -157,6 +198,8 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
       bottomNavigationBar: const BottomBarWidget(currentRoute: '/healthinfo'),
     );
   }
+
+  // ===== 아래는 전부 UI 헬퍼 위젯들 =====
 
   Widget _buildDropdownSection({
     required String label,

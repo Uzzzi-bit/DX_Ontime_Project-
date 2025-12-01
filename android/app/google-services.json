@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "946831801404",
+    "project_id": "pregnantapp-492e6",
+    "storage_bucket": "pregnantapp-492e6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:946831801404:android:3e6865d84dc3e406f85739",
+        "android_client_info": {
+          "package_name": "com.example.dx_project_prototype"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCLnvyMiXUXdaWb4nYtY621XWYg-saqvTs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
