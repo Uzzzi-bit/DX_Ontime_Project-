@@ -84,33 +84,55 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   // TODO: [SERVER] 추천 레시피 리스트 Fetch
-  // 오늘의 추천 식단 (Mock Data) - 3개 아이템
-  final List<_RecommendedMeal> _recommendedMeals = const [
-    _RecommendedMeal(
-      id: 'salmon-steak',
-      name: '연어스테이크',
-      imagePath: 'assets/image/sample_food.png',
-      calories: 350,
-      tags: ['오메가-3', '비타민 D'],
-      backgroundColor: Color(0xFFD2ECBF),
-    ),
-    _RecommendedMeal(
-      id: 'cold-noodles',
-      name: '냉모밀',
-      imagePath: 'assets/image/sample_food.png',
-      calories: 400,
-      tags: ['단백질', '미네랄'],
-      backgroundColor: Color(0xFFFEF493),
-    ),
-    _RecommendedMeal(
-      id: 'seaweed-soup',
-      name: '미역국',
-      imagePath: 'assets/image/sample_food.png',
-      calories: 150,
-      tags: ['철분', '칼슘'],
-      backgroundColor: Color(0xFFBCE7F0),
-    ),
-  ];
+  // 오늘의 추천 식단 - recipe_pages.dart의 레시피 데이터 사용
+  List<_RecommendedMeal> get _recommendedMeals {
+    final recipes = RecipeScreen.getRecommendedRecipes();
+    // 레시피를 RecommendedMeal 형식으로 변환
+    final List<Color> backgroundColors = [
+      const Color(0xFFD2ECBF), // 연어스테이크 색상
+      const Color(0xFFFEF493), // 냉모밀 색상
+      const Color(0xFFBCE7F0), // 미역국 색상
+    ];
+
+    return recipes.asMap().entries.map((entry) {
+      final index = entry.key;
+      final recipe = entry.value;
+      // 레시피 ID 매핑 (기존 매핑 유지)
+      String mealId;
+      switch (index) {
+        case 0:
+          mealId = 'salmon-steak'; // 간장 닭봉 구이
+          break;
+        case 1:
+          mealId = 'cold-noodles'; // 냉메밀
+          break;
+        case 2:
+          mealId = 'seaweed-soup'; // 미역국
+          break;
+        default:
+          mealId = 'salmon-steak';
+      }
+
+      // 태그 추출 (재료나 영양소 기반으로 추정)
+      List<String> tags = [];
+      if (recipe.title.contains('닭') || recipe.title.contains('구이')) {
+        tags = ['단백질', '비타민'];
+      } else if (recipe.title.contains('메밀') || recipe.title.contains('면')) {
+        tags = ['단백질', '미네랄'];
+      } else if (recipe.title.contains('미역')) {
+        tags = ['철분', '칼슘'];
+      }
+
+      return _RecommendedMeal(
+        id: mealId,
+        name: recipe.title,
+        imagePath: recipe.imagePath,
+        calories: 350, // TODO: [API] 실제 칼로리 정보로 대체
+        tags: tags,
+        backgroundColor: backgroundColors[index % backgroundColors.length],
+      );
+    }).toList();
+  }
 
   final List<_ApplianceInfo> _appliances = const [
     _ApplianceInfo(
@@ -150,8 +172,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<Map<String, dynamic>> get _mealData {
+    final meals = _recommendedMeals;
     // 데이터가 없을 경우 임시 데이터 반환
-    if (_recommendedMeals.isEmpty) {
+    if (meals.isEmpty) {
       return [
         {
           'id': 'temp-1',
@@ -179,7 +202,7 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ];
     }
-    return _recommendedMeals.map((meal) {
+    return meals.map((meal) {
       return {
         'id': meal.id,
         'name': meal.name,
@@ -275,10 +298,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _navigateToRecipe(String mealId) {
     // TODO: [API] 실제 레시피 상세 페이지로 이동
+    // 홈 화면의 추천 식단과 recipe_pages의 메뉴 매핑
+    // 연어스테이크 → 간장 닭봉 구이 (index 0)
+    // 냉모밀 → 냉메밀 (index 1)
+    // 미역국 → 미역국 (index 2)
+    int recipeIndex = 0;
+    switch (mealId) {
+      case 'salmon-steak':
+        recipeIndex = 0; // 간장 닭봉 구이
+        break;
+      case 'cold-noodles':
+        recipeIndex = 1; // 냉메밀
+        break;
+      case 'seaweed-soup':
+        recipeIndex = 2; // 미역국
+        break;
+      default:
+        recipeIndex = 0;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const RecipeScreen(),
+        builder: (context) => RecipeScreen(
+          initialMenuIndex: recipeIndex,
+        ),
       ),
     );
   }
