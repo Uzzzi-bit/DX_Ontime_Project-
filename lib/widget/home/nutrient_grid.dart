@@ -10,63 +10,63 @@ class NutrientGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 1. 데이터를 왼쪽 줄(철분, 엽산, 칼슘)과 오른쪽 줄(비타민, 오메가, 콜린)로 분리
+    // 1. 데이터 분리
     final leftItems = <Map<String, dynamic>>[];
     final rightItems = <Map<String, dynamic>>[];
 
     for (int i = 0; i < nutrients.length; i++) {
       if (i % 2 == 0) {
-        leftItems.add(nutrients[i]); // 0, 2, 4번째 인덱스
+        leftItems.add(nutrients[i]);
       } else {
-        rightItems.add(nutrients[i]); // 1, 3, 5번째 인덱스
+        rightItems.add(nutrients[i]);
       }
     }
 
-    // GridView 대신 Row를 사용하여 좌우 배치를 직접 제어
     return Row(
+      // [높이 맞춤] 좌우 컬럼의 높이를 강제로 맞춰서 'spaceBetween'이 정확히 동작하게 함
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // [왼쪽 열]
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: leftItems.map((item) => _buildNutrientItem(item, isLeft: true)).toList(),
-          ),
+        Column(
+          // [핵심 1] 컬럼 내부 아이템들을 '좌측(Start)'으로 정렬
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween, // 위아래 간격 균등 분배
+          children: leftItems.map((item) => _buildNutrientItem(item, isLeft: true)).toList(),
         ),
 
-        // [핵심] 여기에 있는 숫자를 줄이면 두 줄 사이가 더 가까워집니다!
-        const SizedBox(width: 0),
+        // [간격]
+        const SizedBox(width: 8),
 
         // [오른쪽 열]
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: rightItems.map((item) => _buildNutrientItem(item, isLeft: false)).toList(),
-          ),
+        Column(
+          // [핵심 1] 컬럼 내부 아이템들을 '좌측(Start)'으로 정렬
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: rightItems.map((item) => _buildNutrientItem(item, isLeft: false)).toList(),
         ),
       ],
     );
   }
 
-  // 아이템 하나(글자+바)를 만드는 함수
   Widget _buildNutrientItem(Map<String, dynamic> item, {required bool isLeft}) {
     final label = item['label'] as String;
     final progress = (item['progress'] as num? ?? 0).toDouble();
     final clampedProgress = progress.clamp(0.0, 100.0);
 
-    // 보내주신 코드의 로직 적용 (왼쪽 30, 오른쪽 50)
+    // 텍스트 너비 설정 (왼쪽 줄 30, 오른쪽 줄 50)
     final labelWidth = isLeft ? 30.0 : 50.0;
 
     return Row(
-      mainAxisSize: MainAxisSize.min, // 내용물 크기만큼만 차지하게 설정
+      mainAxisSize: MainAxisSize.min, // 내용물 크기만큼만 차지
+      crossAxisAlignment: CrossAxisAlignment.center, // 텍스트와 바의 수직 중앙 정렬
       children: [
-        // 1. 텍스트 너비
+        // 1. 텍스트
         SizedBox(
           width: labelWidth,
           child: Text(
             label,
+            // [핵심 2] 텍스트 박스 안에서 글자를 '좌측'으로 강제 정렬
+            textAlign: TextAlign.right,
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
@@ -77,10 +77,10 @@ class NutrientGrid extends StatelessWidget {
           ),
         ),
 
-        // 텍스트와 바 사이 간격 (0으로 설정하셨음)
-        const SizedBox(width: 0),
+        // 텍스트와 바 사이 간격 (0으로 설정)
+        const SizedBox(width: 5),
 
-        // 2. 바 (설정하신 크기 적용: 55 x 30)
+        // 2. 게이지 바 (크기 고정)
         SizedBox(
           width: 55,
           height: 30,
