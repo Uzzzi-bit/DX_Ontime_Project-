@@ -9,7 +9,7 @@ class SettingsScreen extends StatelessWidget {
   static const _secondaryText = ColorPalette.textSecondary;
   static const _surface = ColorPalette.surface;
   static const _background = ColorPalette.background;
-  static const _surfaceVariant = ColorPalette.primary300;
+  static const _surfaceVariant = ColorPalette.primary100;
   static final _outline = ColorPalette.bg300.withOpacity(0.8);
 
   static const _manageSection = MenuSection(

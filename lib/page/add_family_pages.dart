@@ -1,5 +1,6 @@
 import 'package:characters/characters.dart';
 import 'package:flutter/material.dart';
+import '../theme/color_palette.dart';
 import '../widget/bottom_bar_widget.dart';
 
 class AddFamilyScreen extends StatefulWidget {
@@ -67,13 +68,14 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: colorScheme.surfaceVariant,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         elevation: 0,
-        backgroundColor: const Color(0xFFFAFBFC),
+        backgroundColor: colorScheme.surface,
         leading: IconButton(
           onPressed: () {
             if (Navigator.canPop(context)) {
@@ -82,7 +84,7 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
               Navigator.pushReplacementNamed(context, '/');
             }
           },
-          icon: const Icon(Icons.keyboard_backspace, color: Color(0xFF1E1E1E)),
+          icon: Icon(Icons.keyboard_backspace, color: colorScheme.onSurface),
         ),
       ),
       body: SafeArea(
@@ -97,12 +99,12 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
                 style:
                     theme.textTheme.displaySmall?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: const Color(0xFF000000),
+                      color: colorScheme.onSurface,
                     ) ??
                     const TextStyle(
                       fontSize: 36,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF000000),
+                      color: ColorPalette.textPrimary,
                     ),
               ),
               const SizedBox(height: 12),
@@ -111,12 +113,12 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
                 style:
                     theme.textTheme.titleMedium?.copyWith(
                       height: 1.3,
-                      color: const Color(0xFF1E1E1E),
+                      color: colorScheme.onSurface,
                     ) ??
                     const TextStyle(
                       fontSize: 20,
                       height: 1.3,
-                      color: Color(0xFF1E1E1E),
+                      color: ColorPalette.textPrimary,
                     ),
               ),
               const SizedBox(height: 24),
@@ -142,7 +144,7 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
                 child: FilledButton(
                   onPressed: _selectedIds.isEmpty ? null : _handleSubmit,
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF6750A4),
+                    backgroundColor: colorScheme.primary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -180,16 +182,18 @@ class _FamilyMemberTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return InkWell(
       onTap: onChanged,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFFEF7FF),
+          color: colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? const Color(0xFF6750A4) : const Color(0xFFE6E0E9),
+            color: isSelected ? colorScheme.primary : colorScheme.outline,
             width: 1.2,
           ),
         ),
@@ -204,11 +208,11 @@ class _FamilyMemberTile extends StatelessWidget {
                 children: [
                   Text(
                     member.relation,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                       letterSpacing: 0.5,
-                      color: Color(0xFF49454F),
+                      color: ColorPalette.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -217,7 +221,7 @@ class _FamilyMemberTile extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1D1B20),
+                      color: ColorPalette.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -226,7 +230,7 @@ class _FamilyMemberTile extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 14,
                       height: 1.4,
-                      color: Color(0xFF49454F),
+                      color: ColorPalette.textSecondary,
                     ),
                   ),
                 ],
@@ -242,7 +246,7 @@ class _FamilyMemberTile extends StatelessWidget {
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                       letterSpacing: 0.5,
-                      color: Color(0xFF49454F),
+                      color: ColorPalette.textSecondary,
                     ),
                   ),
                 Checkbox(
@@ -251,8 +255,8 @@ class _FamilyMemberTile extends StatelessWidget {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  activeColor: const Color(0xFF6750A4),
-                  side: const BorderSide(color: Color(0xFF49454F), width: 1.5),
+                  activeColor: colorScheme.primary,
+                  side: const BorderSide(color: ColorPalette.textSecondary, width: 1.5),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ],
@@ -271,20 +275,21 @@ class _Monogram extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       width: 48,
       height: 48,
       decoration: BoxDecoration(
-        color: const Color(0xFFEADDFF),
+        color: ColorPalette.primary100.withOpacity(0.8),
         borderRadius: BorderRadius.circular(24),
       ),
       alignment: Alignment.center,
       child: Text(
         initial,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w600,
-          color: Color(0xFF4F378A),
+          color: ColorPalette.primary300,
         ),
       ),
     );
