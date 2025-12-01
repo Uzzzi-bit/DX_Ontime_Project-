@@ -41,12 +41,12 @@ class _HomeScreenState extends State<HomeScreen> {
   // TODO: [DB] 금일 영양소 섭취 현황 데이터 로드
   // 영양소 섭취량 (0.0 ~ 100.0 퍼센트) - 리포트 페이지와 영양제 체크 시 증가
   Map<_NutrientType, double> _nutrientProgress = {
-    _NutrientType.iron: 70.0, // 예시: 70% 섭취
-    _NutrientType.vitaminD: 0.0,
-    _NutrientType.folate: 0.0,
-    _NutrientType.omega3: 0.0,
-    _NutrientType.calcium: 0.0,
-    _NutrientType.choline: 0.0,
+    _NutrientType.iron: 70.0, // 철분 기본값
+    _NutrientType.vitaminD: 0.0, // 비타민D 기본값
+    _NutrientType.folate: 0.0, // 엽산 기본값
+    _NutrientType.omega3: 0.0, // 오메가-3 기본값
+    _NutrientType.calcium: 0.0, // 칼슘 기본값
+    _NutrientType.choline: 0.0, // 콜린 기본값
   };
 
   // 영양제 체크리스트 (6개)
@@ -253,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final supplementId = _supplements.firstWhere((s) => s.label == supplementLabel).id;
     final option = _supplements.firstWhere((element) => element.id == supplementId);
     // TODO: [API] 영양제 1알당 함량 정보 GET
-    const double supplementValuePerPill = 10.0; // 영양제 1알당 증가량 (예시)
+    const double supplementValuePerPill = 30.0; // 영양제 1알당 증가량 (예시)
 
     setState(() {
       if (_selectedSupplements.contains(supplementId)) {

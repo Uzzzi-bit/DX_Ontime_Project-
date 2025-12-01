@@ -84,32 +84,41 @@ class NutrientGrid extends StatelessWidget {
         SizedBox(
           width: 55,
           height: 30,
-          child: Stack(
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0F0F0),
-                  borderRadius: BorderRadius.circular(30),
-                ),
-              ),
-              if (clampedProgress > 0)
-                FractionallySizedBox(
-                  widthFactor: clampedProgress / 100.0,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFFFEF493),
-                          Color(0xFFD2ECBF),
-                        ],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(30),
+            child: Stack(
+              children: [
+                // 빈 게이지 배경
+                Container(
+                  width: 55,
+                  height: 30,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF0F0F0),
                   ),
                 ),
-            ],
+                // 채워지는 게이지
+                if (clampedProgress > 0)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FractionallySizedBox(
+                      widthFactor: clampedProgress / 100.0,
+                      heightFactor: 1.0,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(0xFFFEF493),
+                              Color(0xFFD2ECBF),
+                            ],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ],
