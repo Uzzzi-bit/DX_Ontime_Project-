@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../widget/bottom_bar_widget.dart';
+import '../theme/color_palette.dart';
 import 'recipe_pages.dart';
 import 'analysis_pages.dart';
 
@@ -228,7 +229,7 @@ class _ReportScreenState extends State<ReportScreen> {
     final todayText = todayFormat.format(DateTime.now());
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: ColorPalette.bg100,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
@@ -237,7 +238,7 @@ class _ReportScreenState extends State<ReportScreen> {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(
             Icons.arrow_back,
-            color: Color(0xFF1D1B20),
+            color: ColorPalette.text100,
           ),
         ),
         title: Row(
@@ -246,7 +247,7 @@ class _ReportScreenState extends State<ReportScreen> {
             Text(
               '오늘',
               style: TextStyle(
-                color: const Color(0xFF1D1B20),
+                color: ColorPalette.text100,
                 fontSize: 11,
                 fontWeight: FontWeight.w400,
               ),
@@ -254,8 +255,8 @@ class _ReportScreenState extends State<ReportScreen> {
             const SizedBox(width: 4),
             Text(
               todayText,
-              style: const TextStyle(
-                color: Color(0xFF1D1B20),
+              style: TextStyle(
+                color: ColorPalette.text100,
                 fontSize: 22,
                 fontWeight: FontWeight.w400,
                 letterSpacing: 0,
@@ -276,7 +277,7 @@ class _ReportScreenState extends State<ReportScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                   decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFFE8E8E8)),
+                    border: Border.all(color: ColorPalette.bg300),
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: DropdownButton<int>(
@@ -285,7 +286,7 @@ class _ReportScreenState extends State<ReportScreen> {
                     icon: const Icon(
                       Icons.expand_more,
                       size: 16,
-                      color: Color(0xFF2F2F2F),
+                      color: ColorPalette.text200,
                     ),
                     items: List.generate(12, (index) => index + 1)
                         .map(
@@ -294,7 +295,7 @@ class _ReportScreenState extends State<ReportScreen> {
                             child: Text(
                               '$month월',
                               style: const TextStyle(
-                                color: Color(0xFF2F2F2F),
+                                color: ColorPalette.text200,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -315,7 +316,7 @@ class _ReportScreenState extends State<ReportScreen> {
                         onPressed: _goToToday,
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          backgroundColor: const Color(0xFFBCE7F0),
+                          backgroundColor: ColorPalette.primary100,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
@@ -323,7 +324,7 @@ class _ReportScreenState extends State<ReportScreen> {
                         child: const Text(
                           'Today',
                           style: TextStyle(
-                            color: Color(0xFF1D1B20),
+                            color: ColorPalette.text100,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
@@ -335,7 +336,7 @@ class _ReportScreenState extends State<ReportScreen> {
                       onPressed: _selectDate,
                       icon: const Icon(
                         Icons.calendar_today,
-                        color: Color(0xFF2F2F2F),
+                        color: ColorPalette.text200,
                         size: 20,
                       ),
                     ),
@@ -387,9 +388,9 @@ class _ReportScreenState extends State<ReportScreen> {
                             margin: const EdgeInsets.symmetric(horizontal: 2),
                             padding: const EdgeInsets.symmetric(vertical: 6),
                             decoration: BoxDecoration(
-                              color: isSelected ? const Color(0xFFD7F1FF) : Colors.transparent,
+                              color: isSelected ? ColorPalette.primary100.withOpacity(0.3) : Colors.transparent,
                               border: Border.all(
-                                color: isSelected ? const Color(0xFFBCE7F0) : const Color(0xFFE8E8E8),
+                                color: isSelected ? ColorPalette.primary100 : ColorPalette.bg300,
                               ),
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -399,7 +400,7 @@ class _ReportScreenState extends State<ReportScreen> {
                                 Text(
                                   weekdayNames[weekdayIndex],
                                   style: TextStyle(
-                                    color: isSelected ? const Color(0xFF1E1E1E) : const Color(0xFF585555),
+                                    color: isSelected ? ColorPalette.text100 : ColorPalette.text200,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w400,
                                   ),
@@ -408,7 +409,7 @@ class _ReportScreenState extends State<ReportScreen> {
                                 Text(
                                   '${date.day}',
                                   style: TextStyle(
-                                    color: isSelected ? const Color(0xFF1E1E1E) : const Color(0xFF585555),
+                                    color: isSelected ? ColorPalette.text100 : ColorPalette.text200,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -432,13 +433,13 @@ class _ReportScreenState extends State<ReportScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFBFCEF), Color(0xFFF1FAF9)],
+                  gradient: LinearGradient(
+                    colors: [ColorPalette.gradientYellow.withOpacity(0.1), ColorPalette.primary100.withOpacity(0.1)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFF0ECE4)),
+                  border: Border.all(color: ColorPalette.bg300),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -446,7 +447,7 @@ class _ReportScreenState extends State<ReportScreen> {
                     const Text(
                       'AI 추천 식단',
                       style: TextStyle(
-                        color: Color(0xFF000000),
+                        color: ColorPalette.text100,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -455,7 +456,7 @@ class _ReportScreenState extends State<ReportScreen> {
                     Text(
                       '$_userName님, 다음 식사는 $_lackingNutrient 보충을 위해 $_recommendedFood은(는) 어떤가요? 🥗',
                       style: const TextStyle(
-                        color: Color(0xFF000000),
+                        color: ColorPalette.text100,
                         fontSize: 14,
                         fontWeight: FontWeight.w400,
                         height: 1.4,
@@ -484,8 +485,8 @@ class _ReportScreenState extends State<ReportScreen> {
                     return Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE5F5F3),
-                        border: Border.all(color: const Color(0xFFBCE7F0)),
+                        color: ColorPalette.primary100.withOpacity(0.2),
+                        border: Border.all(color: ColorPalette.primary100),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
@@ -495,7 +496,7 @@ class _ReportScreenState extends State<ReportScreen> {
                           Text(
                             slot.name,
                             style: const TextStyle(
-                              color: Color(0xFF1D1B20),
+                              color: ColorPalette.text100,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
@@ -504,7 +505,7 @@ class _ReportScreenState extends State<ReportScreen> {
                           Text(
                             '${slot.current.toInt()}/${slot.target.toInt()}mg',
                             style: const TextStyle(
-                              color: Color(0xFF1D1B20),
+                              color: ColorPalette.text100,
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
@@ -514,7 +515,7 @@ class _ReportScreenState extends State<ReportScreen> {
                           Container(
                             height: 4,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE0E0E0),
+                              color: ColorPalette.bg200,
                               borderRadius: BorderRadius.circular(2),
                             ),
                             child: FractionallySizedBox(
@@ -522,7 +523,7 @@ class _ReportScreenState extends State<ReportScreen> {
                               widthFactor: (slot.percent / 100).clamp(0.0, 1.0),
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF5BB5C8),
+                                  color: ColorPalette.primary200,
                                   borderRadius: BorderRadius.circular(2),
                                 ),
                               ),
@@ -551,7 +552,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   child: Text(
                     '${_selectedWeekDate.month}월 ${_selectedWeekDate.day}일에는 아직 섭취한 영양소가 없습니다.',
                     style: const TextStyle(
-                      color: Color(0xFF49454F),
+                      color: ColorPalette.text200,
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
                     ),
@@ -566,7 +567,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   child: Text(
                     '오늘 아직 섭취한 영양소가 없습니다.',
                     style: TextStyle(
-                      color: Color(0xFF49454F),
+                      color: ColorPalette.text200,
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
                     ),
@@ -622,13 +623,13 @@ class _ReportScreenState extends State<ReportScreen> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: meal.hasRecord
-              ? [const Color(0xFFFBFCEF), const Color(0xFFF1FAF9)]
-              : [const Color(0xFFF9FADE).withOpacity(0.5), const Color(0xFFE2F4F3).withOpacity(0.5)],
+              ? [ColorPalette.gradientYellow.withOpacity(0.1), ColorPalette.primary100.withOpacity(0.1)]
+              : [ColorPalette.gradientYellow.withOpacity(0.05), ColorPalette.primary100.withOpacity(0.05)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFF0ECE4)),
+        border: Border.all(color: ColorPalette.bg300),
       ),
       child: Stack(
         children: [
@@ -640,9 +641,9 @@ class _ReportScreenState extends State<ReportScreen> {
                   height: 100,
                   margin: const EdgeInsets.only(right: 16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFECE6F0),
+                    color: ColorPalette.bg200,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFCAC4D0)),
+                    border: Border.all(color: ColorPalette.bg300),
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
@@ -682,13 +683,13 @@ class _ReportScreenState extends State<ReportScreen> {
                             Icon(
                               Icons.add_circle,
                               size: 20,
-                              color: Color(0xFF1D1B20),
+                              color: ColorPalette.text100,
                             ),
                             SizedBox(width: 4),
                             Text(
                               '기록하기',
                               style: TextStyle(
-                                color: Color(0xFF1D1B20),
+                                color: ColorPalette.text100,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w400,
                                 letterSpacing: 0.25,

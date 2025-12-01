@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+// ✅ intl: 한국어 날짜 포맷용
+import 'package:intl/date_symbol_data_local.dart';
+
 import 'firebase_options.dart';
 import 'theme/app_theme.dart';
 
@@ -19,6 +22,9 @@ import 'page/setting_pages.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ✅ 한국어 날짜/요일 로케일 초기화 (여기가 추가된 부분)
+  await initializeDateFormatting('ko_KR', null);
 
   // 🔹 Firebase 초기화
   await Firebase.initializeApp(

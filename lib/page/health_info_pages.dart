@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../widget/bottom_bar_widget.dart';
+import '../theme/color_palette.dart';
 
 class HealthInfoScreen extends StatefulWidget {
   const HealthInfoScreen({super.key});
@@ -104,7 +105,7 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: ColorPalette.bg200,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         leading: IconButton(
@@ -121,10 +122,10 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
           '건강 정보 입력',
           style: theme.textTheme.bodyMedium,
         ),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor: ColorPalette.bg100,
+        surfaceTintColor: ColorPalette.bg100,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Color(0xFF1E1E1E)),
+        iconTheme: IconThemeData(color: ColorPalette.text100),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -136,14 +137,14 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
                 '건강 정보 입력',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFF1D1B20),
+                  color: ColorPalette.text100,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 '정확한 추천을 위해 아래 정보를 입력해 주세요.',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF49454F),
+                  color: ColorPalette.text200,
                 ),
               ),
               const SizedBox(height: 24),
@@ -196,8 +197,8 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
                   onPressed: _handleSave,
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: const Color(0xFF5BB5C8),
-                    foregroundColor: Colors.white,
+                    backgroundColor: ColorPalette.primary200,
+                    foregroundColor: ColorPalette.bg100,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -226,7 +227,7 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
         value: options.contains(value) ? value : null,
         decoration: InputDecoration(
           filled: true,
-          fillColor: const Color(0xFFF7F2FA),
+          fillColor: ColorPalette.bg200,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
@@ -259,7 +260,7 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
         keyboardType: TextInputType.number,
         decoration: InputDecoration(
           filled: true,
-          fillColor: const Color(0xFFF7F2FA),
+          fillColor: ColorPalette.bg200,
           suffixText: suffixText,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
@@ -279,7 +280,7 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
     return _SectionCard(
       label: '출산 예정일',
       child: ListTile(
-        tileColor: const Color(0xFFF7F2FA),
+        tileColor: ColorPalette.bg200,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         title: Text(dateText),
@@ -313,7 +314,7 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
           setState(() => _hasGestationalDiabetes = value);
         },
         title: const Text('현재 임신성 당뇨 진단을 받으셨나요?'),
-        tileColor: const Color(0xFFF7F2FA),
+        tileColor: ColorPalette.bg200,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16),
       ),
@@ -340,8 +341,8 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
                   }
                 });
               },
-              selectedColor: const Color(0xFF5BB5C8).withOpacity(0.15),
-              checkmarkColor: const Color(0xFF5BB5C8),
+              selectedColor: ColorPalette.primary200.withOpacity(0.15),
+              checkmarkColor: ColorPalette.primary200,
             ),
           ActionChip(
             avatar: const Icon(Icons.add, size: 16),
