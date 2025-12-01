@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../widget/bottom_bar_widget.dart';
 
@@ -38,27 +39,43 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
   DateTime? _expectedDueDate = DateTime.now().add(const Duration(days: 120));
   final Set<String> _selectedAllergies = {'우유', '땅콩'};
 
-  /// 🔹 저장 버튼 눌렀을 때 Firestore에 쓰는 함수
+  @override
+  void dispose() {
+    _heightController.dispose();
+    _weightController.dispose();
+    super.dispose();
+  }
+
+  // 🔹 저장 버튼 눌렀을 때 Firestore에 쓰기
   Future<void> _handleSave() async {
-    final birthYear = _selectedBirthYear != null ? int.tryParse(_selectedBirthYear!) : null;
-    final height = double.tryParse(_heightController.text.trim());
-    final weight = double.tryParse(_weightController.text.trim());
-    final pregWeek = _selectedWeek;
-    final dueDate = _expectedDueDate;
-
-    if (birthYear == null || height == null || weight == null || dueDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('필수 정보를 모두 입력해 주세요.')),
-      );
-      return;
-    }
-
-    final allergies = _selectedAllergies.toList();
-
     try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('로그인 정보가 없습니다.')),
+        );
+        return;
+      }
+      final uid = user.uid;
+
+      final birthYear = _selectedBirthYear != null ? int.tryParse(_selectedBirthYear!) : null;
+      final height = double.tryParse(_heightController.text.trim());
+      final weight = double.tryParse(_weightController.text.trim());
+      final pregWeek = _selectedWeek;
+      final dueDate = _expectedDueDate;
+
+      if (birthYear == null || height == null || weight == null || dueDate == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('필수 정보를 모두 입력해 주세요.')),
+        );
+        return;
+      }
+
+      final allergies = _selectedAllergies.toList();
+
       await FirebaseFirestore.instance
-          .collection('PREGNANCY') // 컬렉션 이름
-          .doc('member_id') // 콘솔에서 보고 있는 문서 ID
+          .collection('PREGNANCY')
+          .doc(uid) // 👈 로그인한 사용자 기준으로 한 명당 한 문서
           .set({
             'birthYear': birthYear,
             'heightCm': height,
@@ -80,13 +97,6 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
         SnackBar(content: Text('저장 실패: $e')),
       );
     }
-  }
-
-  @override
-  void dispose() {
-    _heightController.dispose();
-    _weightController.dispose();
-    super.dispose();
   }
 
   @override
@@ -142,9 +152,11 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
                 value: _selectedBirthYear,
                 hint: '연도를 선택하세요',
                 options: _birthYears,
-                onChanged: (value) => setState(() {
-                  _selectedBirthYear = value;
-                }),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedBirthYear = value;
+                  });
+                },
               ),
               const SizedBox(height: 24),
               _buildNumberField(
@@ -168,7 +180,9 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
                 options: _pregnancyWeeks.map((w) => '$w주차').toList(),
                 onChanged: (value) {
                   if (value == null) return;
-                  setState(() => _selectedWeek = int.parse(value.replaceAll('주차', '')));
+                  setState(() {
+                    _selectedWeek = int.parse(value.replaceAll('주차', ''));
+                  });
                 },
               ),
               const SizedBox(height: 24),
@@ -198,8 +212,6 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
       bottomNavigationBar: const BottomBarWidget(currentRoute: '/healthinfo'),
     );
   }
-
-  // ===== 아래는 전부 UI 헬퍼 위젯들 =====
 
   Widget _buildDropdownSection({
     required String label,
@@ -282,7 +294,9 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
               lastDate: today.add(const Duration(days: 365)),
             );
             if (picked != null) {
-              setState(() => _expectedDueDate = picked);
+              setState(() {
+                _expectedDueDate = picked;
+              });
             }
           },
         ),
@@ -295,7 +309,9 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
       label: '임신성 당뇨 여부',
       child: SwitchListTile.adaptive(
         value: _hasGestationalDiabetes,
-        onChanged: (value) => setState(() => _hasGestationalDiabetes = value),
+        onChanged: (value) {
+          setState(() => _hasGestationalDiabetes = value);
+        },
         title: const Text('현재 임신성 당뇨 진단을 받으셨나요?'),
         tileColor: const Color(0xFFF7F2FA),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

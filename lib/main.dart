@@ -1,28 +1,35 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:prototype/firebase_options.dart';
-import 'package:prototype/page/add_family_pages.dart';
-import 'package:prototype/page/analysis_pages.dart';
-import 'package:prototype/page/health_info_pages.dart';
-import 'package:prototype/page/mom_care_setting_pages.dart';
-import 'package:prototype/page/recipe_pages.dart';
-import 'package:prototype/theme/app_theme.dart';
-import 'page/report_pages.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'firebase_options.dart';
+import 'theme/app_theme.dart';
+
+// 페이지들
 import 'page/home_pages.dart';
 import 'page/chat_pages.dart';
+import 'page/report_pages.dart';
+import 'page/analysis_pages.dart';
+import 'page/recipe_pages.dart';
+import 'page/mom_care_setting_pages.dart';
+import 'page/health_info_pages.dart';
+import 'page/add_family_pages.dart';
 import 'page/setting_pages.dart';
-import 'package:intl/date_symbol_data_local.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 🔹 Firebase 초기화
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // 🔹 임시로 익명 로그인 (회원가입 붙이기 전까지)
   final auth = FirebaseAuth.instance;
   if (auth.currentUser == null) {
     await auth.signInAnonymously();
   }
+
   runApp(const HealthApp());
 }
 
