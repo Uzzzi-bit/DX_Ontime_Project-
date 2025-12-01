@@ -8,16 +8,19 @@ environment:
   sdk: ^3.9.2
 
 dependencies:
+<<<<<<< HEAD
   http: ^1.2.0
+=======
+  flutter:
+    sdk: flutter
+>>>>>>> c3296640bfe3d1c4ba09705977e329fafc15c91a
   firebase_core: ^3.6.0
   firebase_auth: ^5.3.1
   cloud_firestore: ^5.4.4
-  flutter:
-    sdk: flutter
   cupertino_icons: ^1.0.8
   intl: ^0.19.0
   image_picker: ^1.0.7
-  
+  google_generative_ai: ^0.4.0 # 버전은 pub.dev 보고 가장 최신으로 맞추기
 
 dev_dependencies:
   flutter_test:

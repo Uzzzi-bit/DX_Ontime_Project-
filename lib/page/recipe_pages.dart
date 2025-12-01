@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widget/bottom_bar_widget.dart';
+import '../theme/color_palette.dart';
 import 'oven_pages.dart';
 
 // [API] 실제 서버 응답과 유사한 형태의 데이터 모델
@@ -142,7 +143,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
     final selectedRecipe = _recipes[_selectedMenuIndex];
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: ColorPalette.bg100,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
@@ -151,13 +152,13 @@ class _RecipeScreenState extends State<RecipeScreen> {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(
             Icons.arrow_back,
-            color: Color(0xFF0F0F0F),
+            color: ColorPalette.text100,
           ),
         ),
         title: const Text(
           'AI 추천식단',
           style: TextStyle(
-            color: Color(0xFF0F0F0F),
+            color: ColorPalette.text100,
             fontSize: 20,
             fontWeight: FontWeight.w500,
             letterSpacing: 0.5,
@@ -176,7 +177,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                 _getRecommendationMessage(),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  color: Color(0xFF0F0F0F),
+                  color: ColorPalette.text100,
                   fontSize: 20,
                   fontWeight: FontWeight.w500,
                   letterSpacing: 0.5,
@@ -201,9 +202,9 @@ class _RecipeScreenState extends State<RecipeScreen> {
                       margin: const EdgeInsets.symmetric(horizontal: 4),
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: isSelected ? const Color(0xFFBCE7F0) : Colors.white,
+                        color: isSelected ? ColorPalette.primary100 : ColorPalette.bg100,
                         border: Border.all(
-                          color: isSelected ? const Color(0xFFBCE7F0) : const Color(0xFFBCE7F0).withOpacity(0.5),
+                          color: isSelected ? ColorPalette.primary100 : ColorPalette.primary100.withOpacity(0.5),
                         ),
                         borderRadius: BorderRadius.circular(23),
                       ),
@@ -211,7 +212,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                         recipe.title,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: const Color(0xFF636363),
+                          color: ColorPalette.text200,
                           fontSize: 9.5,
                           fontWeight: FontWeight.w500,
                           letterSpacing: 0.5,
@@ -241,7 +242,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                       child: Text(
                         '메뉴 사진',
                         style: TextStyle(
-                          color: Color(0xFF000000),
+                          color: ColorPalette.text100,
                           fontSize: 9.5,
                           fontWeight: FontWeight.w500,
                         ),
@@ -257,7 +258,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFFF0ECE4)),
+                border: Border.all(color: ColorPalette.bg300),
                 borderRadius: BorderRadius.circular(11),
               ),
               child: Column(
@@ -266,7 +267,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                   const Text(
                     '레시피',
                     style: TextStyle(
-                      color: Color(0xFF0F0F0F),
+                      color: ColorPalette.text100,
                       fontSize: 9.5,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.5,
@@ -276,7 +277,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                   Text(
                     selectedRecipe.fullTitle,
                     style: const TextStyle(
-                      color: Color(0xFF0F0F0F),
+                      color: ColorPalette.text100,
                       fontSize: 15,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.5,
@@ -291,7 +292,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFFF0ECE4)),
+                border: Border.all(color: ColorPalette.bg300),
                 borderRadius: BorderRadius.circular(11),
               ),
               child: Column(
@@ -300,7 +301,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                   const Text(
                     '재료',
                     style: TextStyle(
-                      color: Color(0xFF0F0F0F),
+                      color: ColorPalette.text100,
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
                       letterSpacing: 0.5,
@@ -313,7 +314,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                       child: Text(
                         '• $ingredient',
                         style: const TextStyle(
-                          color: Color(0xFF0F0F0F),
+                          color: ColorPalette.text100,
                           fontSize: 14,
                           fontWeight: FontWeight.w400,
                         ),
@@ -329,7 +330,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFFF0ECE4)),
+                border: Border.all(color: ColorPalette.bg300),
                 borderRadius: BorderRadius.circular(11),
               ),
               child: Column(
@@ -338,7 +339,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                   const Text(
                     '조리 방법',
                     style: TextStyle(
-                      color: Color(0xFF0F0F0F),
+                      color: ColorPalette.text100,
                       fontSize: 10,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.5,
@@ -351,7 +352,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                       child: Text(
                         step,
                         style: const TextStyle(
-                          color: Color(0xFF0F0F0F),
+                          color: ColorPalette.text100,
                           fontSize: 14,
                           fontWeight: FontWeight.w400,
                           height: 1.4,
@@ -408,7 +409,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                   child: const Text(
                     '광파오븐으로 보내기',
                     style: TextStyle(
-                      color: Color(0xFF5BB5C8),
+                      color: ColorPalette.primary200,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                       letterSpacing: 0.5,

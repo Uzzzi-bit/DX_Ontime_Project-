@@ -16,7 +16,7 @@ class _MomCareSettingScreenState extends State<MomCareSettingScreen> {
   static const _secondaryText = ColorPalette.textSecondary;
   static const _surface = ColorPalette.surface;
   static const _background = ColorPalette.background;
-  static const _accent = ColorPalette.primary200;
+  static const _accent = ColorPalette.primary300;
 
   final List<_MomCareMenuItem> _menuItems = const [
     _MomCareMenuItem(
@@ -143,7 +143,7 @@ class _MomCareSettingScreenState extends State<MomCareSettingScreen> {
               children: [
                 Icon(
                   Icons.child_friendly_outlined,
-                  color: _accent,
+                  color: ColorPalette.primary300,
                   size: 32,
                 ),
                 const SizedBox(width: 16),

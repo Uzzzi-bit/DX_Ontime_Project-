@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../theme/color_palette.dart';
 
 enum _AnalysisStep { capture, analyzingImage, reviewFoods, nutrientAnalysis }
 
@@ -121,7 +122,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: ColorPalette.bg200,
       appBar: AppBar(
         title: const Text('식단 분석'),
         leading: IconButton(
@@ -208,15 +209,15 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             const SizedBox(height: 16),
             LinearProgressIndicator(
               minHeight: 8,
-              backgroundColor: const Color(0xFFE0E0E0),
-              valueColor: const AlwaysStoppedAnimation(Color(0xFF5BB5C8)),
+              backgroundColor: ColorPalette.bg200,
+              valueColor: const AlwaysStoppedAnimation(ColorPalette.primary200),
             ),
             const SizedBox(height: 32),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFFE5F5F3),
+                color: ColorPalette.primary100.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Text(
@@ -264,13 +265,13 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     final placeholder = Container(
       height: 200,
       decoration: BoxDecoration(
-        color: const Color(0xFFEAEAEA),
+        color: ColorPalette.bg200,
         borderRadius: BorderRadius.circular(16),
       ),
       child: const Center(
         child: Text(
           '음식 사진을 추가해 주세요',
-          style: TextStyle(color: Color(0xFF7A7A7A)),
+          style: TextStyle(color: ColorPalette.text200),
         ),
       ),
     );
@@ -294,7 +295,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.6),
+                color: ColorPalette.bg100.withOpacity(0.6),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Center(
@@ -326,7 +327,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 decoration: const InputDecoration(
                   hintText: '음식명을 입력하세요',
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: ColorPalette.bg100,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.all(Radius.circular(12)),
                     borderSide: BorderSide.none,
@@ -343,10 +344,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF5BB5C8),
+                  color: ColorPalette.primary200,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.add, color: Colors.white),
+                child: const Icon(Icons.add, color: ColorPalette.bg100),
               ),
             ),
           ],
@@ -361,13 +362,13 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 32),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: ColorPalette.bg100,
           borderRadius: BorderRadius.circular(16),
         ),
         child: const Center(
           child: Text(
             '추가된 음식이 없습니다.',
-            style: TextStyle(color: Color(0xFF7A7A7A)),
+            style: TextStyle(color: ColorPalette.text200),
           ),
         ),
       );
@@ -428,7 +429,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               },
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 16),
-          backgroundColor: const Color(0xFF5BB5C8),
+          backgroundColor: ColorPalette.primary200,
         ),
         child: Text(
           buttonLabel,
@@ -456,7 +457,7 @@ class _FoodDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: const Color(0xFFF7F7F7),
+      backgroundColor: ColorPalette.bg200,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -516,7 +517,7 @@ class _ConfirmDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: const Color(0xFFF7F7F7),
+      backgroundColor: ColorPalette.bg200,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(20),

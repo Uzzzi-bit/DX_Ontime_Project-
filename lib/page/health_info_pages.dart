@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 
 import 'package:prototype/api_config.dart';
 import '../widget/bottom_bar_widget.dart';
+import '../theme/color_palette.dart';
 
 class HealthInfoScreen extends StatefulWidget {
   const HealthInfoScreen({super.key});
@@ -204,7 +205,7 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: ColorPalette.bg200,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         leading: IconButton(
@@ -221,12 +222,13 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
           '건강 정보 입력',
           style: theme.textTheme.bodyMedium,
         ),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor: ColorPalette.bg100,
+        surfaceTintColor: ColorPalette.bg100,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Color(0xFF1E1E1E)),
+        iconTheme: IconThemeData(color: ColorPalette.text100),
       ),
       body: SafeArea(
+<<<<<<< HEAD
         child: Stack(
           children: [
             SingleChildScrollView(
@@ -239,6 +241,81 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: const Color(0xFF1D1B20),
+=======
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '건강 정보 입력',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: ColorPalette.text100,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '정확한 추천을 위해 아래 정보를 입력해 주세요.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: ColorPalette.text200,
+                ),
+              ),
+              const SizedBox(height: 24),
+              _buildDropdownSection(
+                label: '출생연도',
+                value: _selectedBirthYear,
+                hint: '연도를 선택하세요',
+                options: _birthYears,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedBirthYear = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 24),
+              _buildNumberField(
+                label: '키',
+                controller: _heightController,
+                suffixText: 'cm',
+              ),
+              const SizedBox(height: 16),
+              _buildNumberField(
+                label: '몸무게',
+                controller: _weightController,
+                suffixText: 'kg',
+              ),
+              const SizedBox(height: 24),
+              _buildDatePickerCard(context),
+              const SizedBox(height: 24),
+              _buildDropdownSection(
+                label: '임신 주차',
+                value: '$_selectedWeek주차',
+                hint: null,
+                options: _pregnancyWeeks.map((w) => '$w주차').toList(),
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() {
+                    _selectedWeek = int.parse(value.replaceAll('주차', ''));
+                  });
+                },
+              ),
+              const SizedBox(height: 24),
+              _buildSwitchSection(),
+              const SizedBox(height: 24),
+              _buildAllergySection(theme),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _handleSave,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: ColorPalette.primary200,
+                    foregroundColor: ColorPalette.bg100,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+>>>>>>> c3296640bfe3d1c4ba09705977e329fafc15c91a
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -339,7 +416,7 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
         value: options.contains(value) ? value : null,
         decoration: InputDecoration(
           filled: true,
-          fillColor: const Color(0xFFF7F2FA),
+          fillColor: ColorPalette.bg200,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
@@ -375,7 +452,7 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
         keyboardType: TextInputType.number,
         decoration: InputDecoration(
           filled: true,
-          fillColor: const Color(0xFFF7F2FA),
+          fillColor: ColorPalette.bg200,
           suffixText: suffixText,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
@@ -398,10 +475,15 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
     return _SectionCard(
       label: '출산 예정일',
       child: ListTile(
+<<<<<<< HEAD
         tileColor: const Color(0xFFF7F2FA),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
+=======
+        tileColor: ColorPalette.bg200,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+>>>>>>> c3296640bfe3d1c4ba09705977e329fafc15c91a
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         title: Text(dateText),
         trailing: IconButton(
@@ -434,10 +516,15 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
           setState(() => _hasGestationalDiabetes = value);
         },
         title: const Text('현재 임신성 당뇨 진단을 받으셨나요?'),
+<<<<<<< HEAD
         tileColor: const Color(0xFFF7F2FA),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
+=======
+        tileColor: ColorPalette.bg200,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+>>>>>>> c3296640bfe3d1c4ba09705977e329fafc15c91a
         contentPadding: const EdgeInsets.symmetric(horizontal: 16),
       ),
     );
@@ -463,8 +550,8 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
                   }
                 });
               },
-              selectedColor: const Color(0xFF5BB5C8).withOpacity(0.15),
-              checkmarkColor: const Color(0xFF5BB5C8),
+              selectedColor: ColorPalette.primary200.withOpacity(0.15),
+              checkmarkColor: ColorPalette.primary200,
             ),
           ActionChip(
             avatar: const Icon(Icons.add, size: 16),

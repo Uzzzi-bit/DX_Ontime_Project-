@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/color_palette.dart';
 
 enum _OvenMode {
   grilling, // 구이
@@ -129,7 +130,7 @@ class _OvenScreenState extends State<OvenScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: ColorPalette.bg100,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
@@ -138,13 +139,13 @@ class _OvenScreenState extends State<OvenScreen> {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(
             Icons.arrow_back,
-            color: Color(0xFF0F0F0F),
+            color: ColorPalette.text100,
           ),
         ),
         title: const Text(
           '광파오븐',
           style: TextStyle(
-            color: Color(0xFF0F0F0F),
+            color: ColorPalette.text100,
             fontSize: 36,
             fontWeight: FontWeight.w900,
             letterSpacing: 0.5,
@@ -174,7 +175,7 @@ class _OvenScreenState extends State<OvenScreen> {
                           Text(
                             _getModeText(_currentMode),
                             style: const TextStyle(
-                              color: Color(0xFF0F0F0F),
+                              color: ColorPalette.text100,
                               fontSize: 24,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 0.5,
@@ -184,7 +185,7 @@ class _OvenScreenState extends State<OvenScreen> {
                           const Icon(
                             Icons.arrow_forward_ios,
                             size: 16,
-                            color: Color(0xFF0F0F0F),
+                            color: ColorPalette.text100,
                           ),
                         ],
                       ),
@@ -197,8 +198,8 @@ class _OvenScreenState extends State<OvenScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: const Color(0xFFE8E8E8)),
+                    color: ColorPalette.bg100,
+                    border: Border.all(color: ColorPalette.bg300),
                     borderRadius: BorderRadius.circular(11),
                   ),
                   child: Column(
@@ -207,7 +208,7 @@ class _OvenScreenState extends State<OvenScreen> {
                       const Text(
                         '요리 시간',
                         style: TextStyle(
-                          color: Color(0xFF0F0F0F),
+                          color: ColorPalette.text100,
                           fontSize: 15,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 0.5,
@@ -219,7 +220,7 @@ class _OvenScreenState extends State<OvenScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: ColorPalette.bg100,
                           border: Border.all(color: const Color(0xFFE8E8E8)),
                           borderRadius: BorderRadius.circular(11),
                         ),
@@ -233,7 +234,7 @@ class _OvenScreenState extends State<OvenScreen> {
                                 child: Text(
                                   '${(_minutes - 1).clamp(0, 99)}',
                                   style: const TextStyle(
-                                    color: Color(0xFF000000),
+                                    color: ColorPalette.text100,
                                     fontSize: 20,
                                     fontWeight: FontWeight.w400,
                                   ),
@@ -266,7 +267,7 @@ class _OvenScreenState extends State<OvenScreen> {
                                 child: Text(
                                   '${(_minutes + 1).clamp(0, 99)}',
                                   style: const TextStyle(
-                                    color: Color(0xFF000000),
+                                    color: ColorPalette.text100,
                                     fontSize: 20,
                                     fontWeight: FontWeight.w400,
                                   ),
@@ -282,7 +283,7 @@ class _OvenScreenState extends State<OvenScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: ColorPalette.bg100,
                           border: Border.all(color: const Color(0xFFE8E8E8)),
                           borderRadius: BorderRadius.circular(11),
                         ),
@@ -296,7 +297,7 @@ class _OvenScreenState extends State<OvenScreen> {
                                 child: Text(
                                   '${(_seconds - 1).clamp(0, 59)}',
                                   style: const TextStyle(
-                                    color: Color(0xFF000000),
+                                    color: ColorPalette.text100,
                                     fontSize: 20,
                                     fontWeight: FontWeight.w400,
                                   ),
@@ -329,7 +330,7 @@ class _OvenScreenState extends State<OvenScreen> {
                                 child: Text(
                                   '${(_seconds + 1).clamp(0, 59)}',
                                   style: const TextStyle(
-                                    color: Color(0xFF000000),
+                                    color: ColorPalette.text100,
                                     fontSize: 20,
                                     fontWeight: FontWeight.w400,
                                   ),
@@ -386,7 +387,7 @@ class _OvenScreenState extends State<OvenScreen> {
           if (_isSent)
             Positioned.fill(
               child: Container(
-                color: Colors.white.withOpacity(0.95),
+                color: ColorPalette.bg100.withOpacity(0.95),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -400,9 +401,9 @@ class _OvenScreenState extends State<OvenScreen> {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            const Color(0xFFD2ECBF).withOpacity(0.5),
-                            const Color(0xFFC7E9D7).withOpacity(0.5),
-                            const Color(0xFFBCE7F0).withOpacity(0.5),
+                            ColorPalette.gradientGreen.withOpacity(0.5),
+                            ColorPalette.gradientGreenMid.withOpacity(0.5),
+                            ColorPalette.primary100.withOpacity(0.5),
                           ],
                         ),
                       ),
@@ -413,7 +414,7 @@ class _OvenScreenState extends State<OvenScreen> {
                             Text(
                               '전송 완료',
                               style: TextStyle(
-                                color: Color(0xFF0F0F0F),
+                                color: ColorPalette.text100,
                                 fontSize: 20,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: 0.5,
@@ -424,7 +425,7 @@ class _OvenScreenState extends State<OvenScreen> {
                               '오븐에서 \'시작\' 버튼을 누르세요.',
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: Color(0xFF0F0F0F),
+                                color: ColorPalette.text100,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
                                 letterSpacing: 0.5,
@@ -445,7 +446,7 @@ class _OvenScreenState extends State<OvenScreen> {
                             child: Text(
                               widget.recipeName,
                               style: const TextStyle(
-                                color: Color(0xFF0F0F0F),
+                                color: ColorPalette.text100,
                                 fontSize: 20,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: 0.5,
@@ -477,7 +478,7 @@ class _OvenScreenState extends State<OvenScreen> {
                         child: const Text(
                           '전송 취소',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: ColorPalette.bg100,
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
                             letterSpacing: 0.5,
@@ -494,4 +495,3 @@ class _OvenScreenState extends State<OvenScreen> {
     );
   }
 }
-

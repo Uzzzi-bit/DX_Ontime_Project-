@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../theme/color_palette.dart';
 
 class ChatMessage {
   final bool isUser;
@@ -184,12 +185,12 @@ class _ChatScreenState extends State<ChatScreen> {
           onPressed: () {
             Navigator.pushReplacementNamed(context, '/');
           },
-          icon: const Icon(Icons.keyboard_backspace, color: Color(0xFF000000)),
+          icon: const Icon(Icons.keyboard_backspace, color: ColorPalette.text100),
         ),
         title: const Text(
           '먹어도 되나요?',
           style: TextStyle(
-            color: Color(0xFF000000),
+            color: ColorPalette.text100,
             fontSize: 20,
             fontWeight: FontWeight.w500,
             letterSpacing: 0.5,
@@ -198,17 +199,18 @@ class _ChatScreenState extends State<ChatScreen> {
         centerTitle: true,
       ),
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: SweepGradient(
-            center: Alignment.center,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
-              Color(0xFFE2F4EC),
-              Color(0xFFE7F6F9),
-              Color(0xFFE5F5F3),
-              Color(0xFFE1F3E8),
-              Color(0xFFDDF1DC),
+              ColorPalette.primary100.withOpacity(0.15),
+              ColorPalette.gradientGreenMid.withOpacity(0.12),
+              ColorPalette.primary100.withOpacity(0.18),
+              ColorPalette.gradientGreen.withOpacity(0.1),
+              ColorPalette.primary100.withOpacity(0.15),
             ],
-            stops: [0.0, 0.27, 0.39, 0.60, 0.81],
+            stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
           ),
         ),
         child: SafeArea(
@@ -230,10 +232,7 @@ class _ChatScreenState extends State<ChatScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: const BoxDecoration(
-                  color: Colors.white,
-                  border: Border(
-                    top: BorderSide(color: Color(0xFFF0ECE4), width: 1),
-                  ),
+                  color: Colors.transparent,
                 ),
                 child: SafeArea(
                   child: Row(
@@ -245,12 +244,12 @@ class _ChatScreenState extends State<ChatScreen> {
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF5F5F5),
+                            color: ColorPalette.bg200,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Icon(
                             Icons.add,
-                            color: Color(0xFF0F0F0F),
+                            color: ColorPalette.text100,
                             size: 24,
                           ),
                         ),
@@ -260,16 +259,16 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: ColorPalette.bg100,
                             borderRadius: BorderRadius.circular(27.5),
-                            border: Border.all(color: const Color(0xFFF0ECE4)),
+                            border: Border.all(color: ColorPalette.bg300),
                           ),
                           child: TextField(
                             controller: _textController,
                             decoration: const InputDecoration(
                               hintText: '궁금한 음식/약을 물어보세요',
                               hintStyle: TextStyle(
-                                color: Color(0xFFDADADA),
+                                color: ColorPalette.text300,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
                                 letterSpacing: 0.5,
@@ -278,7 +277,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             ),
                             style: const TextStyle(
                               fontSize: 14,
-                              color: Color(0xFF0F0F0F),
+                              color: ColorPalette.text100,
                             ),
                             maxLines: null,
                             textInputAction: TextInputAction.send,
@@ -295,11 +294,11 @@ class _ChatScreenState extends State<ChatScreen> {
                           height: 28,
                           decoration: const BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Color(0xFFBCE7F0),
+                            color: ColorPalette.primary100,
                           ),
                           child: const Icon(
                             Icons.send,
-                            color: Color(0xFF0F0F0F),
+                            color: ColorPalette.text100,
                             size: 16,
                           ),
                         ),
@@ -349,7 +348,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 constraints: const BoxConstraints(maxWidth: 250),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEEEEEE),
+                  color: ColorPalette.bg200,
                   borderRadius: BorderRadius.circular(message.imagePath != null ? 10 : 25),
                 ),
                 child: Text(
@@ -357,7 +356,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w300,
-                    color: Color(0xFF000000),
+                    color: ColorPalette.text100,
                     letterSpacing: 0.5,
                     height: 1.2,
                   ),
@@ -404,7 +403,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w300,
-                    color: isLoading ? const Color(0xFF999999) : const Color(0xFF000000),
+                    color: isLoading ? ColorPalette.text300 : ColorPalette.text100,
                     letterSpacing: 0.5,
                     height: 1.3,
                   ),
