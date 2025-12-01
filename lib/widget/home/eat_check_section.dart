@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -7,11 +8,46 @@ class EatCheckSection extends StatelessWidget {
     required this.controller,
     required this.onSubmit,
     required this.onImageSelected,
+    this.selectedImagePath,
+    this.onRemoveImage,
   });
 
   final TextEditingController controller;
   final VoidCallback onSubmit;
   final ValueChanged<XFile> onImageSelected;
+  final String? selectedImagePath;
+  final VoidCallback? onRemoveImage;
+
+  Widget _buildImagePreview(String imagePath) {
+    try {
+      final file = File(imagePath);
+      if (!file.existsSync()) {
+        return _buildErrorWidget();
+      }
+      return Image.file(
+        file,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildErrorWidget();
+        },
+      );
+    } catch (e) {
+      return _buildErrorWidget();
+    }
+  }
+
+  Widget _buildErrorWidget() {
+    return Container(
+      width: double.infinity,
+      height: 200,
+      color: Colors.grey[300],
+      child: const Icon(
+        Icons.broken_image,
+        size: 50,
+        color: Colors.grey,
+      ),
+    );
+  }
 
   void _showImagePicker(BuildContext context) {
     showModalBottomSheet(
@@ -25,12 +61,25 @@ class EatCheckSection extends StatelessWidget {
               title: const Text('카메라로 촬영'),
               onTap: () async {
                 Navigator.pop(context);
-                final ImagePicker picker = ImagePicker();
-                final XFile? image = await picker.pickImage(
-                  source: ImageSource.camera,
-                );
-                if (image != null) {
-                  onImageSelected(image);
+                try {
+                  final ImagePicker picker = ImagePicker();
+                  // 미리보기용으로는 품질을 낮추지 않고 원본을 사용 (전송 시 원본 화질 유지)
+                  final XFile? image = await picker.pickImage(
+                    source: ImageSource.camera,
+                    // imageQuality를 설정하지 않아 원본 화질 유지
+                  );
+                  if (image != null && context.mounted) {
+                    onImageSelected(image);
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('카메라 오류: ${e.toString()}'),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
                 }
               },
             ),
@@ -39,12 +88,25 @@ class EatCheckSection extends StatelessWidget {
               title: const Text('앨범에서 선택'),
               onTap: () async {
                 Navigator.pop(context);
-                final ImagePicker picker = ImagePicker();
-                final XFile? image = await picker.pickImage(
-                  source: ImageSource.gallery,
-                );
-                if (image != null) {
-                  onImageSelected(image);
+                try {
+                  final ImagePicker picker = ImagePicker();
+                  // 미리보기용으로는 품질을 낮추지 않고 원본을 사용 (전송 시 원본 화질 유지)
+                  final XFile? image = await picker.pickImage(
+                    source: ImageSource.gallery,
+                    // imageQuality를 설정하지 않아 원본 화질 유지
+                  );
+                  if (image != null && context.mounted) {
+                    onImageSelected(image);
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('앨범 오류: ${e.toString()}'),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
                 }
               },
             ),
@@ -71,6 +133,46 @@ class EatCheckSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
+        // 선택된 이미지 미리보기
+        if (selectedImagePath != null) ...[
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 200,
+                    child: _buildImagePreview(selectedImagePath!),
+                  ),
+                ),
+                // 삭제 버튼
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: InkWell(
+                    onTap: onRemoveImage,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(

@@ -200,16 +200,17 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Container(
         decoration: BoxDecoration(
-          gradient: SweepGradient(
-            center: Alignment.center,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
-              ColorPalette.primary100.withOpacity(0.3),
-              ColorPalette.primary100.withOpacity(0.4),
-              ColorPalette.primary100.withOpacity(0.3),
-              ColorPalette.primary100.withOpacity(0.35),
-              ColorPalette.primary100.withOpacity(0.3),
+              ColorPalette.primary100.withOpacity(0.15),
+              ColorPalette.gradientGreenMid.withOpacity(0.12),
+              ColorPalette.primary100.withOpacity(0.18),
+              ColorPalette.gradientGreen.withOpacity(0.1),
+              ColorPalette.primary100.withOpacity(0.15),
             ],
-            stops: const [0.0, 0.27, 0.39, 0.60, 0.81],
+            stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
           ),
         ),
         child: SafeArea(
@@ -231,10 +232,7 @@ class _ChatScreenState extends State<ChatScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: const BoxDecoration(
-                  color: Colors.white,
-                  border: Border(
-                    top: BorderSide(color: ColorPalette.bg300, width: 1),
-                  ),
+                  color: Colors.transparent,
                 ),
                 child: SafeArea(
                   child: Row(

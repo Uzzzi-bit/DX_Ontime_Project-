@@ -97,7 +97,6 @@ class HeaderSection extends StatelessWidget {
           const SizedBox(height: 4),
           LayoutBuilder(
             builder: (context, constraints) {
-              final barWidth = constraints.maxWidth - 72 - 8 - 61;
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -117,57 +116,64 @@ class HeaderSection extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: SizedBox(
-                      height: 10,
-                      child: Stack(
-                        children: [
-                          Positioned(
-                            top: 3,
-                            left: 0,
-                            right: 0,
-                            child: Container(
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF7F7F7),
-                                borderRadius: BorderRadius.circular(50),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            top: 3,
-                            left: 0,
-                            child: FractionallySizedBox(
-                              widthFactor: pregnancyProgress.clamp(0.0, 1.0),
-                              child: Container(
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF3A8FA8), // 진한 하늘색
-                                  borderRadius: BorderRadius.circular(50),
-                                ),
-                              ),
-                            ),
-                          ),
-                          ...List.generate(4, (index) {
-                            final position = index / 3;
-                            return Positioned(
-                              left: position * barWidth,
-                              top: 0,
-                              child: Container(
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: const Color(0xFFF0ECE4),
-                                    width: 1,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final barWidth = constraints.maxWidth;
+                        final progressWidth = barWidth * pregnancyProgress.clamp(0.0, 1.0);
+                        return SizedBox(
+                          height: 10,
+                          child: Stack(
+                            children: [
+                              // 배경 바 (회색)
+                              Positioned(
+                                top: 3,
+                                left: 0,
+                                right: 0,
+                                child: Container(
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF7F7F7),
+                                    borderRadius: BorderRadius.circular(50),
                                   ),
                                 ),
                               ),
-                            );
-                          }),
-                        ],
-                      ),
+                              // 진행 바 (진한 하늘색)
+                              Positioned(
+                                top: 3,
+                                left: 0,
+                                child: Container(
+                                  width: progressWidth,
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF3A8FA8), // 진한 하늘색
+                                    borderRadius: BorderRadius.circular(50),
+                                  ),
+                                ),
+                              ),
+                              // 구분선 점들
+                              ...List.generate(4, (index) {
+                                final position = index / 3;
+                                return Positioned(
+                                  left: position * barWidth,
+                                  top: 0,
+                                  child: Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: const Color(0xFFF0ECE4),
+                                        width: 1,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(width: 8),

@@ -23,6 +23,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _qaController = TextEditingController();
+  String? _selectedImagePath; // 선택된 이미지 경로 저장
 
   // TODO: [SERVER] 사용자 이름 및 임신 주차 정보 GET
   final String _userName = '김레제';
@@ -30,8 +31,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // TODO: [SERVER] 출산 예정일 및 임신 시작일 정보 GET
   // 출산 예정일: 2026.07.01
   final DateTime _dueDate = DateTime(2026, 7, 1);
-  // 임신 시작일: 출산 예정일로부터 280일(40주) 전으로 역산
-  DateTime get _pregnancyStartDate => _dueDate.subtract(const Duration(days: 280));
+  // 임시: 현재 임신 주차를 20주차로 고정
+  static const int _fixedPregnancyWeek = 20;
 
   // TODO: [DB] 금일 칼로리 섭취량 및 목표량 GET
   double _currentCalorie = 1000.0; // 임시 데이터
@@ -190,21 +191,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
-  // 임신 주차 계산
+  // 임신 주차 계산 (임시: 20주차로 고정)
   int _getPregnancyWeek() {
-    final now = DateTime.now();
-    final difference = now.difference(_pregnancyStartDate);
-    return (difference.inDays / 7).floor();
+    // TODO: [SERVER] 실제 임신 주차 정보로 대체
+    return _fixedPregnancyWeek;
   }
 
   // 임신 진행률 계산 (0.0 ~ 1.0) - 출산예정일까지의 남은 기간 기준
+  // 20주차 = 140일 경과, 전체 280일 중 50% 진행
   double _getPregnancyProgress() {
-    final now = DateTime.now();
-    final startDate = _pregnancyStartDate;
-    final totalDays = 280; // 임신 기간: 280일 (40주)
-    final elapsedDays = now.difference(startDate).inDays;
-    // 진행률: (오늘날짜 - 임신시작일) / 280일
-    return (elapsedDays / totalDays).clamp(0.0, 1.0);
+    // TODO: [SERVER] 실제 임신 진행률로 대체
+    // 임시: 20주차 = 140일 경과 / 280일 = 0.5 (50%)
+    const int currentWeek = _fixedPregnancyWeek;
+    const int totalWeeks = 40;
+    const double progress = currentWeek / totalWeeks;
+    return progress.clamp(0.0, 1.0);
   }
 
   @override
@@ -215,20 +216,37 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _handleAskSubmit() {
     final query = _qaController.text.trim();
-    if (query.isEmpty) return;
+    // 텍스트나 이미지 중 하나라도 있어야 전송 가능
+    if (query.isEmpty && _selectedImagePath == null) return;
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ChatScreen(
-          initialText: query,
+          initialText: query.isEmpty ? null : query,
+          initialImagePath: _selectedImagePath,
         ),
       ),
     );
+
+    // 전송 후 상태 초기화
+    setState(() {
+      _qaController.clear();
+      _selectedImagePath = null;
+    });
   }
 
   void _handleImageSelected(XFile file) {
+    setState(() {
+      _selectedImagePath = file.path;
+    });
     // TODO: [API] 이미지 업로드 및 분석 요청
+  }
+
+  void _removeSelectedImage() {
+    setState(() {
+      _selectedImagePath = null;
+    });
   }
 
   void _toggleSupplement(String supplementLabel) {
@@ -445,6 +463,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           controller: _qaController,
                           onSubmit: _handleAskSubmit,
                           onImageSelected: _handleImageSelected,
+                          selectedImagePath: _selectedImagePath,
+                          onRemoveImage: _removeSelectedImage,
                         ),
                         const SizedBox(height: 32),
                         TodayMealSection(
