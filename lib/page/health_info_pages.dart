@@ -1,7 +1,12 @@
-import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+// lib/page/health_info_pages.dart
 
+import 'dart:convert';
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
+import 'package:prototype/api_config.dart';
 import '../widget/bottom_bar_widget.dart';
 
 class HealthInfoScreen extends StatefulWidget {
@@ -39,6 +44,14 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
   DateTime? _expectedDueDate = DateTime.now().add(const Duration(days: 120));
   final Set<String> _selectedAllergies = {'우유', '땅콩'};
 
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingHealthInfo();
+  }
+
   @override
   void dispose() {
     _heightController.dispose();
@@ -46,7 +59,74 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
     super.dispose();
   }
 
-  // 🔹 저장 버튼 눌렀을 때 Firestore에 쓰기
+  /// 🔹 기존에 저장된 건강정보 불러오기 (로그인한 사용자 기준)
+  Future<void> _loadExistingHealthInfo() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      setState(() {
+        _isLoading = true;
+      });
+
+      final res = await http.get(
+        Uri.parse('$apiBaseUrl/api/health/${user.uid}/'),
+      );
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+
+        setState(() {
+          final birthYear = data['birthYear'];
+          if (birthYear != null) {
+            _selectedBirthYear = birthYear.toString();
+          }
+
+          final h = data['heightCm'];
+          final w = data['weightKg'];
+          if (h != null) _heightController.text = h.toString();
+          if (w != null) _weightController.text = w.toString();
+
+          final due = data['dueDate'];
+          if (due != null) {
+            _expectedDueDate = DateTime.tryParse(due);
+          }
+
+          final pregWeek = data['pregWeek'];
+          if (pregWeek is int) {
+            _selectedWeek = pregWeek;
+          }
+
+          _hasGestationalDiabetes = data['gestationalDiabetes'] == true;
+
+          _selectedAllergies.clear();
+          final allergies = data['allergies'];
+          if (allergies is List) {
+            for (final a in allergies) {
+              if (a is String && _allergyOptions.contains(a)) {
+                _selectedAllergies.add(a);
+              }
+            }
+          }
+        });
+      } else if (res.statusCode == 404) {
+        // 아직 건강정보가 없는 사용자 → 무시
+        debugPrint('No health info yet for user.');
+      } else {
+        debugPrint('Failed to load health info: ${res.statusCode} ${res.body}');
+      }
+    } catch (e) {
+      debugPrint('Error loading health info: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  /// 🔹 저장 버튼 → Django API에 POST
   Future<void> _handleSave() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -73,29 +153,49 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
 
       final allergies = _selectedAllergies.toList();
 
-      await FirebaseFirestore.instance
-          .collection('PREGNANCY')
-          .doc(uid) // 👈 로그인한 사용자 기준으로 한 명당 한 문서
-          .set({
-            'birthYear': birthYear,
-            'heightCm': height,
-            'weightKg': weight,
-            'dueDate': Timestamp.fromDate(dueDate),
-            'pregWeek': pregWeek,
-            'gestationalDiabetes': _hasGestationalDiabetes,
-            'allergies': allergies,
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+      setState(() {
+        _isLoading = true;
+      });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('건강 정보가 저장되었습니다.')),
+      final res = await http.post(
+        Uri.parse('$apiBaseUrl/api/health/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'memberId': uid,
+          'birthYear': birthYear,
+          'heightCm': height,
+          'weightKg': weight,
+          'dueDate': dueDate.toIso8601String(),
+          'pregWeek': pregWeek,
+          'gestationalDiabetes': _hasGestationalDiabetes,
+          'allergies': allergies,
+        }),
       );
 
-      Navigator.pop(context, true);
+      if (!mounted) return;
+
+      if (res.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('건강 정보가 저장되었습니다.')),
+        );
+        Navigator.pop(context, true);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('저장 실패: ${res.body}')),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('저장 실패: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('저장 실패: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -127,86 +227,99 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
         iconTheme: const IconThemeData(color: Color(0xFF1E1E1E)),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '건강 정보 입력',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF1D1B20),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '정확한 추천을 위해 아래 정보를 입력해 주세요.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF49454F),
-                ),
-              ),
-              const SizedBox(height: 24),
-              _buildDropdownSection(
-                label: '출생연도',
-                value: _selectedBirthYear,
-                hint: '연도를 선택하세요',
-                options: _birthYears,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedBirthYear = value;
-                  });
-                },
-              ),
-              const SizedBox(height: 24),
-              _buildNumberField(
-                label: '키',
-                controller: _heightController,
-                suffixText: 'cm',
-              ),
-              const SizedBox(height: 16),
-              _buildNumberField(
-                label: '몸무게',
-                controller: _weightController,
-                suffixText: 'kg',
-              ),
-              const SizedBox(height: 24),
-              _buildDatePickerCard(context),
-              const SizedBox(height: 24),
-              _buildDropdownSection(
-                label: '임신 주차',
-                value: '$_selectedWeek주차',
-                hint: null,
-                options: _pregnancyWeeks.map((w) => '$w주차').toList(),
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() {
-                    _selectedWeek = int.parse(value.replaceAll('주차', ''));
-                  });
-                },
-              ),
-              const SizedBox(height: 24),
-              _buildSwitchSection(),
-              const SizedBox(height: 24),
-              _buildAllergySection(theme),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _handleSave,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: const Color(0xFF5BB5C8),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '건강 정보 입력',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF1D1B20),
                     ),
                   ),
-                  child: const Text('저장하기'),
+                  const SizedBox(height: 8),
+                  Text(
+                    '정확한 추천을 위해 아래 정보를 입력해 주세요.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF49454F),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildDropdownSection(
+                    label: '출생연도',
+                    value: _selectedBirthYear,
+                    hint: '연도를 선택하세요',
+                    options: _birthYears,
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedBirthYear = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  _buildNumberField(
+                    label: '키',
+                    controller: _heightController,
+                    suffixText: 'cm',
+                  ),
+                  const SizedBox(height: 16),
+                  _buildNumberField(
+                    label: '몸무게',
+                    controller: _weightController,
+                    suffixText: 'kg',
+                  ),
+                  const SizedBox(height: 24),
+                  _buildDatePickerCard(context),
+                  const SizedBox(height: 24),
+                  _buildDropdownSection(
+                    label: '임신 주차',
+                    value: '$_selectedWeek주차',
+                    hint: null,
+                    options: _pregnancyWeeks.map((w) => '$w주차').toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() {
+                        _selectedWeek = int.parse(value.replaceAll('주차', ''));
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSwitchSection(),
+                  const SizedBox(height: 24),
+                  _buildAllergySection(theme),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _isLoading ? null : _handleSave,
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: const Color(0xFF5BB5C8),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(_isLoading ? '저장 중...' : '저장하기'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (_isLoading)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.white.withOpacity(0.3),
+                  child: const Center(
+                    child: CircularProgressIndicator(),
+                  ),
                 ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
       bottomNavigationBar: const BottomBarWidget(currentRoute: '/healthinfo'),
@@ -231,7 +344,10 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
         hint: hint != null ? Text(hint) : null,
         items: options
@@ -265,7 +381,10 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 18,
+          ),
         ),
       ),
     );
@@ -280,7 +399,9 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
       label: '출산 예정일',
       child: ListTile(
         tileColor: const Color(0xFFF7F2FA),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         title: Text(dateText),
         trailing: IconButton(
@@ -314,7 +435,9 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
         },
         title: const Text('현재 임신성 당뇨 진단을 받으셨나요?'),
         tileColor: const Color(0xFFF7F2FA),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16),
       ),
     );
@@ -348,7 +471,9 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
             label: const Text('직접 입력'),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('직접 입력 기능은 준비 중입니다.')),
+                const SnackBar(
+                  content: Text('직접 입력 기능은 준비 중입니다.'),
+                ),
               );
             },
           ),

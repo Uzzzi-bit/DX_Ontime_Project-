@@ -1,30 +1,54 @@
+# django_backend/members/models.py
 from django.db import models
 
-class Member(models.Model):   # 👈 클래스 이름 정확히 Member
-    member_id = models.CharField(max_length=50, primary_key=True)
-    password = models.CharField(max_length=255)
-    nickname = models.CharField(max_length=50)
-    birth_date = models.CharField(max_length=8)   # 'YYYYMMDD'
-    phone = models.CharField(max_length=20)
-    address = models.CharField(max_length=300)
-    is_pregnant_mode = models.CharField(max_length=1, default='N')
+
+class Member(models.Model):
+    """
+    Firebase 인증으로 받은 uid 기준 회원 테이블
+    (회원가입 API에서 저장 / 조회에 사용하는 테이블)
+    """
+    uid = models.CharField(max_length=128, primary_key=True)  # Firebase uid
+    email = models.EmailField(unique=True)
+    nickname = models.CharField(max_length=100, blank=True)
+    phone = models.CharField(max_length=20, blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    is_pregnant_mode = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'MEMBER'  # 오라클 실제 테이블 이름
+        db_table = "MEMBER"   # 이미 만들어둔 오라클 MEMBER 테이블과 매핑
 
     def __str__(self):
-        return f"{self.member_id} ({self.nickname})"
-class HealthRecord(models.Model):
-    id = models.AutoField(primary_key=True)
-    member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='health_records')
-    record_date = models.DateField()
-    weight = models.FloatField(null=True, blank=True)
-    blood_pressure_high = models.IntegerField(null=True, blank=True)
-    blood_pressure_low = models.IntegerField(null=True, blank=True)
-    blood_sugar = models.FloatField(null=True, blank=True)
-    memo = models.CharField(max_length=500, blank=True)
-    image_url = models.CharField(max_length=500, blank=True)
+        return f"{self.nickname or self.email}({self.uid})"
+
+
+class MemberPregnancy(models.Model):
+    """
+    건강 정보(health_info_pages.dart) 저장용 테이블
+    한 명의 회원(Member)당 1개 (1:1)
+    """
+    member = models.OneToOneField(
+        Member,
+        on_delete=models.CASCADE,
+        related_name="pregnancy",
+        primary_key=True,          # PK = member_id 처럼 쓰기
+        db_column="member_id",     # 오라클 MEMBER_PREGNANCY.member_id와 매핑
+    )
+
+    birth_year = models.IntegerField()
+    height_cm = models.FloatField()
+    weight_kg = models.FloatField()
+    due_date = models.DateField()
+    preg_week = models.IntegerField()
+    gestational_diabetes = models.BooleanField(default=False)
+
+    # 오라클에 JSONField가 애매해서, 알러지는 문자열로 저장 (예: "우유,땅콩")
+    allergies = models.TextField(blank=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'HEALTH_RECORD'
+        db_table = "MEMBER_PREGNANCY"
+
+    def __str__(self):
+        return f"Pregnancy info of {self.member.uid}"
