@@ -1,9 +1,18 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import '../widget/bottom_bar_widget.dart';
+import '../widget/home/header_section.dart';
+import '../widget/home/nutrient_grid.dart';
+import '../widget/home/supplement_checklist.dart';
+import '../widget/home/eat_check_section.dart';
+import '../widget/home/today_meal_section.dart';
+import '../widget/home/rounded_container.dart';
 import 'chat_pages.dart';
 import 'report_pages.dart';
+import 'recipe_pages.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,53 +24,31 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _qaController = TextEditingController();
 
+  // TODO: [SERVER] 사용자 이름 및 임신 주차 정보 GET
   final String _userName = '김레제';
-  final String _pregnancyWeekLabel = '임신 N 주차';
 
-  final double _currentCalorie = 1000;
-  final double _targetCalorie = 2000;
+  // TODO: [SERVER] 출산 예정일 및 임신 시작일 정보 GET
+  // 출산 예정일: 2026.07.01
+  final DateTime _dueDate = DateTime(2026, 7, 1);
+  // 임신 시작일: 출산 예정일로부터 280일(40주) 전으로 역산
+  DateTime get _pregnancyStartDate => _dueDate.subtract(const Duration(days: 280));
 
-  // TODO(eunbee): 실제 영양제 1회 섭취 시 증가할 함량으로 치환해 주세요.
-  static const double supplementValue = 30.0;
+  // TODO: [DB] 금일 칼로리 섭취량 및 목표량 GET
+  double _currentCalorie = 1000.0; // 임시 데이터
+  double _targetCalorie = 2000.0; // 임시 데이터
 
-  final Map<_NutrientType, double> _baseNutrientProgress = {
-    _NutrientType.iron: 70,
-    _NutrientType.folate: 0,
-    _NutrientType.calcium: 0,
-    _NutrientType.vitaminD: 0,
-    _NutrientType.omega3: 0,
+  // TODO: [DB] 금일 영양소 섭취 현황 데이터 로드
+  // 영양소 섭취량 (0.0 ~ 100.0 퍼센트) - 리포트 페이지와 영양제 체크 시 증가
+  Map<_NutrientType, double> _nutrientProgress = {
+    _NutrientType.iron: 70.0, // 예시: 70% 섭취
+    _NutrientType.vitaminD: 0.0,
+    _NutrientType.folate: 0.0,
+    _NutrientType.omega3: 0.0,
+    _NutrientType.calcium: 0.0,
+    _NutrientType.choline: 0.0,
   };
 
-  late final Map<_NutrientType, double> _nutrientProgress;
-
-  final List<_NutrientDefinition> _nutrientDefinitions = const [
-    _NutrientDefinition(
-      type: _NutrientType.iron,
-      label: '철분',
-      activeColor: Color(0xFFFef493),
-    ),
-    _NutrientDefinition(
-      type: _NutrientType.folate,
-      label: '엽산',
-      activeColor: Color(0xFFE6E0E9),
-    ),
-    _NutrientDefinition(
-      type: _NutrientType.calcium,
-      label: '칼슘',
-      activeColor: Color(0xFFE6E0E9),
-    ),
-    _NutrientDefinition(
-      type: _NutrientType.vitaminD,
-      label: '비타민D',
-      activeColor: Color(0xFFE6E0E9),
-    ),
-    _NutrientDefinition(
-      type: _NutrientType.omega3,
-      label: '오메가-3',
-      activeColor: Color(0xFFE6E0E9),
-    ),
-  ];
-
+  // 영양제 체크리스트 (6개)
   final List<_SupplementOption> _supplements = const [
     _SupplementOption(
       id: 'iron-pill',
@@ -75,7 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
     _SupplementOption(
       id: 'vitamin-complex',
-      label: '영양제',
+      label: '종합영양제',
       nutrient: _NutrientType.folate,
     ),
     _SupplementOption(
@@ -87,6 +74,40 @@ class _HomeScreenState extends State<HomeScreen> {
       id: 'vitaminD',
       label: '비타민D',
       nutrient: _NutrientType.vitaminD,
+    ),
+    _SupplementOption(
+      id: 'choline',
+      label: '콜린',
+      nutrient: _NutrientType.choline,
+    ),
+  ];
+
+  // TODO: [SERVER] 추천 레시피 리스트 Fetch
+  // 오늘의 추천 식단 (Mock Data) - 3개 아이템
+  final List<_RecommendedMeal> _recommendedMeals = const [
+    _RecommendedMeal(
+      id: 'salmon-steak',
+      name: '연어스테이크',
+      imagePath: 'assets/image/sample_food.png',
+      calories: 350,
+      tags: ['오메가-3', '비타민 D'],
+      backgroundColor: Color(0xFFD2ECBF),
+    ),
+    _RecommendedMeal(
+      id: 'cold-noodles',
+      name: '냉모밀',
+      imagePath: 'assets/image/sample_food.png',
+      calories: 400,
+      tags: ['단백질', '미네랄'],
+      backgroundColor: Color(0xFFFEF493),
+    ),
+    _RecommendedMeal(
+      id: 'seaweed-soup',
+      name: '미역국',
+      imagePath: 'assets/image/sample_food.png',
+      calories: 150,
+      tags: ['철분', '칼슘'],
+      backgroundColor: Color(0xFFBCE7F0),
     ),
   ];
 
@@ -101,12 +122,89 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   ];
 
-  final Set<String> _selectedSupplements = {};
+  Set<String> _selectedSupplements = {}; // 임시 데이터
 
-  @override
-  void initState() {
-    super.initState();
-    _nutrientProgress = Map<_NutrientType, double>.from(_baseNutrientProgress);
+  List<String> get _supplementLabels => _supplements.map((s) => s.label).toList();
+
+  List<Map<String, dynamic>> get _nutrientData {
+    // 데이터가 없을 경우 임시 데이터 반환
+    if (_nutrientProgress.isEmpty) {
+      return [
+        {'label': '철분', 'progress': 0.0},
+        {'label': '비타민D', 'progress': 0.0},
+        {'label': '엽산', 'progress': 0.0},
+        {'label': '오메가-3', 'progress': 0.0},
+        {'label': '칼슘', 'progress': 0.0},
+        {'label': '콜린', 'progress': 0.0},
+      ];
+    }
+    return [
+      {'label': '철분', 'progress': _nutrientProgress[_NutrientType.iron] ?? 0.0},
+      {'label': '비타민D', 'progress': _nutrientProgress[_NutrientType.vitaminD] ?? 0.0},
+      {'label': '엽산', 'progress': _nutrientProgress[_NutrientType.folate] ?? 0.0},
+      {'label': '오메가-3', 'progress': _nutrientProgress[_NutrientType.omega3] ?? 0.0},
+      {'label': '칼슘', 'progress': _nutrientProgress[_NutrientType.calcium] ?? 0.0},
+      {'label': '콜린', 'progress': _nutrientProgress[_NutrientType.choline] ?? 0.0},
+    ];
+  }
+
+  List<Map<String, dynamic>> get _mealData {
+    // 데이터가 없을 경우 임시 데이터 반환
+    if (_recommendedMeals.isEmpty) {
+      return [
+        {
+          'id': 'temp-1',
+          'name': '연어스테이크',
+          'imagePath': 'assets/image/sample_food.png',
+          'calories': 350,
+          'tags': ['오메가-3', '비타민 D'],
+          'backgroundColor': const Color(0xFFD2ECBF).value.toInt(),
+        },
+        {
+          'id': 'temp-2',
+          'name': '냉모밀',
+          'imagePath': 'assets/image/sample_food.png',
+          'calories': 400,
+          'tags': ['단백질', '미네랄'],
+          'backgroundColor': const Color(0xFFFEF493).value.toInt(),
+        },
+        {
+          'id': 'temp-3',
+          'name': '미역국',
+          'imagePath': 'assets/image/sample_food.png',
+          'calories': 150,
+          'tags': ['철분', '칼슘'],
+          'backgroundColor': const Color(0xFFBCE7F0).value.toInt(),
+        },
+      ];
+    }
+    return _recommendedMeals.map((meal) {
+      return {
+        'id': meal.id,
+        'name': meal.name,
+        'imagePath': meal.imagePath,
+        'calories': meal.calories,
+        'tags': meal.tags,
+        'backgroundColor': meal.backgroundColor.value.toInt(),
+      };
+    }).toList();
+  }
+
+  // 임신 주차 계산
+  int _getPregnancyWeek() {
+    final now = DateTime.now();
+    final difference = now.difference(_pregnancyStartDate);
+    return (difference.inDays / 7).floor();
+  }
+
+  // 임신 진행률 계산 (0.0 ~ 1.0) - 출산예정일까지의 남은 기간 기준
+  double _getPregnancyProgress() {
+    final now = DateTime.now();
+    final startDate = _pregnancyStartDate;
+    final totalDays = 280; // 임신 기간: 280일 (40주)
+    final elapsedDays = now.difference(startDate).inDays;
+    // 진행률: (오늘날짜 - 임신시작일) / 280일
+    return (elapsedDays / totalDays).clamp(0.0, 1.0);
   }
 
   @override
@@ -129,350 +227,264 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _toggleSupplement(String supplementId) {
+  void _handleImageSelected(XFile file) {
+    // TODO: [API] 이미지 업로드 및 분석 요청
+  }
+
+  void _toggleSupplement(String supplementLabel) {
+    final supplementId = _supplements.firstWhere((s) => s.label == supplementLabel).id;
     final option = _supplements.firstWhere((element) => element.id == supplementId);
+    // TODO: [API] 영양제 1알당 함량 정보 GET
+    const double supplementValuePerPill = 10.0; // 영양제 1알당 증가량 (예시)
 
     setState(() {
       if (_selectedSupplements.contains(supplementId)) {
         _selectedSupplements.remove(supplementId);
-        _nutrientProgress[option.nutrient] = (_nutrientProgress[option.nutrient]! - supplementValue).clamp(0, 100);
+        _nutrientProgress[option.nutrient] = (_nutrientProgress[option.nutrient]! - supplementValuePerPill).clamp(
+          0.0,
+          100.0,
+        );
       } else {
         _selectedSupplements.add(supplementId);
-        _nutrientProgress[option.nutrient] = (_nutrientProgress[option.nutrient]! + supplementValue).clamp(0, 100);
+        _nutrientProgress[option.nutrient] = (_nutrientProgress[option.nutrient]! + supplementValuePerPill).clamp(
+          0.0,
+          100.0,
+        );
       }
     });
+    // TODO: [API] 영양제 체크 상태 POST/PUT 요청
+  }
+
+  void _navigateToRecipe(String mealId) {
+    // TODO: [API] 실제 레시피 상세 페이지로 이동
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const RecipeScreen(),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
+    final now = DateTime.now();
+    final dateFormat = DateFormat('M월 d일 (E)', 'ko');
+
+    final pregnancyWeek = _getPregnancyWeek();
+    final pregnancyProgress = _getPregnancyProgress();
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 100),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                clipBehavior: Clip.hardEdge,
-                width: double.infinity,
-                padding: const EdgeInsets.only(top: 20, bottom: 0),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFBCE7F0),
-                  borderRadius: BorderRadius.vertical(
-                    bottom: Radius.circular(5),
-                  ),
-                ),
-                child: SizedBox(
-                  height: 440,
-                  child: Stack(
-                    alignment: Alignment.topCenter,
-                    children: [
-                      Positioned(
-                        bottom: 0, // 바닥에 딱 붙이기
-                        left: 0, // 양옆 여백 (취향껏 조절 가능, 0으로 하면 꽉 참)
-                        right: 0,
-                        child: Container(
-                          height: 280, // 반원 높이 (아기 이미지 뒤에 깔릴 정도)
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(260), // 둥글기 (높이보다 큰 값을 줘야 완만한 아치가 됨)
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Positioned.fill 부분을 이걸로 통째로 바꾸세요
-                      Positioned.fill(
-                        child: Padding(
-                          // ✅ 1. 여백 추가 (글자가 벽에 붙지 않게)
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: Column(
-                            // ✅ 2. 전체를 '왼쪽 정렬'로 변경 (글자, 버튼을 위해)
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 40), // 상단 여백 (조절 가능)
-                              // 이름
-                              Text(
-                                '$_userName 홈',
-                                style:
-                                    textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 0.5,
-                                    ) ??
-                                    const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 0.5,
-                                    ),
-                              ),
-                              const SizedBox(height: 6),
+              /// 1) 파란색 헤더
+              HeaderSection(
+                userName: _userName,
+                pregnancyWeek: pregnancyWeek,
+                dueDate: _dueDate,
+                pregnancyProgress: pregnancyProgress,
+                onHealthInfoUpdate: () => Navigator.pushNamed(context, '/healthinfo'),
+              ),
 
-                              // 임신 주차
+              /// 2) RoundedContainer를 자연스럽게 위로 끌어올림
+              Transform.translate(
+                offset: const Offset(0, -170), // 흰색 박스 배경 침투 조절
+                child: RoundedContainer(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
                               Text(
-                                _pregnancyWeekLabel,
+                                dateFormat.format(now),
                                 style:
                                     textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.w500,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
                                       letterSpacing: 0.5,
                                     ) ??
                                     const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w500,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
                                       letterSpacing: 0.5,
                                     ),
                               ),
-
-                              const SizedBox(height: 12), // 글자와 버튼 사이 간격
-                              // ✅ 3. Row를 없애고 버튼을 여기로 가져옴 (세로 배치)
-                              SizedBox(
-                                height: 28,
-                                child: TextButton(
-                                  onPressed: () => Navigator.pushNamed(context, '/healthinfo'),
-                                  style: TextButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 0,
+                              const SizedBox(width: 12),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const ReportScreen(),
                                     ),
-                                    backgroundColor: const Color(0xFF5BB5C8),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    foregroundColor: Colors.white,
+                                  );
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
                                   ),
-                                  child: const Text(
-                                    '건강정보 업데이트',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                  backgroundColor: const Color(0xFFBCE7F0),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
+                                  foregroundColor: const Color(0xFF49454F),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 ),
-                              ),
-
-                              // 아기 위쪽 여백 (화면 보면서 조절하세요)
-                              const SizedBox(height: 40),
-
-                              // ✅ 4. 아기랑 게이지는 '가운데 정렬'로 따로 설정 (Align 사용)
-                              Align(
-                                alignment: Alignment.center,
-                                child: SizedBox(
-                                  width: 195, // 300은 너무 큽니다. 195 추천
-                                  height: 195,
-                                  child: CalorieArcGauge(
-                                    current: _currentCalorie,
-                                    target: _targetCalorie,
-                                    gradientColors: const [
-                                      Color(0xFFFEF493),
-                                      Color(0xFFDDEDC1),
-                                      Color(0xFFBCE7F0),
-                                    ],
-                                    child: SizedBox(
-                                      height: 175,
-                                      width: 175,
-                                      child: Image.asset(
-                                        'assets/image/baby.png',
-                                        fit: BoxFit.contain,
-                                      ),
-                                    ),
+                                child: const Text(
+                                  '종합리포트 가기',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.5,
                                   ),
-                                ),
-                              ),
-
-                              const SizedBox(height: 4),
-
-                              // ✅ 5. 칼로리 텍스트도 '가운데 정렬'
-                              Align(
-                                alignment: Alignment.center,
-                                child: Text(
-                                  '${_currentCalorie.toStringAsFixed(0)} Kcal',
-                                  style:
-                                      textTheme.displaySmall?.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        height: 1.0,
-                                      ) ??
-                                      const TextStyle(
-                                        fontSize: 40, // 30보다 40 추천
-                                        fontWeight: FontWeight.w700,
-                                        height: 1.0,
-                                      ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(
+                                flex: 4,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: 120,
+                                      height: 130,
+                                      child: CalorieArcGauge(
+                                        current: _currentCalorie,
+                                        target: _targetCalorie,
+                                        gradientColors: const [
+                                          Color(0xFFFEF493),
+                                          Color(0xFFDDEDC1),
+                                          Color(0xFFBCE7F0),
+                                        ],
+                                        child: SizedBox(
+                                          height: 110,
+                                          width: 110,
+                                          child: Image.asset(
+                                            'assets/image/baby.png',
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Container(
+                                                width: 90,
+                                                height: 90,
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFBCE7F0).withOpacity(0.3),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.child_care,
+                                                  size: 50,
+                                                  color: Color(0xFF5BB5C8),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Transform.translate(
+                                      offset: const Offset(0, -10),
+                                      child: Text(
+                                        '${_currentCalorie.toStringAsFixed(0)}Kcal',
+                                        style:
+                                            textTheme.displaySmall?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 24,
+                                              height: 1.0,
+                                              letterSpacing: 0.5,
+                                            ) ??
+                                            const TextStyle(
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.w700,
+                                              height: 1.0,
+                                              letterSpacing: 0.5,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 6,
+                                child: NutrientGrid(nutrients: _nutrientData),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SupplementChecklist(
+                          supplements: _supplementLabels,
+                          selectedSupplements: _selectedSupplements
+                              .map((id) => _supplements.firstWhere((s) => s.id == id).label)
+                              .toSet(),
+                          onToggle: _toggleSupplement,
+                          onAdd: () {
+                            // TODO: [API] 영양제 추가하기 기능
+                          },
+                        ),
+                        const SizedBox(height: 32),
+                        EatCheckSection(
+                          controller: _qaController,
+                          onSubmit: _handleAskSubmit,
+                          onImageSelected: _handleImageSelected,
+                        ),
+                        const SizedBox(height: 32),
+                        TodayMealSection(
+                          meals: _mealData,
+                          onMealTap: _navigateToRecipe,
+                          onRefresh: () {
+                            // TODO: [SERVER] 추천 식단 새로고침
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          '즐겨 찾는 제품',
+                          style:
+                              textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 12,
+                                letterSpacing: 0.5,
+                              ) ??
+                              const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 0.5,
+                              ),
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          height: 30,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _appliances.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 12),
+                            itemBuilder: (context, index) {
+                              final appliance = _appliances[index];
+                              return _ApplianceCard(info: appliance);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _SectionHeader(
-                      title: '오늘 총 영양 요약',
-                      actionLabel: '종합리포트 가기',
-                      onActionTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const ReportScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFF0ECE4)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: _nutrientDefinitions
-                            .map(
-                              (definition) => SizedBox(
-                                width: 68,
-                                height: 77,
-                                child: _NutrientProgressBar(
-                                  definition: definition,
-                                  percent: _nutrientProgress[definition.type] ?? 0,
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    _SectionHeader(
-                      title: '오늘 영양제',
-                      actionLabel: '영양제 추가하기',
-                      onActionTap: () {},
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 20,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFF0ECE4)),
-                      ),
-                      child: Wrap(
-                        spacing: 18,
-                        runSpacing: 18,
-                        children: _supplements
-                            .map(
-                              (option) => SizedBox(
-                                width: 110,
-                                child: _SupplementCheckbox(
-                                  option: option,
-                                  selected: _selectedSupplements.contains(option.id),
-                                  onChanged: () => _toggleSupplement(option.id),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    Text(
-                      '먹어도 되나요?',
-                      style:
-                          textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ) ??
-                          const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(55),
-                        border: Border.all(color: const Color(0xFFF0ECE4)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.add, size: 18, color: Color(0xFF0F0F0F)),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextField(
-                              controller: _qaController,
-                              decoration: const InputDecoration(
-                                hintText: '궁금한 음식/약을 물어보세요',
-                                hintStyle: TextStyle(
-                                  color: Color(0xFFBDBDBD),
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                border: InputBorder.none,
-                              ),
-                              onSubmitted: (_) => _handleAskSubmit(),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          InkWell(
-                            onTap: _handleAskSubmit,
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              width: 28,
-                              height: 28,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Color(0xFFBCE7F0),
-                              ),
-                              child: const Icon(
-                                Icons.send,
-                                size: 16,
-                                color: Color(0xFF0F0F0F),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    Text(
-                      '즐겨 찾는 제품',
-                      style:
-                          textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                          ) ??
-                          const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                          ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      height: 36,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _appliances.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 16),
-                        itemBuilder: (context, index) {
-                          final appliance = _appliances[index];
-                          return _ApplianceCard(info: appliance);
-                        },
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ],
@@ -484,6 +496,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+// 칼로리 아크 게이지
 class CalorieArcGauge extends StatelessWidget {
   const CalorieArcGauge({
     super.key,
@@ -500,22 +513,28 @@ class CalorieArcGauge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 240,
-      height: 240,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          CustomPaint(
-            size: const Size(240, 240),
-            painter: _CalorieArcPainter(
-              progress: (current / target).clamp(0.0, 1.0),
-              gradientColors: gradientColors,
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final height = constraints.maxHeight;
+        return SizedBox(
+          width: width,
+          height: height,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              CustomPaint(
+                size: Size(width, height),
+                painter: _CalorieArcPainter(
+                  progress: (current / target).clamp(0.0, 1.0),
+                  gradientColors: gradientColors,
+                ),
+              ),
+              child,
+            ],
           ),
-          child,
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -538,9 +557,9 @@ class _CalorieArcPainter extends CustomPainter {
       ..color = const Color(0xFFF7F7F7)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 30;
+      ..strokeWidth = 18;
 
-    final arcRect = Rect.fromCircle(center: center, radius: radius - 10);
+    final arcRect = Rect.fromCircle(center: center, radius: radius - 6);
     canvas.drawArc(
       arcRect,
       math.pi,
@@ -558,7 +577,7 @@ class _CalorieArcPainter extends CustomPainter {
       ..shader = gradient.createShader(arcRect)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 30;
+      ..strokeWidth = 18;
 
     canvas.drawArc(
       arcRect,
@@ -575,162 +594,7 @@ class _CalorieArcPainter extends CustomPainter {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    required this.actionLabel,
-    required this.onActionTap,
-  });
-
-  final String title;
-  final String actionLabel;
-  final VoidCallback onActionTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
-          ),
-        ),
-        TextButton(
-          onPressed: onActionTap,
-          style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            backgroundColor: const Color(0xFFBCE7F0),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          child: Text(
-            actionLabel,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF0F0F0F),
-              letterSpacing: 0.5,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _NutrientProgressBar extends StatelessWidget {
-  const _NutrientProgressBar({
-    required this.definition,
-    required this.percent,
-  });
-
-  final _NutrientDefinition definition;
-  final double percent;
-
-  @override
-  Widget build(BuildContext context) {
-    final clampedPercent = percent.clamp(0, 100);
-    final fillHeight = 53 * (clampedPercent / 100);
-
-    return Stack(
-      alignment: Alignment.bottomCenter,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFF7F7F7),
-            borderRadius: BorderRadius.circular(15),
-          ),
-        ),
-        Align(
-          alignment: Alignment.bottomCenter,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            height: fillHeight,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: clampedPercent > 0 ? definition.activeColor : const Color(0xFFE7E1EA),
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(15),
-                bottomRight: Radius.circular(15),
-              ),
-            ),
-          ),
-        ),
-        Positioned.fill(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                '${clampedPercent.round()}%',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: clampedPercent > 0 ? const Color(0xFF0F0F0F) : const Color(0xFFBABABA),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                definition.label,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SupplementCheckbox extends StatelessWidget {
-  const _SupplementCheckbox({
-    required this.option,
-    required this.selected,
-    required this.onChanged,
-  });
-
-  final _SupplementOption option;
-  final bool selected;
-  final VoidCallback onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onChanged,
-      borderRadius: BorderRadius.circular(8),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Checkbox(
-            value: selected,
-            onChanged: (_) => onChanged(),
-            activeColor: const Color(0xFF5BB5C8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(4),
-            ),
-            side: const BorderSide(color: Color(0x26000000)),
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            option.label,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w300,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
+// 가전 제품 카드
 class _ApplianceCard extends StatelessWidget {
   const _ApplianceCard({required this.info});
 
@@ -739,26 +603,44 @@ class _ApplianceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 113,
-      height: 36,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      width: 95,
+      height: 30,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: const Color(0x45CDCDCD),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
           SizedBox(
-            width: 29,
-            height: 23,
-            child: Image.asset(info.assetPath, fit: BoxFit.contain),
+            width: 24,
+            height: 19,
+            child: Image.asset(
+              info.assetPath,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  width: 24,
+                  height: 19,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Icon(
+                    info.name.contains('오븐') ? Icons.microwave : Icons.kitchen,
+                    size: 14,
+                    color: Colors.grey[600],
+                  ),
+                );
+              },
+            ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Expanded(
             child: Text(
               info.name,
               style: const TextStyle(
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: FontWeight.w500,
                 letterSpacing: 0.5,
               ),
@@ -770,6 +652,7 @@ class _ApplianceCard extends StatelessWidget {
   }
 }
 
+// 데이터 모델
 class _ApplianceInfo {
   const _ApplianceInfo({
     required this.name,
@@ -778,18 +661,6 @@ class _ApplianceInfo {
 
   final String name;
   final String assetPath;
-}
-
-class _NutrientDefinition {
-  const _NutrientDefinition({
-    required this.type,
-    required this.label,
-    required this.activeColor,
-  });
-
-  final _NutrientType type;
-  final String label;
-  final Color activeColor;
 }
 
 class _SupplementOption {
@@ -804,4 +675,29 @@ class _SupplementOption {
   final _NutrientType nutrient;
 }
 
-enum _NutrientType { iron, folate, calcium, vitaminD, omega3 }
+class _RecommendedMeal {
+  const _RecommendedMeal({
+    required this.id,
+    required this.name,
+    required this.imagePath,
+    required this.calories,
+    required this.tags,
+    required this.backgroundColor,
+  });
+
+  final String id;
+  final String name;
+  final String imagePath;
+  final int calories;
+  final List<String> tags;
+  final Color backgroundColor;
+}
+
+enum _NutrientType {
+  iron,
+  vitaminD,
+  folate,
+  omega3,
+  calcium,
+  choline,
+}
