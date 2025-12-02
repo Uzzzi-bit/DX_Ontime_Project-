@@ -1,54 +1,106 @@
 # django_backend/members/models.py
+
 from django.db import models
 
 
 class Member(models.Model):
     """
-    Firebase 인증으로 받은 uid 기준 회원 테이블
-    (회원가입 API에서 저장 / 조회에 사용하는 테이블)
+    앱 기본 사용자 정보
+    - PK: id (Django가 자동 생성)
+    - firebase_uid: Firebase Auth UID
     """
-    uid = models.CharField(max_length=128, primary_key=True)  # Firebase uid
-    email = models.EmailField(unique=True)
-    nickname = models.CharField(max_length=100, blank=True)
-    phone = models.CharField(max_length=20, blank=True)
-    address = models.CharField(max_length=255, blank=True)
-    is_pregnant_mode = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = "MEMBER"   # 이미 만들어둔 오라클 MEMBER 테이블과 매핑
+    firebase_uid = models.CharField(
+        max_length=128,
+        unique=True,
+        help_text="Firebase Authentication에서 받은 UID",
+    )
+    email = models.EmailField(
+        unique=True,
+    )
+    password = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+    )
+    nickname = models.CharField(
+        max_length=50,
+    )
+    birth_date = models.DateField(
+        null=True,
+        blank=True,
+    )
+    phone_number = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+    )
+    address = models.CharField(
+        max_length=300,
+        null=True,
+        blank=True,
+    )
+    is_pregnant_mode = models.BooleanField(
+        default=False,
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+    )
 
     def __str__(self):
-        return f"{self.nickname or self.email}({self.uid})"
+        return f"{self.id} / {self.nickname} ({self.firebase_uid})"
 
 
 class MemberPregnancy(models.Model):
     """
-    건강 정보(health_info_pages.dart) 저장용 테이블
-    한 명의 회원(Member)당 1개 (1:1)
+    임산부 추가 건강 정보 (Member와 1:1)
     """
     member = models.OneToOneField(
         Member,
         on_delete=models.CASCADE,
-        related_name="pregnancy",
-        primary_key=True,          # PK = member_id 처럼 쓰기
-        db_column="member_id",     # 오라클 MEMBER_PREGNANCY.member_id와 매핑
+        related_name='pregnancy',
     )
 
-    birth_year = models.IntegerField()
-    height_cm = models.FloatField()
-    weight_kg = models.FloatField()
-    due_date = models.DateField()
-    preg_week = models.IntegerField()
-    gestational_diabetes = models.BooleanField(default=False)
+    birth_year = models.IntegerField(
+        null=True,
+        blank=True,
+    )
+    height_cm = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    weight_kg = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    due_date = models.DateField(
+        null=True,
+        blank=True,
+    )
+    preg_week = models.IntegerField(
+        null=True,
+        blank=True,
+    )
 
-    # 오라클에 JSONField가 애매해서, 알러지는 문자열로 저장 (예: "우유,땅콩")
-    allergies = models.TextField(blank=True)
+    gestational_diabetes = models.BooleanField(
+        default=False,
+    )
 
-    updated_at = models.DateTimeField(auto_now=True)
+    # 콤마로 이어붙여 저장하는 문자열 (뷰에서 리스트로 변환)
+    allergies = models.TextField(
+        null=True,
+        blank=True,
+    )
 
-    class Meta:
-        db_table = "MEMBER_PREGNANCY"
+    updated_at = models.DateTimeField(
+        auto_now=True,
+    )
 
     def __str__(self):
-        return f"Pregnancy info of {self.member.uid}"
+        return f"Pregnancy info of {self.member.firebase_uid}"

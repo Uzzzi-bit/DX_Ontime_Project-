@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:prototype/api_config.dart';
+import 'package:prototype/api/member_api_service.dart';
 import '../widget/bottom_bar_widget.dart';
 import '../theme/color_palette.dart';
 
@@ -98,7 +99,7 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
             _selectedWeek = pregWeek;
           }
 
-          _hasGestationalDiabetes = data['gestationalDiabetes'] == true;
+          _hasGestationalDiabetes = (data['hasGestationalDiabetes'] ?? data['gestationalDiabetes']) == true;
 
           _selectedAllergies.clear();
           final allergies = data['allergies'];
@@ -158,33 +159,23 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
         _isLoading = true;
       });
 
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/api/health/'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'memberId': uid,
-          'birthYear': birthYear,
-          'heightCm': height,
-          'weightKg': weight,
-          'dueDate': dueDate.toIso8601String(),
-          'pregWeek': pregWeek,
-          'gestationalDiabetes': _hasGestationalDiabetes,
-          'allergies': allergies,
-        }),
+      await MemberApiService.instance.saveHealthInfo(
+        memberId: uid,
+        birthYear: birthYear,
+        heightCm: height,
+        weightKg: weight,
+        dueDate: dueDate,
+        pregWeek: pregWeek,
+        hasGestationalDiabetes: _hasGestationalDiabetes,
+        allergies: allergies,
       );
 
       if (!mounted) return;
 
-      if (res.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('건강 정보가 저장되었습니다.')),
-        );
-        Navigator.pop(context, true);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('저장 실패: ${res.body}')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('건강 정보가 저장되었습니다.')),
+      );
+      Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

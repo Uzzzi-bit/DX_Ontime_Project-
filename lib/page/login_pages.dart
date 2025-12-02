@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:prototype/api/member_api_service.dart';
 import 'package:prototype/page/home_pages.dart';
 import 'package:prototype/page/signup_pages.dart';
 
@@ -167,23 +168,30 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      // FirebaseAuth 인증 처리
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      // 1) Firebase 로그인
+      final cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+      final uid = cred.user!.uid;
+      final firebaseEmail = cred.user!.email ?? email;
 
-      // 로그인 성공 시 홈페이지로 이동
-      // AuthWrapper가 자동으로 HomeScreen을 보여주지만,
-      // 명시적으로 네비게이션을 수행하여 즉시 이동
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const HomeScreen(),
-          ),
-        );
+      // 2) Django 서버에 uid 등록 (이미 등록된 경우 무시)
+      try {
+        final result = await MemberApiService.instance.registerMember(uid, email: firebaseEmail);
+        debugPrint('registerMember result: $result');
+      } catch (e) {
+        debugPrint('Django register_member exception: $e');
       }
+
+      // 3) 홈으로 이동
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const HomeScreen(),
+        ),
+      );
     } on FirebaseAuthException catch (e) {
       // Firebase 인증 에러 처리
       String errorMessage = '로그인에 실패했습니다.';

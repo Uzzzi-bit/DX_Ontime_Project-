@@ -1,6 +1,6 @@
 # django_backend/members/views.py
 import json
-from datetime import date
+import traceback
 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -9,7 +9,7 @@ from django.utils.dateparse import parse_datetime, parse_date
 from .models import Member, MemberPregnancy
 
 
-# ✅ 헬스 체크용 루트 뷰 (127.0.0.1:8000 에서 보이던 그거)
+# ✅ 헬스 체크용 루트 뷰 (127.0.0.1:8000)
 def root(request):
     return JsonResponse({"message": "DX Django backend is running 🚀"})
 
@@ -17,61 +17,62 @@ def root(request):
 @csrf_exempt
 def register_member(request):
     """
-    회원 기본 정보 저장 (회원가입 첫 단계)
     POST /api/member/register/
-
-    body 예시 :
-    {
-      "uid": "firebase-uid-123",
-      "email": "test@example.com",
-      "nickname": "테스트맘",
-      "phone": "010-0000-0000",
-      "address": "서울시 어딘가",
-      "is_pregnant_mode": true
-    }
+    body: { "uid": "firebase-uid", "email": "user@example.com" }
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST only'}, status=405)
 
     try:
-        body = json.loads(request.body.decode())
+        raw = request.body.decode('utf-8')
+        print('>>> register_member raw body:', raw)
+        body = json.loads(raw)
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
     uid = body.get('uid')
-    email = body.get('email')
-    nickname = body.get('nickname') or ''
-    phone = body.get('phone') or ''
-    address = body.get('address') or ''
-    is_pregnant_mode = body.get('is_pregnant_mode', False)
+    email = body.get('email')  # 🔥 추가
 
     if not uid:
         return JsonResponse({'error': 'uid is required'}, status=400)
 
     try:
-        # ✅ PK = uid 기준으로 upsert
-        member, created = Member.objects.update_or_create(
-            uid=uid,
-            defaults={
-                'email': email,
-                'nickname': nickname,
-                'phone': phone,
-                'address': address,
-                'is_pregnant_mode': bool(is_pregnant_mode),
-            },
-        )
+        print(f'>>> register_member uid = {uid}, email = {email}')
 
-        return JsonResponse(
-            {
-                'ok': True,
-                'created': created,
-                'uid': member.uid,
-                'email': member.email,
-                'nickname': member.nickname,
-            }
-        )
+        # 1) 이미 firebase_uid 로 등록된 멤버가 있으면 그대로 사용
+        try:
+            member = Member.objects.get(firebase_uid=uid)
+            created = False
+            # 이메일이 비어 있거나, 바뀌었으면 업데이트
+            if email and member.email != email:
+                member.email = email
+                member.save(update_fields=['email'])
+        except Member.DoesNotExist:
+            # 2) 새 멤버라면 email 이 필수
+            if not email:
+                return JsonResponse(
+                    {'error': 'email is required for new member'},
+                    status=400,
+                )
+            # email 은 UNIQUE 이므로 email 기준으로 get_or_create
+            member, created = Member.objects.get_or_create(
+                email=email,
+                defaults={
+                    'firebase_uid': uid,
+                    'is_pregnant_mode': False,
+                },
+            )
 
+        return JsonResponse({
+            'ok': True,
+            'created': created,
+            'uid': member.firebase_uid,
+            'email': member.email,
+            'is_pregnant_mode': member.is_pregnant_mode,
+        })
     except Exception as e:
+        print('>>> register_member DB error:', e)
+        traceback.print_exc()
         return JsonResponse(
             {'error': 'Server error in register_member', 'detail': str(e)},
             status=500,
@@ -86,7 +87,7 @@ def save_health_info(request):
 
     body 예시 :
     {
-      "memberId": "firebase-uid-123",
+      "memberId": "firebase-uid-123",   <- Firebase UID (문자열)
       "birthYear": 1993,
       "heightCm": 162,
       "weightKg": 60,
@@ -104,6 +105,7 @@ def save_health_info(request):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
+    # 클라이언트의 memberId = Firebase UID
     member_uid = body.get('memberId')
     birth_year = body.get('birthYear')
     height_cm = body.get('heightCm')
@@ -120,13 +122,15 @@ def save_health_info(request):
     if due_dt is None:
         return JsonResponse({'error': 'dueDate 형식 오류'}, status=400)
 
+    # datetime이면 date만 추출
     if hasattr(due_dt, 'date'):
         due_dt = due_dt.date()
 
     allergy_str = ','.join(allergies_list) if allergies_list else ''
 
     try:
-        member = Member.objects.get(uid=member_uid)
+        # ✅ firebase_uid로 Member 찾기
+        member = Member.objects.get(firebase_uid=member_uid)
 
         preg, created = MemberPregnancy.objects.update_or_create(
             member=member,
@@ -146,6 +150,7 @@ def save_health_info(request):
     except Member.DoesNotExist:
         return JsonResponse({'error': 'member not found'}, status=404)
     except Exception as e:
+        traceback.print_exc()
         return JsonResponse(
             {'error': 'Server error in save_health_info', 'detail': str(e)},
             status=500,
@@ -156,9 +161,12 @@ def get_health_info(request, uid):
     """
     건강 정보 조회
     GET /api/health/<uid>/
+
+    여기서 uid = Firebase UID (문자열)
     """
     try:
-        member = Member.objects.get(uid=uid)
+        # ✅ firebase_uid 기준으로 조회
+        member = Member.objects.get(firebase_uid=uid)
     except Member.DoesNotExist:
         return JsonResponse({'error': 'member not found'}, status=404)
 
@@ -172,7 +180,7 @@ def get_health_info(request, uid):
         allergies_list = [s.strip() for s in preg.allergies.split(',') if s.strip()]
 
     data = {
-        'memberId': member.uid,
+        'memberId': member.firebase_uid,
         'birthYear': preg.birth_year,
         'heightCm': preg.height_cm,
         'weightKg': preg.weight_kg,

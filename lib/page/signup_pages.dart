@@ -3,7 +3,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import 'package:prototype/page/api/member_api_service.dart';
+import 'package:prototype/api/member_api_service.dart';
 import 'package:prototype/page/home_pages.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -63,10 +63,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
         password: password,
       );
       final uid = cred.user!.uid;
-
+      final firebaseEmail = cred.user!.email ?? email;
       // 2) Django 서버에 uid 등록 (MemberApiService 사용)
       try {
-        final result = await MemberApiService.instance.registerMember(uid);
+        final result = await MemberApiService.instance.registerMember(uid, email: firebaseEmail);
         debugPrint('registerMember result: $result');
 
         if (result['ok'] != true) {
