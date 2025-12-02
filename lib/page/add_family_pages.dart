@@ -1,4 +1,3 @@
-import 'package:characters/characters.dart';
 import 'package:flutter/material.dart';
 import '../theme/color_palette.dart';
 import '../widget/bottom_bar_widget.dart';
@@ -71,7 +70,7 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.surfaceVariant,
+      backgroundColor: colorScheme.surfaceContainerHighest,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         elevation: 0,
@@ -275,7 +274,6 @@ class _Monogram extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       width: 48,
       height: 48,

@@ -8,12 +8,8 @@ environment:
   sdk: ^3.9.2
 
 dependencies:
-<<<<<<< HEAD
-  http: ^1.2.0
-=======
   flutter:
     sdk: flutter
->>>>>>> c3296640bfe3d1c4ba09705977e329fafc15c91a
   firebase_core: ^3.6.0
   firebase_auth: ^5.3.1
   cloud_firestore: ^5.4.4
