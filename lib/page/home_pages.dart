@@ -25,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _qaController = TextEditingController();
   String? _selectedImagePath; // 선택된 이미지 경로 저장
 
+  final ImagePicker _picker = ImagePicker();
   // TODO: [SERVER] 추천 식단 업데이트 메서드
   //
   // [서버 연동 시 구현 사항]
@@ -285,6 +286,93 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _selectedImagePath = null;
     });
+  }
+
+  /// 플로팅 버튼 클릭 시 이미지 선택 옵션 표시
+  void _showMealImagePicker() {
+    showDialog(
+      context: context,
+      barrierDismissible: true, // 외부 클릭 시 닫기
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Text(
+                    '식단 사진 추가',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const Divider(height: 24),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt, color: Color(0xFF5BB5C8)),
+                  title: const Text('사진 직접 촬영'),
+                  onTap: () async {
+                    Navigator.pop(dialogContext);
+                    await _handleMealImageCapture(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library, color: Color(0xFF5BB5C8)),
+                  title: const Text('앨범에서 추가'),
+                  onTap: () async {
+                    Navigator.pop(dialogContext);
+                    await _handleMealImageCapture(ImageSource.gallery);
+                  },
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('취소'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 식단 사진 캡처/선택 처리 (임시 기능)
+  Future<void> _handleMealImageCapture(ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(source: source);
+      if (image != null && mounted) {
+        // TODO: [API] 식단 사진 업로드 및 분석 기능 구현
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              source == ImageSource.camera ? '사진이 촬영되었습니다. (임시 기능)' : '앨범에서 사진이 선택되었습니다. (임시 기능)',
+            ),
+            duration: const Duration(seconds: 2),
+            backgroundColor: const Color(0xFF5BB5C8),
+          ),
+        );
+        // 여기에 실제 식단 분석 및 저장 로직 추가 예정
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              source == ImageSource.camera ? '카메라 오류: ${e.toString()}' : '앨범 오류: ${e.toString()}',
+            ),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _toggleSupplement(String supplementLabel) {
@@ -568,6 +656,14 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       bottomNavigationBar: const BottomBarWidget(currentRoute: '/'),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showMealImagePicker,
+        backgroundColor: const Color(0xFF5BB5C8),
+        foregroundColor: Colors.white,
+        shape: const CircleBorder(),
+        child: const Icon(Icons.add, size: 28),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }
