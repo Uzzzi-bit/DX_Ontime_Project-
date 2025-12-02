@@ -129,7 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
     _SupplementOption(
       id: 'omega3',
-      label: 'DHA(오메가-3)',
+      label: '오메가-3',
       nutrient: _NutrientType.omega3,
     ),
     _SupplementOption(

@@ -116,7 +116,7 @@ class SupplementChecklist extends StatelessWidget {
                               visualDensity: VisualDensity.compact,
                             ),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 10),
                           Flexible(
                             child: Text(
                               supplement,

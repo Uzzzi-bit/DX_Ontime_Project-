@@ -57,7 +57,7 @@ class SettingsScreen extends StatelessWidget {
         icon: Icons.tips_and_updates_outlined,
       ),
       MenuItem(
-        title: '임산부 모드',
+        title: '맘케어 모드',
         subtitle: '연결된 디바이스 동기화',
         icon: Icons.child_friendly_outlined,
         route: '/momcaresetting',
