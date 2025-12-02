@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
                 ('created_at', models.DateTimeField(auto_now_add=True, db_column='created_at')),
             ],
             options={
-                'db_table': 'FAMILY_RELATION',
+                'db_table': 'member_familyrelation',
                 'managed': True,
                 'indexes': [models.Index(fields=['member_id'], name='FAMILY_RELA_member__70b7cc_idx'), models.Index(fields=['guardian_member_id'], name='FAMILY_RELA_guardia_1b6557_idx')],
                 'unique_together': {('member_id', 'guardian_member_id')},

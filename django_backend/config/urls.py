@@ -8,7 +8,7 @@ from members.views import (
     save_health_info,
     get_health_info,
     update_pregnant_mode,
-    add_family_members,
+    update_family_members,
     get_family_members,
 )
 
@@ -23,6 +23,6 @@ urlpatterns = [
     path('api/health/', save_health_info, name='health-save'),
     path('api/health/<str:uid>/', get_health_info, name='health-get'),
 
-    path('api/family/add/', add_family_members, name='family-add'),
+    path('api/family/update/', update_family_members, name='family-update'),
     path('api/family/<str:member_id>/', get_family_members, name='family-get'),
 ]

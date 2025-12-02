@@ -51,8 +51,54 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
     ),
   ];
 
-  final Set<String> _selectedIds = {'partner', 'father'};
+  final Set<String> _selectedIds = <String>{};
   bool _isLoading = false;
+  bool _isInitialLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingFamilyMembers();
+  }
+
+  /// 기존에 저장된 가족 구성원 불러오기
+  Future<void> _loadExistingFamilyMembers() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() {
+        _isInitialLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final result = await FamilyApiService.instance.getFamilyMembers(user.uid);
+      final guardians = result['guardians'] as List<dynamic>? ?? [];
+
+      // DB에 저장된 relation_type을 기준으로 체크리스트에 반영
+      final savedRelationTypes = guardians.map((g) => g['relation_type'] as String).toSet();
+
+      // _members에서 relation_type이 일치하는 항목의 id를 찾아서 선택
+      final selectedIds = <String>{};
+      for (final member in _members) {
+        if (savedRelationTypes.contains(member.relation)) {
+          selectedIds.add(member.id);
+        }
+      }
+
+      setState(() {
+        _selectedIds.clear();
+        _selectedIds.addAll(selectedIds);
+        _isInitialLoading = false;
+      });
+    } catch (e) {
+      // 에러가 발생해도 계속 진행 (새로 추가하는 경우일 수 있음)
+      print('기존 가족 구성원 불러오기 실패: $e');
+      setState(() {
+        _isInitialLoading = false;
+      });
+    }
+  }
 
   Future<void> _handleSubmit() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -75,27 +121,36 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
     });
 
     try {
-      // 선택된 가족 구성원들을 API 형식으로 변환
-      final guardians = _selectedIds.map((selectedId) {
+      // 선택된 항목의 relation_type 목록 추출
+      final selectedRelationTypes = _selectedIds.map((selectedId) {
         final member = _members.firstWhere((m) => m.id == selectedId);
-        // 임시로 guardian_member_id를 relation_type으로 설정
-        // 실제로는 보호자의 Firebase UID를 입력받아야 하지만, 현재는 임시로 처리
-        return {
-          'guardian_member_id': selectedId, // 임시: 실제로는 보호자의 Firebase UID
-          'relation_type': member.relation,
-        };
+        return member.relation;
       }).toList();
 
-      // API 호출
-      await FamilyApiService.instance.addFamilyMembers(
+      // API 호출 (전체 동기화)
+      final result = await FamilyApiService.instance.updateFamilyMembers(
         user.uid, // 현재 사용자(임산부)의 Firebase UID
-        guardians,
+        selectedRelationTypes,
       );
 
       if (mounted) {
+        final createdCount = result['created_count'] as int? ?? 0;
+        final deletedCount = result['deleted_count'] as int? ?? 0;
+
+        String message;
+        if (createdCount > 0 && deletedCount > 0) {
+          message = '$createdCount명 추가, $deletedCount명 삭제되었습니다.';
+        } else if (createdCount > 0) {
+          message = '$createdCount명의 가족 구성원이 추가되었습니다.';
+        } else if (deletedCount > 0) {
+          message = '$deletedCount명의 가족 구성원이 삭제되었습니다.';
+        } else {
+          message = '변경사항이 없습니다.';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${_selectedIds.length}명의 가족 구성원이 추가되었습니다.'),
+            content: Text(message),
             backgroundColor: Colors.green,
           ),
         );
@@ -187,20 +242,24 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
               ),
               const SizedBox(height: 24),
               Expanded(
-                child: ListView.separated(
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: _members.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final member = _members[index];
-                    final isSelected = _selectedIds.contains(member.id);
-                    return _FamilyMemberTile(
-                      member: member,
-                      isSelected: isSelected,
-                      onChanged: () => _toggleSelection(member.id),
-                    );
-                  },
-                ),
+                child: _isInitialLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(),
+                      )
+                    : ListView.separated(
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: _members.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final member = _members[index];
+                          final isSelected = _selectedIds.contains(member.id);
+                          return _FamilyMemberTile(
+                            member: member,
+                            isSelected: isSelected,
+                            onChanged: () => _toggleSelection(member.id),
+                          );
+                        },
+                      ),
               ),
               const SizedBox(height: 16),
               SizedBox(

@@ -18,7 +18,7 @@ def root(request):
 def register_member(request):
     """
     POST /api/member/register/
-    body: { "uid": "firebase-uid", "email": "user@example.com" }
+    body: { "uid": "firebase-uid", "email": "user@example.com", "nickname": "닉네임" }
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST only'}, status=405)
@@ -31,13 +31,14 @@ def register_member(request):
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
     uid = body.get('uid')
-    email = body.get('email')  # 🔥 추가
+    email = body.get('email')
+    nickname = body.get('nickname')  # 사용자가 입력한 닉네임
 
     if not uid:
         return JsonResponse({'error': 'uid is required'}, status=400)
 
     try:
-        print(f'>>> register_member uid = {uid}, email = {email}')
+        print(f'>>> register_member uid = {uid}, email = {email}, nickname = {nickname}')
 
         # 1) 이미 firebase_uid 로 등록된 멤버가 있으면 그대로 사용
         try:
@@ -47,6 +48,10 @@ def register_member(request):
             if email and member.email != email:
                 member.email = email
                 member.save(update_fields=['email'])
+            # 닉네임이 제공되었고, 기존 닉네임과 다르면 업데이트
+            if nickname and member.nickname != nickname:
+                member.nickname = nickname
+                member.save(update_fields=['nickname'])
         except Member.DoesNotExist:
             # 2) 새 멤버라면 email 이 필수
             if not email:
@@ -54,23 +59,29 @@ def register_member(request):
                     {'error': 'email is required for new member'},
                     status=400,
                 )
+            # nickname이 제공되지 않으면 이메일의 @ 앞부분을 기본값으로 사용 (기존 로직 유지)
+            final_nickname = nickname if nickname else (email.split('@')[0] if email else 'User')
+            
             # email 은 UNIQUE 이므로 email 기준으로 get_or_create
-            # nickname은 이메일의 @ 앞부분을 기본값으로 사용
-            nickname = email.split('@')[0] if email else 'User'
             member, created = Member.objects.get_or_create(
                 email=email,
                 defaults={
                     'firebase_uid': uid,
                     'is_pregnant_mode': False,
-                    'nickname': nickname,
+                    'nickname': final_nickname,
                 },
             )
+            # get_or_create로 기존 멤버를 가져온 경우 nickname 업데이트
+            if not created and nickname and member.nickname != nickname:
+                member.nickname = nickname
+                member.save(update_fields=['nickname'])
 
         return JsonResponse({
             'ok': True,
             'created': created,
             'uid': member.firebase_uid,
             'email': member.email,
+            'nickname': member.nickname,
             'is_pregnant_mode': member.is_pregnant_mode,
         })
     except Exception as e:
@@ -271,26 +282,24 @@ def update_pregnant_mode(request):
 
 
 @csrf_exempt
-def add_family_members(request):
+def update_family_members(request):
     """
-    가족 구성원 추가
-    POST /api/family/add/
+    가족 구성원 업데이트 (전체 동기화)
+    POST /api/family/update/
 
     body 예시:
     {
       "member_id": "firebase-uid-123",  // 임산부의 Firebase UID
-      "guardians": [
-        {
-          "guardian_member_id": "guardian-uid-1",
-          "relation_type": "배우자"
-        },
-        {
-          "guardian_member_id": "guardian-uid-2",
-          "relation_type": "부모님"
-        }
-      ]
+      "relation_types": ["배우자", "부모님"]  // 선택된 relation_type 목록
     }
+    
+    동작:
+    1. DB에서 해당 member_id의 모든 관계 조회
+    2. 선택된 relation_type만 유지하고, 나머지는 삭제
+    3. 선택된 relation_type 중 DB에 없는 것은 추가 (guardian_member_id는 임시로 relation_type 사용)
     """
+    print(f'>>> update_family_members 호출됨: method={request.method}, path={request.path}')
+    
     if request.method != 'POST':
         return JsonResponse({'error': 'POST only'}, status=405)
 
@@ -300,13 +309,13 @@ def add_family_members(request):
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
     member_id = body.get('member_id')  # 임산부의 Firebase UID
-    guardians = body.get('guardians', [])
+    relation_types = body.get('relation_types', [])  # 선택된 relation_type 목록
 
     if not member_id:
         return JsonResponse({'error': 'member_id is required'}, status=400)
 
-    if not guardians or not isinstance(guardians, list):
-        return JsonResponse({'error': 'guardians must be a non-empty list'}, status=400)
+    if not isinstance(relation_types, list):
+        return JsonResponse({'error': 'relation_types must be a list'}, status=400)
 
     try:
         # 임산부가 Member에 등록되어 있는지 확인
@@ -315,42 +324,44 @@ def add_family_members(request):
         except Member.DoesNotExist:
             return JsonResponse({'error': 'member not found'}, status=404)
 
+        # 1. 기존 관계 조회
+        existing_relations = FamilyRelation.objects.filter(member_id=member_id)
+        existing_relation_types = set(existing_relations.values_list('relation_type', flat=True))
+        selected_relation_types = set(relation_types)
+
+        # 2. 삭제할 관계 (기존에 있지만 선택되지 않은 것)
+        to_delete = existing_relation_types - selected_relation_types
+        deleted_count = 0
+        if to_delete:
+            deleted_count = FamilyRelation.objects.filter(
+                member_id=member_id,
+                relation_type__in=to_delete
+            ).delete()[0]
+
+        # 3. 추가할 관계 (선택되었지만 기존에 없는 것)
+        to_add = selected_relation_types - existing_relation_types
         created_count = 0
-        errors = []
-
-        for guardian_data in guardians:
-            guardian_member_id = guardian_data.get('guardian_member_id')
-            relation_type = guardian_data.get('relation_type')
-
-            if not guardian_member_id or not relation_type:
-                errors.append('guardian_member_id and relation_type are required for each guardian')
-                continue
-
-            try:
-                # 중복 체크: 같은 member_id와 guardian_member_id 조합이 이미 있으면 스킵
-                relation, created = FamilyRelation.objects.get_or_create(
-                    member_id=member_id,
-                    guardian_member_id=guardian_member_id,
-                    defaults={
-                        'relation_type': relation_type,
-                    },
-                )
-                if created:
-                    created_count += 1
-            except Exception as e:
-                errors.append(f'Error creating relation for {guardian_member_id}: {str(e)}')
+        for relation_type in to_add:
+            # guardian_member_id는 임시로 relation_type을 사용
+            # 실제로는 보호자의 Firebase UID를 받아야 하지만, 현재는 임시 처리
+            FamilyRelation.objects.create(
+                member_id=member_id,
+                guardian_member_id=relation_type,  # 임시: 실제로는 보호자 UID
+                relation_type=relation_type,
+            )
+            created_count += 1
 
         return JsonResponse({
             'ok': True,
             'created_count': created_count,
-            'total_requested': len(guardians),
-            'errors': errors if errors else None,
+            'deleted_count': deleted_count,
+            'total_selected': len(relation_types),
         })
 
     except Exception as e:
         traceback.print_exc()
         return JsonResponse(
-            {'error': 'Server error in add_family_members', 'detail': str(e)},
+            {'error': 'Server error in update_family_members', 'detail': str(e)},
             status=500,
         )
 
