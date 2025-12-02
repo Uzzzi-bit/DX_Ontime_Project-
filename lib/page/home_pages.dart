@@ -16,6 +16,8 @@ import 'report_pages.dart';
 import 'recipe_pages.dart';
 import '../model/user_model.dart';
 import '../repository/user_repository.dart';
+import '../model/supplement_effects.dart';
+import '../model/nutrient_type.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -37,6 +39,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // 기본값으로 초기화
+    _nutrientProgress = Map.from(_baseNutrientProgress);
     _loadInitialData();
   }
 
@@ -99,48 +103,51 @@ class _HomeScreenState extends State<HomeScreen> {
   double _targetCalorie = 2000.0; // 임시 데이터
 
   // TODO: [DB] 금일 영양소 섭취 현황 데이터 로드
-  // 영양소 섭취량 (0.0 ~ 100.0 퍼센트) - 리포트 페이지와 영양제 체크 시 증가
+  // 기본 영양소 섭취량 (0.0 ~ 100.0 퍼센트) - 리포트 페이지/음식 섭취 등으로 채워진 기본값 (영양제 제외)
   // [테스트용] 80%, 90% 확인을 위해 일부 수치 조절
-  Map<_NutrientType, double> _nutrientProgress = {
-    _NutrientType.iron: 70.0, // 철분 기본값
-    _NutrientType.vitaminD: 80.0, // 비타민D - 테스트용 80%
-    _NutrientType.folate: 90.0, // 엽산 - 테스트용 90%
-    _NutrientType.omega3: 0.0, // 오메가-3 기본값
-    _NutrientType.calcium: 0.0, // 칼슘 기본값
-    _NutrientType.choline: 0.0, // 콜린 기본값
+  final Map<NutrientType, double> _baseNutrientProgress = {
+    NutrientType.iron: 70.0, // 철분 기본값
+    NutrientType.vitaminD: 80.0, // 비타민D - 테스트용 80%
+    NutrientType.folate: 90.0, // 엽산 - 테스트용 90%
+    NutrientType.omega3: 0.0, // 오메가-3 기본값
+    NutrientType.calcium: 0.0, // 칼슘 기본값
+    NutrientType.choline: 0.0, // 콜린 기본값
   };
+
+  // 화면에 보여줄 실제 영양소 섭취량 (기본값 + 영양제 효과 포함)
+  late Map<NutrientType, double> _nutrientProgress;
 
   // 영양제 체크리스트 (6개)
   final List<_SupplementOption> _supplements = const [
     _SupplementOption(
       id: 'iron-pill',
       label: '철분제',
-      nutrient: _NutrientType.iron,
+      nutrient: NutrientType.iron,
     ),
     _SupplementOption(
       id: 'calcium',
       label: '칼슘',
-      nutrient: _NutrientType.calcium,
+      nutrient: NutrientType.calcium,
     ),
     _SupplementOption(
       id: 'vitamin-complex',
       label: '종합영양제',
-      nutrient: _NutrientType.folate,
+      nutrient: NutrientType.folate,
     ),
     _SupplementOption(
       id: 'omega3',
       label: '오메가-3',
-      nutrient: _NutrientType.omega3,
+      nutrient: NutrientType.omega3,
     ),
     _SupplementOption(
       id: 'vitaminD',
       label: '비타민D',
-      nutrient: _NutrientType.vitaminD,
+      nutrient: NutrientType.vitaminD,
     ),
     _SupplementOption(
       id: 'choline',
       label: '콜린',
-      nutrient: _NutrientType.choline,
+      nutrient: NutrientType.choline,
     ),
   ];
 
@@ -205,9 +212,11 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   ];
 
-  Set<String> _selectedSupplements = {}; // 임시 데이터
+  // 영양제 선택 상태 (id 기반)
+  Set<String> _selectedSupplementIds = {};
 
-  List<String> get _supplementLabels => _supplements.map((s) => s.label).toList();
+  // SupplementChecklist에 전달할 영양제 id 리스트
+  List<String> get _supplementIds => _supplements.map((s) => s.id).toList();
 
   List<Map<String, dynamic>> get _nutrientData {
     // 데이터가 없을 경우 임시 데이터 반환
@@ -222,12 +231,12 @@ class _HomeScreenState extends State<HomeScreen> {
       ];
     }
     return [
-      {'label': '철분', 'progress': _nutrientProgress[_NutrientType.iron] ?? 0.0},
-      {'label': '비타민D', 'progress': _nutrientProgress[_NutrientType.vitaminD] ?? 0.0},
-      {'label': '엽산', 'progress': _nutrientProgress[_NutrientType.folate] ?? 0.0},
-      {'label': '오메가-3', 'progress': _nutrientProgress[_NutrientType.omega3] ?? 0.0},
-      {'label': '칼슘', 'progress': _nutrientProgress[_NutrientType.calcium] ?? 0.0},
-      {'label': '콜린', 'progress': _nutrientProgress[_NutrientType.choline] ?? 0.0},
+      {'label': '철분', 'progress': _nutrientProgress[NutrientType.iron] ?? 0.0},
+      {'label': '비타민D', 'progress': _nutrientProgress[NutrientType.vitaminD] ?? 0.0},
+      {'label': '엽산', 'progress': _nutrientProgress[NutrientType.folate] ?? 0.0},
+      {'label': '오메가-3', 'progress': _nutrientProgress[NutrientType.omega3] ?? 0.0},
+      {'label': '칼슘', 'progress': _nutrientProgress[NutrientType.calcium] ?? 0.0},
+      {'label': '콜린', 'progress': _nutrientProgress[NutrientType.choline] ?? 0.0},
     ];
   }
 
@@ -415,26 +424,39 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _toggleSupplement(String supplementLabel) {
-    final supplementId = _supplements.firstWhere((s) => s.label == supplementLabel).id;
-    final option = _supplements.firstWhere((element) => element.id == supplementId);
-    // TODO: [API] 영양제 1알당 함량 정보 GET
-    const double supplementValuePerPill = 30.0; // 영양제 1알당 증가량 (예시)
+  /// 영양제 효과를 반영하여 영양소 진행도를 재계산합니다.
+  ///
+  /// 기본값(_baseNutrientProgress)에 선택된 영양제들의 효과를 누적하여
+  /// 최종 _nutrientProgress를 계산합니다.
+  void _recalculateNutrientsWithSupplements() {
+    // 기본값으로 초기화
+    _nutrientProgress = Map.from(_baseNutrientProgress);
 
+    // 선택된 영양제마다 효과 누적
+    for (final id in _selectedSupplementIds) {
+      final effects = SupplementEffects.effects[id];
+      if (effects == null) continue;
+
+      effects.forEach((nutrient, delta) {
+        final current = _nutrientProgress[nutrient] ?? 0.0;
+        final updated = (current + delta).clamp(0.0, 100.0);
+        _nutrientProgress[nutrient] = updated;
+      });
+    }
+  }
+
+  /// 영양제 체크/해제 토글 함수
+  ///
+  /// [supplementId] 영양제 id (예: 'iron-pill', 'calcium')
+  void _toggleSupplement(String supplementId) {
     setState(() {
-      if (_selectedSupplements.contains(supplementId)) {
-        _selectedSupplements.remove(supplementId);
-        _nutrientProgress[option.nutrient] = (_nutrientProgress[option.nutrient]! - supplementValuePerPill).clamp(
-          0.0,
-          100.0,
-        );
+      if (_selectedSupplementIds.contains(supplementId)) {
+        _selectedSupplementIds.remove(supplementId);
       } else {
-        _selectedSupplements.add(supplementId);
-        _nutrientProgress[option.nutrient] = (_nutrientProgress[option.nutrient]! + supplementValuePerPill).clamp(
-          0.0,
-          100.0,
-        );
+        _selectedSupplementIds.add(supplementId);
       }
+      // 영양소 진행도 재계산
+      _recalculateNutrientsWithSupplements();
     });
     // TODO: [API] 영양제 체크 상태 POST/PUT 요청
   }
@@ -957,14 +979,41 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 16),
                         SupplementChecklist(
-                          supplements: _supplementLabels,
-                          selectedSupplements: _selectedSupplements
+                          supplements: _supplementIds
+                              .map((id) => _supplements.firstWhere((s) => s.id == id).label)
+                              .toList(),
+                          selectedSupplements: _selectedSupplementIds
                               .map((id) => _supplements.firstWhere((s) => s.id == id).label)
                               .toSet(),
-                          onToggle: _toggleSupplement,
+                          onToggle: (label) {
+                            final id = _supplements.firstWhere((s) => s.label == label).id;
+                            _toggleSupplement(id);
+                          },
                           onAdd: () {
                             // TODO: [API] 영양제 추가하기 기능
                           },
+                        ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            '※ 영양제 효과는 1일 권장량 대비 평균적인 퍼센트로 가정한 값입니다. 실제 제품과는 차이가 있을 수 있어요.',
+                            style:
+                                textTheme.bodySmall?.copyWith(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w300,
+                                  color: Colors.grey[600],
+                                  letterSpacing: 0.09,
+                                  height: 1.3,
+                                ) ??
+                                TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w300,
+                                  color: Colors.grey[600],
+                                  letterSpacing: 0.09,
+                                  height: 1.3,
+                                ),
+                          ),
                         ),
                         const SizedBox(height: 32),
                         EatCheckSection(
@@ -1205,7 +1254,7 @@ class _SupplementOption {
 
   final String id;
   final String label;
-  final _NutrientType nutrient;
+  final NutrientType nutrient;
 }
 
 class _RecommendedMeal {
@@ -1226,11 +1275,4 @@ class _RecommendedMeal {
   final Color backgroundColor;
 }
 
-enum _NutrientType {
-  iron,
-  vitaminD,
-  folate,
-  omega3,
-  calcium,
-  choline,
-}
+// NutrientType enum은 lib/model/nutrient_type.dart로 이동됨
