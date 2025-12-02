@@ -61,6 +61,7 @@ class MemberPregnancy(models.Model):
         Member,
         on_delete=models.CASCADE,
         related_name='pregnancy',
+        primary_key=True,
     )
 
     birth_year = models.IntegerField(
