@@ -477,12 +477,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // 즐겨 찾는 제품 목록
     final List<Map<String, String>> favoriteProducts = const [
-      {'name': '광파오븐', 'icon': 'assets/image/oven.png'},
-      {'name': '공기청정기', 'icon': ''},
-      {'name': '세탁기', 'icon': ''},
-      {'name': '환기', 'icon': ''},
-      {'name': '에어컨', 'icon': ''},
-      {'name': '로봇청소기', 'icon': ''},
+      {'name': '광파오븐', 'icon': 'assets/image/oven2.png'},
+      {'name': '공기청정기', 'icon': 'assets/image/air_purifier.png'},
+      {'name': '세탁기', 'icon': 'assets/image/washing_machine.png'},
+      {'name': '환기', 'icon': 'assets/image/circulator.png'},
+      {'name': '에어컨', 'icon': 'assets/image/air_conditioner.png'},
+      {'name': '로봇청소기', 'icon': 'assets/image/robot.png'},
     ];
 
     // 스마트 루틴 목록
@@ -494,7 +494,8 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     return Container(
-      color: const Color(0xFFBCE7F0), // 피그마 배경색
+      color: const Color(0xFFBCE7F0),
+      height: double.infinity, // 피그마 배경색
       child: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
@@ -505,21 +506,43 @@ class _HomeScreenState extends State<HomeScreen> {
               // 상단 타이틀
               Padding(
                 padding: const EdgeInsets.only(top: 16, bottom: 24),
-                child: Text(
-                  '${_userName}님 홈',
-                  style:
-                      textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 30,
-                        color: Colors.black,
-                        letterSpacing: 0.5,
-                      ) ??
-                      const TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black,
-                        letterSpacing: 0.5,
-                      ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${_userName}님',
+                      style:
+                          textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 30,
+                            color: Colors.black,
+                            letterSpacing: 0.5,
+                          ) ??
+                          const TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black,
+                            letterSpacing: 0.5,
+                          ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '홈',
+                      style:
+                          textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 24,
+                            color: Colors.black,
+                            letterSpacing: 0.5,
+                          ) ??
+                          const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black,
+                            letterSpacing: 0.5,
+                          ),
+                    ),
+                  ],
                 ),
               ),
 
@@ -534,15 +557,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 child: Row(
                   children: [
+                    const SizedBox(width: 20),
                     Container(
                       width: 45,
                       height: 45,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD9D9D9),
                         borderRadius: BorderRadius.circular(8),
+                        image: const DecorationImage(
+                          image: AssetImage('assets/image/blueprint.png'),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 36),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -624,45 +650,49 @@ class _HomeScreenState extends State<HomeScreen> {
                 itemCount: favoriteProducts.length,
                 itemBuilder: (context, index) {
                   final product = favoriteProducts[index];
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (product['icon'] != null && product['icon']!.isNotEmpty)
-                            Image.asset(
-                              product['icon']!,
-                              width: 40,
-                              height: 40,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const SizedBox.shrink();
-                              },
-                            ),
-                          const SizedBox(height: 8),
-                          Text(
-                            product['name']!,
-                            style:
-                                textTheme.bodySmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                  color: Colors.black,
-                                  letterSpacing: 0.5,
-                                ) ??
-                                const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black,
-                                  letterSpacing: 0.5,
-                                ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
+                  final iconPath = product['icon'];
+
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Center(
+                          child: iconPath != null && iconPath.isNotEmpty
+                              ? Image.asset(
+                                  iconPath,
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const SizedBox.shrink();
+                                  },
+                                )
+                              : const SizedBox(height: 60),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Text(
+                        product['name'] ?? '',
+                        style:
+                            textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              color: Colors.black,
+                              letterSpacing: 0.5,
+                            ) ??
+                            const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black,
+                              letterSpacing: 0.5,
+                            ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   );
                 },
               ),
@@ -706,7 +736,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     child: Center(
                       child: Text(
-                        routine['name']!,
+                        routine['name'] ?? '',
                         style:
                             textTheme.bodySmall?.copyWith(
                               fontWeight: FontWeight.w600,
