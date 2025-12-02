@@ -27,8 +27,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _qaController = TextEditingController();
   String? _selectedImagePath; // 선택된 이미지 경로 저장
+  final ImagePicker _picker = ImagePicker();
 
-<<<<<<< HEAD
   // Mom Care Mode 상태
   bool _isMomCareMode = false;
   bool _isLoading = true;
@@ -71,10 +71,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
   }
-
-=======
-  final ImagePicker _picker = ImagePicker();
->>>>>>> 8ac4218992a6a6076a3caa78133f9be9c65247be
   // TODO: [SERVER] 추천 식단 업데이트 메서드
   //
   // [서버 연동 시 구현 사항]
@@ -243,7 +239,7 @@ class _HomeScreenState extends State<HomeScreen> {
           'name': '연어스테이크',
           'imagePath': 'assets/image/sample_food.png',
           'calories': 350,
-          'tags': ['오메가-3', '비타민 D'],
+          'tags': <String>['오메가-3', '비타민 D'],
           'backgroundColor': const Color(0xFFD2ECBF).value.toInt(),
         },
         {
@@ -251,7 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
           'name': '냉모밀',
           'imagePath': 'assets/image/sample_food.png',
           'calories': 400,
-          'tags': ['단백질', '미네랄'],
+          'tags': <String>['단백질', '미네랄'],
           'backgroundColor': const Color(0xFFFEF493).value.toInt(),
         },
         {
@@ -259,13 +255,13 @@ class _HomeScreenState extends State<HomeScreen> {
           'name': '미역국',
           'imagePath': 'assets/image/sample_food.png',
           'calories': 150,
-          'tags': ['철분', '칼슘'],
+          'tags': <String>['철분', '칼슘'],
           'backgroundColor': const Color(0xFFBCE7F0).value.toInt(),
         },
       ];
     }
-    return meals.map((meal) {
-      return {
+    return meals.map<Map<String, dynamic>>((meal) {
+      return <String, dynamic>{
         'id': meal.id,
         'name': meal.name,
         'imagePath': meal.imagePath,
@@ -689,7 +685,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         SupplementChecklist(
                           supplements: _supplementLabels,
                           selectedSupplements: _selectedSupplements
-                              .map((id) => _supplements.firstWhere((s) => s.id == id).label)
+                              .map<String>((id) => _supplements.firstWhere((s) => s.id == id).label)
                               .toSet(),
                           onToggle: _toggleSupplement,
                           onAdd: () {
