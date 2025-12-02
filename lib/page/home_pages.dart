@@ -472,26 +472,264 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Mode OFF 화면 빌드
   Widget _buildModeOffView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // 이미지 표시
-            Image.asset(
-              'assets/image/img_app_home.png',
-              width: double.infinity,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) {
-                return const Icon(
-                  Icons.image,
-                  size: 200,
-                  color: Color(0xFFD0D0D0),
-                );
-              },
-            ),
-          ],
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
+    // 즐겨 찾는 제품 목록
+    final List<Map<String, String>> favoriteProducts = const [
+      {'name': '광파오븐', 'icon': 'assets/image/oven.png'},
+      {'name': '공기청정기', 'icon': ''},
+      {'name': '세탁기', 'icon': ''},
+      {'name': '환기', 'icon': ''},
+      {'name': '에어컨', 'icon': ''},
+      {'name': '로봇청소기', 'icon': ''},
+    ];
+
+    // 스마트 루틴 목록
+    final List<Map<String, String>> smartRoutines = const [
+      {'name': '🏠 집에 가는길', 'icon': ''},
+      {'name': '🎥 무비 타임에는', 'icon': ''},
+      {'name': '🌙 잠들기 전', 'icon': ''},
+      {'name': '🧳 휴가', 'icon': ''},
+    ];
+
+    return Container(
+      color: const Color(0xFFBCE7F0), // 피그마 배경색
+      child: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 상단 타이틀
+              Padding(
+                padding: const EdgeInsets.only(top: 16, bottom: 24),
+                child: Text(
+                  '${_userName}님 홈',
+                  style:
+                      textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 30,
+                        color: Colors.black,
+                        letterSpacing: 0.5,
+                      ) ??
+                      const TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                        letterSpacing: 0.5,
+                      ),
+                ),
+              ),
+
+              // 3D 홈뷰 만들기 배너
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 45,
+                      height: 45,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD9D9D9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '3D 홈뷰로 우리집과 제품의 실시간 상태를\n한눈에 확인 해보세요.',
+                            style:
+                                textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  color: Colors.black,
+                                  letterSpacing: 0.14,
+                                  height: 1.43,
+                                ) ??
+                                const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black,
+                                  letterSpacing: 0.14,
+                                  height: 1.43,
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD5DBFF),
+                              borderRadius: BorderRadius.circular(1000),
+                            ),
+                            child: Text(
+                              '3D 홈뷰 만들기',
+                              style:
+                                  textTheme.bodySmall?.copyWith(
+                                    fontSize: 10,
+                                    color: const Color(0xFF4A57BF),
+                                    letterSpacing: 0.1,
+                                  ) ??
+                                  const TextStyle(
+                                    fontSize: 10,
+                                    color: Color(0xFF4A57BF),
+                                    letterSpacing: 0.1,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 즐겨 찾는 제품 섹션
+              Text(
+                '즐겨 찾는 제품',
+                style:
+                    textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 18,
+                      color: const Color(0xFF606C80),
+                      letterSpacing: 0.5,
+                    ) ??
+                    const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF606C80),
+                      letterSpacing: 0.5,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 110 / 80,
+                ),
+                itemCount: favoriteProducts.length,
+                itemBuilder: (context, index) {
+                  final product = favoriteProducts[index];
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (product['icon'] != null && product['icon']!.isNotEmpty)
+                            Image.asset(
+                              product['icon']!,
+                              width: 40,
+                              height: 40,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const SizedBox.shrink();
+                              },
+                            ),
+                          const SizedBox(height: 8),
+                          Text(
+                            product['name']!,
+                            style:
+                                textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  color: Colors.black,
+                                  letterSpacing: 0.5,
+                                ) ??
+                                const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black,
+                                  letterSpacing: 0.5,
+                                ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 32),
+
+              // 스마트 루틴 섹션
+              Text(
+                '스마트 루틴',
+                style:
+                    textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 18,
+                      color: const Color(0xFF606C80),
+                      letterSpacing: 0.5,
+                    ) ??
+                    const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF606C80),
+                      letterSpacing: 0.5,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 165 / 50,
+                ),
+                itemCount: smartRoutines.length,
+                itemBuilder: (context, index) {
+                  final routine = smartRoutines[index];
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Center(
+                      child: Text(
+                        routine['name']!,
+                        style:
+                            textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              color: Colors.black,
+                              letterSpacing: 0.5,
+                            ) ??
+                            const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black,
+                              letterSpacing: 0.5,
+                            ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 100), // 하단 네비게이션 바 공간
+            ],
+          ),
         ),
       ),
     );
