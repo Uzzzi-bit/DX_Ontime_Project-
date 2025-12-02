@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/color_palette.dart';
 import '../widget/bottom_bar_widget.dart';
+import '../api/family_api_service.dart';
 
 class AddFamilyScreen extends StatefulWidget {
   const AddFamilyScreen({super.key});
@@ -50,8 +52,71 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
   ];
 
   final Set<String> _selectedIds = {'partner', 'father'};
-  void _handleSubmit() {
-    Navigator.pop(context, true);
+  bool _isLoading = false;
+
+  Future<void> _handleSubmit() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('로그인이 필요합니다.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (_selectedIds.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // 선택된 가족 구성원들을 API 형식으로 변환
+      final guardians = _selectedIds.map((selectedId) {
+        final member = _members.firstWhere((m) => m.id == selectedId);
+        // 임시로 guardian_member_id를 relation_type으로 설정
+        // 실제로는 보호자의 Firebase UID를 입력받아야 하지만, 현재는 임시로 처리
+        return {
+          'guardian_member_id': selectedId, // 임시: 실제로는 보호자의 Firebase UID
+          'relation_type': member.relation,
+        };
+      }).toList();
+
+      // API 호출
+      await FamilyApiService.instance.addFamilyMembers(
+        user.uid, // 현재 사용자(임산부)의 Firebase UID
+        guardians,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${_selectedIds.length}명의 가족 구성원이 추가되었습니다.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('가족 구성원 추가 실패: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _toggleSelection(String memberId) {
@@ -141,7 +206,7 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: _selectedIds.isEmpty ? null : _handleSubmit,
+                  onPressed: (_selectedIds.isEmpty || _isLoading) ? null : _handleSubmit,
                   style: FilledButton.styleFrom(
                     backgroundColor: colorScheme.primary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -149,13 +214,22 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: Text(
-                    _selectedIds.isEmpty ? '구성원을 선택해 주세요' : '${_selectedIds.length}명 추가하기',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : Text(
+                          _selectedIds.isEmpty ? '구성원을 선택해 주세요' : '${_selectedIds.length}명 추가하기',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -236,32 +310,18 @@ class _FamilyMemberTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            Column(
-              children: [
-                if (member.trailingLabel != null)
-                  Text(
-                    member.trailingLabel!,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.5,
-                      color: ColorPalette.textSecondary,
-                    ),
-                  ),
-                Checkbox(
-                  value: isSelected,
-                  onChanged: (_) => onChanged(),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  activeColor: colorScheme.primary,
-                  side: const BorderSide(
-                    color: ColorPalette.textSecondary,
-                    width: 1.5,
-                  ),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ],
+            Checkbox(
+              value: isSelected,
+              onChanged: (_) => onChanged(),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
+              activeColor: colorScheme.primary,
+              side: const BorderSide(
+                color: ColorPalette.textSecondary,
+                width: 1.5,
+              ),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           ],
         ),
@@ -303,12 +363,10 @@ class _FamilyMember {
     required this.relation,
     required this.name,
     required this.description,
-    this.trailingLabel,
   });
 
   final String id;
   final String relation;
   final String name;
   final String description;
-  final String? trailingLabel;
 }

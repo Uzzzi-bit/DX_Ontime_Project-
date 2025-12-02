@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.dateparse import parse_datetime, parse_date
 
-from .models import Member, MemberPregnancy
+from .models import Member, MemberPregnancy, FamilyRelation
 
 
 # ✅ 헬스 체크용 루트 뷰 (127.0.0.1:8000)
@@ -202,6 +202,14 @@ def update_pregnant_mode(request):
     임신 모드 업데이트
     POST /api/member/pregnant-mode/
     body: { "uid": "firebase-uid", "is_pregnant_mode": true }
+    
+    역할 전환 로직:
+    - is_pregnant_mode = False -> True: 보호자에서 임산부로 전환
+      * 기존에 이 사용자가 guardian_member_id로 있던 관계들은 삭제
+      * 이제 이 사용자는 member_id로 사용 가능
+    - is_pregnant_mode = True -> False: 임산부에서 보호자로 전환
+      * 기존에 이 사용자가 member_id로 있던 관계들은 삭제
+      * 이제 이 사용자는 guardian_member_id로 사용 가능
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST only'}, status=405)
@@ -222,13 +230,34 @@ def update_pregnant_mode(request):
 
     try:
         member = Member.objects.get(firebase_uid=uid)
-        member.is_pregnant_mode = bool(is_pregnant_mode)
+        old_mode = member.is_pregnant_mode
+        new_mode = bool(is_pregnant_mode)
+        
+        # 모드가 실제로 변경되는 경우에만 관계 데이터 정리
+        if old_mode != new_mode:
+            if new_mode:
+                # 보호자 -> 임산부 전환
+                # 이 사용자가 guardian_member_id로 있던 모든 관계 삭제
+                deleted_as_guardian = FamilyRelation.objects.filter(
+                    guardian_member_id=uid
+                ).delete()[0]
+                print(f'>>> {uid}: 보호자 -> 임산부 전환, {deleted_as_guardian}개 보호자 관계 삭제')
+            else:
+                # 임산부 -> 보호자 전환
+                # 이 사용자가 member_id로 있던 모든 관계 삭제
+                deleted_as_member = FamilyRelation.objects.filter(
+                    member_id=uid
+                ).delete()[0]
+                print(f'>>> {uid}: 임산부 -> 보호자 전환, {deleted_as_member}개 임산부 관계 삭제')
+        
+        member.is_pregnant_mode = new_mode
         member.save(update_fields=['is_pregnant_mode'])
         
         return JsonResponse({
             'ok': True,
             'uid': member.firebase_uid,
             'is_pregnant_mode': member.is_pregnant_mode,
+            'role': '임산부' if new_mode else '보호자',
         })
     except Member.DoesNotExist:
         return JsonResponse({'error': 'member not found'}, status=404)
@@ -237,5 +266,123 @@ def update_pregnant_mode(request):
         traceback.print_exc()
         return JsonResponse(
             {'error': 'Server error in update_pregnant_mode', 'detail': str(e)},
+            status=500,
+        )
+
+
+@csrf_exempt
+def add_family_members(request):
+    """
+    가족 구성원 추가
+    POST /api/family/add/
+
+    body 예시:
+    {
+      "member_id": "firebase-uid-123",  // 임산부의 Firebase UID
+      "guardians": [
+        {
+          "guardian_member_id": "guardian-uid-1",
+          "relation_type": "배우자"
+        },
+        {
+          "guardian_member_id": "guardian-uid-2",
+          "relation_type": "부모님"
+        }
+      ]
+    }
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST only'}, status=405)
+
+    try:
+        body = json.loads(request.body.decode())
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    member_id = body.get('member_id')  # 임산부의 Firebase UID
+    guardians = body.get('guardians', [])
+
+    if not member_id:
+        return JsonResponse({'error': 'member_id is required'}, status=400)
+
+    if not guardians or not isinstance(guardians, list):
+        return JsonResponse({'error': 'guardians must be a non-empty list'}, status=400)
+
+    try:
+        # 임산부가 Member에 등록되어 있는지 확인
+        try:
+            member = Member.objects.get(firebase_uid=member_id)
+        except Member.DoesNotExist:
+            return JsonResponse({'error': 'member not found'}, status=404)
+
+        created_count = 0
+        errors = []
+
+        for guardian_data in guardians:
+            guardian_member_id = guardian_data.get('guardian_member_id')
+            relation_type = guardian_data.get('relation_type')
+
+            if not guardian_member_id or not relation_type:
+                errors.append('guardian_member_id and relation_type are required for each guardian')
+                continue
+
+            try:
+                # 중복 체크: 같은 member_id와 guardian_member_id 조합이 이미 있으면 스킵
+                relation, created = FamilyRelation.objects.get_or_create(
+                    member_id=member_id,
+                    guardian_member_id=guardian_member_id,
+                    defaults={
+                        'relation_type': relation_type,
+                    },
+                )
+                if created:
+                    created_count += 1
+            except Exception as e:
+                errors.append(f'Error creating relation for {guardian_member_id}: {str(e)}')
+
+        return JsonResponse({
+            'ok': True,
+            'created_count': created_count,
+            'total_requested': len(guardians),
+            'errors': errors if errors else None,
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return JsonResponse(
+            {'error': 'Server error in add_family_members', 'detail': str(e)},
+            status=500,
+        )
+
+
+def get_family_members(request, member_id):
+    """
+    가족 구성원 조회
+    GET /api/family/<member_id>/
+
+    member_id: 임산부의 Firebase UID
+    """
+    try:
+        relations = FamilyRelation.objects.filter(member_id=member_id).order_by('-created_at')
+        
+        guardians = []
+        for relation in relations:
+            guardians.append({
+                'guardian_member_id': relation.guardian_member_id,
+                'relation_type': relation.relation_type,
+                'created_at': relation.created_at.isoformat(),
+            })
+
+        return JsonResponse({
+            'ok': True,
+            'member_id': member_id,
+            'guardians': guardians,
+            'count': len(guardians),
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return JsonResponse(
+            {'error': 'Server error in get_family_members', 'detail': str(e)},
             status=500,
         )

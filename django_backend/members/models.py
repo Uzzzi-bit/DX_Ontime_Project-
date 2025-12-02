@@ -113,3 +113,43 @@ class MemberPregnancy(models.Model):
 
     def __str__(self):
         return f"Pregnancy info of {self.member.firebase_uid}"
+
+
+class FamilyRelation(models.Model):
+    """
+    가족 구성원 관계 테이블
+    임산부(member_id)와 보호자(guardian_member_id)의 관계를 저장
+    """
+    id = models.AutoField(primary_key=True, db_column='id')
+    member_id = models.CharField(
+        max_length=128,
+        db_column='member_id',
+        help_text="임산부의 Firebase UID (MEMBER.id 참조)",
+    )
+    guardian_member_id = models.CharField(
+        max_length=128,
+        db_column='guardian_member_id',
+        help_text="보호자의 Firebase UID (MEMBER.id 참조)",
+    )
+    relation_type = models.CharField(
+        max_length=50,
+        db_column='relation_type',
+        help_text="관계 타입 (배우자, 부모님, 가족, 형제자매, 지인 등)",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_column='created_at',
+    )
+
+    class Meta:
+        db_table = 'FAMILY_RELATION'
+        managed = True
+        # 같은 임산부와 보호자 조합은 중복 방지
+        unique_together = [['member_id', 'guardian_member_id']]
+        indexes = [
+            models.Index(fields=['member_id']),
+            models.Index(fields=['guardian_member_id']),
+        ]
+
+    def __str__(self):
+        return f"{self.member_id} - {self.relation_type} - {self.guardian_member_id}"
