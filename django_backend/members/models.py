@@ -61,6 +61,7 @@ class MemberPregnancy(models.Model):
         Member,
         on_delete=models.CASCADE,
         related_name='pregnancy',
+        primary_key=True,
     )
 
     birth_year = models.IntegerField(
@@ -101,6 +102,14 @@ class MemberPregnancy(models.Model):
     updated_at = models.DateTimeField(
         auto_now=True,
     )
+
+    @property
+    def id(self):
+        """
+        Django의 기본 id 필드 대신 member_id를 반환
+        Serializer와 다른 코드에서 .id를 사용할 수 있도록 함
+        """
+        return self.member_id
 
     def __str__(self):
         return f"Pregnancy info of {self.member.firebase_uid}"

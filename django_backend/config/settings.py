@@ -82,8 +82,12 @@ if USE_POSTGRESQL:
             'NAME': 'dx_ontime_db',        # 데이터베이스 이름
             'USER': 'dx_user',             # 사용자 이름
             'PASSWORD': 'mypass1234',                # ⚠️ 여기에 pgAdmin에서 설정한 비밀번호 입력
-            'HOST': 'localhost',           # localhost 또는 서버 IP 주소
+            'HOST': '192.168.0.43',           # localhost 또는 서버 IP 주소
             'PORT': '5432',                # PostgreSQL 포트
+            'OPTIONS': {
+                # 공용 스키마 사용 (모든 사용자가 같은 스키마 사용)
+                'options': '-c search_path=public'
+            },
         }
     }
 else:

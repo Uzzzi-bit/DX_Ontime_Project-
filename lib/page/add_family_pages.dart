@@ -255,7 +255,10 @@ class _FamilyMemberTile extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   activeColor: colorScheme.primary,
-                  side: const BorderSide(color: ColorPalette.textSecondary, width: 1.5),
+                  side: const BorderSide(
+                    color: ColorPalette.textSecondary,
+                    width: 1.5,
+                  ),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ],
