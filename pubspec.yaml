@@ -17,6 +17,7 @@ dependencies:
   intl: ^0.19.0
   image_picker: ^1.0.7
   google_generative_ai: ^0.4.0 # 버전은 pub.dev 보고 가장 최신으로 맞추기
+  http: ^1.2.0
 
 dev_dependencies:
   flutter_test:

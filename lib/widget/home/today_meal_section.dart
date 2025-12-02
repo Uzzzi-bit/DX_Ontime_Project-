@@ -5,42 +5,24 @@ class TodayMealSection extends StatelessWidget {
     super.key,
     required this.meals,
     required this.onMealTap,
-    required this.onRefresh,
   });
 
   final List<Map<String, dynamic>> meals;
   final ValueChanged<String> onMealTap;
-  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              '오늘의 추천 식단',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-                color: Color(0xFF000000),
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: onRefresh,
-              icon: const Icon(
-                Icons.refresh,
-                size: 20,
-                color: Color(0xFF49454F),
-              ),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-          ],
+        const Text(
+          '오늘의 추천 식단',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+            color: Color(0xFF000000),
+          ),
         ),
         const SizedBox(height: 12),
         Container(
@@ -109,12 +91,13 @@ class _MealCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Padding(
-              padding: const EdgeInsets.only(left: 8, top: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               child: Text(
                 meal['name'] as String,
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,

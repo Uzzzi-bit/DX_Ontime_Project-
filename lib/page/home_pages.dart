@@ -25,6 +25,22 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _qaController = TextEditingController();
   String? _selectedImagePath; // 선택된 이미지 경로 저장
 
+  // TODO: [SERVER] 추천 식단 업데이트 메서드
+  //
+  // [서버 연동 시 구현 사항]
+  // report_pages.dart에서 AI 추천 식단이 변경되었을 때 호출되는 메서드
+  // void _updateRecommendedMeals() async {
+  //   try {
+  //     // 서버에서 최신 추천 식단 정보 GET
+  //     // final updatedRecipes = await api.getRecommendedRecipes();
+  //     // setState(() {
+  //     //   // _recommendedMeals를 업데이트된 데이터로 갱신
+  //     // });
+  //   } catch (e) {
+  //     // 에러 처리
+  //   }
+  // }
+
   // TODO: [SERVER] 사용자 이름 및 임신 주차 정보 GET
   final String _userName = '김레제';
 
@@ -85,6 +101,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // TODO: [SERVER] 추천 레시피 리스트 Fetch
   // 오늘의 추천 식단 - recipe_pages.dart의 레시피 데이터 사용
+  //
+  // [서버 연동 시 구현 사항]
+  // 1. report_pages.dart에서 AI 추천 식단이 변경되면 서버에 업데이트 요청
+  // 2. 서버에서 변경된 추천 식단 정보를 받아옴
+  // 3. 이 getter가 서버 데이터를 참조하도록 수정
+  // 4. report_pages.dart에서 변경 시 홈 화면의 추천 식단이 자동으로 업데이트되도록
+  //    - 방법 1: 서버에서 푸시 알림으로 홈 화면에 업데이트 신호 전송
+  //    - 방법 2: 홈 화면 진입 시 서버에서 최신 추천 식단 정보 GET
+  //    - 방법 3: report_pages.dart에서 변경 후 Navigator.pop() 시 콜백으로 홈 화면 업데이트
   List<_RecommendedMeal> get _recommendedMeals {
     final recipes = RecipeScreen.getRecommendedRecipes();
     // 레시피를 RecommendedMeal 형식으로 변환
@@ -113,22 +138,12 @@ class _HomeScreenState extends State<HomeScreen> {
           mealId = 'salmon-steak';
       }
 
-      // 태그 추출 (재료나 영양소 기반으로 추정)
-      List<String> tags = [];
-      if (recipe.title.contains('닭') || recipe.title.contains('구이')) {
-        tags = ['단백질', '비타민'];
-      } else if (recipe.title.contains('메밀') || recipe.title.contains('면')) {
-        tags = ['단백질', '미네랄'];
-      } else if (recipe.title.contains('미역')) {
-        tags = ['철분', '칼슘'];
-      }
-
       return _RecommendedMeal(
         id: mealId,
         name: recipe.title,
         imagePath: recipe.imagePath,
-        calories: 350, // TODO: [API] 실제 칼로리 정보로 대체
-        tags: tags,
+        calories: recipe.calories,
+        tags: recipe.tags,
         backgroundColor: backgroundColors[index % backgroundColors.length],
       );
     }).toList();
@@ -514,9 +529,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         TodayMealSection(
                           meals: _mealData,
                           onMealTap: _navigateToRecipe,
-                          onRefresh: () {
-                            // TODO: [SERVER] 추천 식단 새로고침
-                          },
                         ),
                         const SizedBox(height: 20),
                         Text(

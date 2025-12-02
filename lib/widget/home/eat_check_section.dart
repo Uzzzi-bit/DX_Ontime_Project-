@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../theme/color_palette.dart';
 
 class EatCheckSection extends StatelessWidget {
   const EatCheckSection({
@@ -50,67 +51,81 @@ class EatCheckSection extends StatelessWidget {
   }
 
   void _showImagePicker(BuildContext context) {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('카메라로 촬영'),
-              onTap: () async {
-                Navigator.pop(context);
-                try {
-                  final ImagePicker picker = ImagePicker();
-                  // 미리보기용으로는 품질을 낮추지 않고 원본을 사용 (전송 시 원본 화질 유지)
-                  final XFile? image = await picker.pickImage(
-                    source: ImageSource.camera,
-                    // imageQuality를 설정하지 않아 원본 화질 유지
-                  );
-                  if (image != null && context.mounted) {
-                    onImageSelected(image);
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('카메라 오류: ${e.toString()}'),
-                        duration: const Duration(seconds: 2),
-                      ),
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('카메라로 촬영'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  try {
+                    final ImagePicker picker = ImagePicker();
+                    // 미리보기용으로는 품질을 낮추지 않고 원본을 사용 (전송 시 원본 화질 유지)
+                    final XFile? image = await picker.pickImage(
+                      source: ImageSource.camera,
+                      // imageQuality를 설정하지 않아 원본 화질 유지
                     );
+                    if (image != null && context.mounted) {
+                      onImageSelected(image);
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('카메라 오류: ${e.toString()}'),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
                   }
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('앨범에서 선택'),
-              onTap: () async {
-                Navigator.pop(context);
-                try {
-                  final ImagePicker picker = ImagePicker();
-                  // 미리보기용으로는 품질을 낮추지 않고 원본을 사용 (전송 시 원본 화질 유지)
-                  final XFile? image = await picker.pickImage(
-                    source: ImageSource.gallery,
-                    // imageQuality를 설정하지 않아 원본 화질 유지
-                  );
-                  if (image != null && context.mounted) {
-                    onImageSelected(image);
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('앨범 오류: ${e.toString()}'),
-                        duration: const Duration(seconds: 2),
-                      ),
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('앨범에서 선택'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  try {
+                    final ImagePicker picker = ImagePicker();
+                    // 미리보기용으로는 품질을 낮추지 않고 원본을 사용 (전송 시 원본 화질 유지)
+                    final XFile? image = await picker.pickImage(
+                      source: ImageSource.gallery,
+                      // imageQuality를 설정하지 않아 원본 화질 유지
                     );
+                    if (image != null && context.mounted) {
+                      onImageSelected(image);
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('앨범 오류: ${e.toString()}'),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
                   }
-                }
-              },
-            ),
-          ],
+                },
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  '취소',
+                  style: TextStyle(color: ColorPalette.primary200),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

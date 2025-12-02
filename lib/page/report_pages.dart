@@ -186,6 +186,35 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   void _navigateToRecipe() {
+    // TODO: [SERVER] AI 추천 식단 변경 시 홈 화면 업데이트
+    //
+    // [서버 연동 시 구현 사항]
+    // 1. 사용자가 AI 추천 식단 배너를 클릭하여 레시피 페이지로 이동
+    // 2. 레시피 페이지에서 새로운 추천 식단을 선택하거나 변경할 경우:
+    //    - 서버에 새로운 추천 식단 정보 POST/PUT 요청
+    //    - 서버 응답으로 업데이트된 추천 식단 리스트 받아옴
+    // 3. 홈 화면(home_pages.dart)의 추천 식단을 업데이트하는 방법:
+    //    - 방법 1: Navigator.pop() 시 콜백 함수로 홈 화면의 setState() 호출
+    //    - 방법 2: 전역 상태 관리(Provider, Riverpod 등)로 추천 식단 상태 공유
+    //    - 방법 3: 서버에서 푸시 알림으로 홈 화면에 업데이트 신호 전송
+    //    - 방법 4: 홈 화면 진입 시 항상 서버에서 최신 추천 식단 정보 GET
+    //
+    // 예시 코드 (방법 1 - 콜백 사용):
+    // Navigator.push(
+    //   context,
+    //   MaterialPageRoute(
+    //     builder: (context) => RecipeScreen(
+    //       onRecipeUpdated: (updatedRecipes) {
+    //         // 서버에 업데이트된 추천 식단 POST/PUT
+    //         // await api.updateRecommendedRecipes(updatedRecipes);
+    //         // 홈 화면 업데이트를 위한 콜백 또는 상태 관리
+    //       },
+    //     ),
+    //   ),
+    // ).then((_) {
+    //   // 레시피 페이지에서 돌아올 때 홈 화면 새로고침
+    //   // setState(() {}); // 또는 전역 상태 업데이트
+    // });
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const RecipeScreen()),

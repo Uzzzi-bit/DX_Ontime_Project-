@@ -7,10 +7,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-// Commented out the following import as the target file does not exist
-// import 'package:dx_project_prototype/main.dart';
-
-import '../lib/main.dart';
+import 'package:prototype/main.dart';
 
 void main() {
   testWidgets('App smoke test', (WidgetTester tester) async {

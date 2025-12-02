@@ -28,6 +28,8 @@ class RecipeData {
   final String? ovenMode; // 구이, 오븐, 열풍, 스팀, 전자레인지, 복합
   final int? ovenTimeMinutes; // 분 단위
   final OvenSettings? ovenSettings; // 파싱된 오븐 설정 (null 가능)
+  final int calories; // 칼로리
+  final List<String> tags; // 대표 영양소 태그
 
   RecipeData({
     required this.title,
@@ -40,6 +42,8 @@ class RecipeData {
     this.ovenMode,
     this.ovenTimeMinutes,
     this.ovenSettings,
+    required this.calories,
+    required this.tags,
   });
 }
 
@@ -174,6 +178,8 @@ class _RecipeScreenState extends State<RecipeScreen> {
           '4. 예열된 오븐에 180도에서 20분간 구워줍니다.',
           '5. 뒤집어서 10분 더 구워 완성합니다.',
         ]),
+        calories: 350,
+        tags: ['단백질', '비타민'],
       ),
       RecipeData(
         title: '냉메밀',
@@ -202,6 +208,8 @@ class _RecipeScreenState extends State<RecipeScreen> {
           '4. 간장과 설탕을 섞어 양념장을 만듭니다.',
           '5. 면에 양념장을 넣고 곁들여 완성합니다.',
         ]),
+        calories: 400,
+        tags: ['단백질', '미네랄'],
       ),
       RecipeData(
         title: '미역국',
@@ -230,6 +238,8 @@ class _RecipeScreenState extends State<RecipeScreen> {
           '4. 간장으로 간을 맞추고 10분간 끓입니다.',
           '5. 완성합니다.',
         ]),
+        calories: 150,
+        tags: ['철분', '칼슘'],
       ),
     ];
   }
@@ -380,6 +390,60 @@ class _RecipeScreenState extends State<RecipeScreen> {
                   },
                 ),
               ),
+            ),
+            const SizedBox(height: 16),
+            // 칼로리 및 영양소 태그 섹션
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Text(
+                    '${selectedRecipe.calories} kcal',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.2,
+                      color: Color(0xFF49454F),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: selectedRecipe.tags.map((tag) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: const Color(0xFF49454F).withOpacity(0.5),
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        tag,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.2,
+                          color: Color(0xFF49454F),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             // 레시피 섹션
