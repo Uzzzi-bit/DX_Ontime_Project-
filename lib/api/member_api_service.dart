@@ -86,4 +86,28 @@ class MemberApiService {
 
     return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
   }
+
+  /// 4) 임신 모드 업데이트 API
+  /// POST {apiBaseUrl}/api/member/pregnant-mode/
+  /// body: { "uid": "firebase-uid", "is_pregnant_mode": true }
+  Future<Map<String, dynamic>> updatePregnantMode(String uid, bool isPregnantMode) async {
+    final url = Uri.parse('$apiBaseUrl/api/member/pregnant-mode/');
+
+    final res = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'uid': uid,
+        'is_pregnant_mode': isPregnantMode,
+      }),
+    );
+
+    final body = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+
+    if (res.statusCode != 200) {
+      throw Exception('updatePregnantMode 실패: ${res.statusCode} $body');
+    }
+
+    return body;
+  }
 }

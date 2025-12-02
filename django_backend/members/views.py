@@ -55,11 +55,14 @@ def register_member(request):
                     status=400,
                 )
             # email 은 UNIQUE 이므로 email 기준으로 get_or_create
+            # nickname은 이메일의 @ 앞부분을 기본값으로 사용
+            nickname = email.split('@')[0] if email else 'User'
             member, created = Member.objects.get_or_create(
                 email=email,
                 defaults={
                     'firebase_uid': uid,
                     'is_pregnant_mode': False,
+                    'nickname': nickname,
                 },
             )
 
@@ -191,3 +194,48 @@ def get_health_info(request, uid):
     }
 
     return JsonResponse(data)
+
+
+@csrf_exempt
+def update_pregnant_mode(request):
+    """
+    임신 모드 업데이트
+    POST /api/member/pregnant-mode/
+    body: { "uid": "firebase-uid", "is_pregnant_mode": true }
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST only'}, status=405)
+
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    uid = body.get('uid')
+    is_pregnant_mode = body.get('is_pregnant_mode')
+
+    if not uid:
+        return JsonResponse({'error': 'uid is required'}, status=400)
+
+    if is_pregnant_mode is None:
+        return JsonResponse({'error': 'is_pregnant_mode is required'}, status=400)
+
+    try:
+        member = Member.objects.get(firebase_uid=uid)
+        member.is_pregnant_mode = bool(is_pregnant_mode)
+        member.save(update_fields=['is_pregnant_mode'])
+        
+        return JsonResponse({
+            'ok': True,
+            'uid': member.firebase_uid,
+            'is_pregnant_mode': member.is_pregnant_mode,
+        })
+    except Member.DoesNotExist:
+        return JsonResponse({'error': 'member not found'}, status=404)
+    except Exception as e:
+        print('>>> update_pregnant_mode error:', e)
+        traceback.print_exc()
+        return JsonResponse(
+            {'error': 'Server error in update_pregnant_mode', 'detail': str(e)},
+            status=500,
+        )

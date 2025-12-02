@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/color_palette.dart';
 import '../widget/bottom_bar_widget.dart';
+import '../api/member_api_service.dart';
 
 class MomCareSettingScreen extends StatefulWidget {
   const MomCareSettingScreen({super.key});
@@ -28,8 +30,29 @@ class _MomCareSettingScreenState extends State<MomCareSettingScreen> {
   }
 
   Future<void> _saveMomCareMode(bool value) async {
+    // 1) SharedPreferences에 저장
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_momCareModeKey, value);
+
+    // 2) Django 서버에 is_pregnant_mode 업데이트
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await MemberApiService.instance.updatePregnantMode(user.uid, value);
+        debugPrint('is_pregnant_mode 업데이트 성공: $value');
+      }
+    } catch (e) {
+      debugPrint('is_pregnant_mode 업데이트 실패: $e');
+      // 오류가 발생해도 SharedPreferences는 저장되었으므로 사용자에게 알림만 표시
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('서버 업데이트 실패: $e'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
   }
 
   static const _primaryText = ColorPalette.textPrimary;
