@@ -4,6 +4,8 @@ import '../widget/bottom_bar_widget.dart';
 import '../theme/color_palette.dart';
 import 'recipe_pages.dart';
 import 'analysis_pages.dart';
+import '../model/nutrient_type.dart';
+import '../model/daily_nutrient_status.dart';
 
 class MealRecord {
   final String mealType;
@@ -58,6 +60,11 @@ class _ReportScreenState extends State<ReportScreen> {
   late int _selectedMonth; // 현재 월로 초기화
   final PageController _weekPageController = PageController(initialPage: 1000); // 무한 스크롤을 위한 큰 초기값
 
+  // DailyNutrientStatus 기반 영양소 데이터
+  late DailyNutrientStatus _todayStatus;
+  late List<NutrientSlot> _nutrientSlots;
+  bool _hasNutrientData = true; // 기존 필드는 그대로 사용하되, 이제 실제 상태에 맞게 바꾸도록 준비
+
   @override
   void initState() {
     super.initState();
@@ -66,6 +73,10 @@ class _ReportScreenState extends State<ReportScreen> {
     _selectedDate = now;
     _selectedWeekDate = now;
     _selectedMonth = now.month;
+
+    // TODO: [SERVER][DB] 나중에 API 연동으로 교체
+    _todayStatus = createDummyTodayStatus();
+    _buildNutrientSlotsFromStatus();
   }
 
   @override
@@ -79,50 +90,6 @@ class _ReportScreenState extends State<ReportScreen> {
   final String _lackingNutrient = '단백질, 비타민';
   // TODO: [AI] AI가 추천하는 음식은 AI 서버에서 가져오기
   final String _recommendedFood = '닭가슴살 샐러드';
-
-  // TODO: [DB] 영양소 데이터 유무는 데이터베이스에서 확인
-  final bool _hasNutrientData = true; // 데이터 시각화 활성화
-
-  // TODO: [DB] 영양소 슬롯 데이터는 데이터베이스에서 조회
-  // 영양소 슬롯 데이터 (하늘색 계열로 통일)
-  final List<NutrientSlot> _nutrientSlots = [
-    NutrientSlot(
-      name: '탄수화물',
-      current: 180.0,
-      target: 300.0,
-      percent: 60.0,
-    ),
-    NutrientSlot(
-      name: '나트륨',
-      current: 2400.0,
-      target: 3000.0,
-      percent: 80.0,
-    ),
-    NutrientSlot(
-      name: '단백질',
-      current: 40.0,
-      target: 100.0,
-      percent: 40.0,
-    ),
-    NutrientSlot(
-      name: '지방',
-      current: 20.0,
-      target: 100.0,
-      percent: 20.0,
-    ),
-    NutrientSlot(
-      name: '칼슘',
-      current: 600.0,
-      target: 1000.0,
-      percent: 60.0,
-    ),
-    NutrientSlot(
-      name: '철분',
-      current: 15.0,
-      target: 30.0,
-      percent: 50.0,
-    ),
-  ];
 
   // TODO: [DB] 식사 기록 데이터는 데이터베이스에서 조회
   // 식사 기록 데이터
@@ -146,6 +113,81 @@ class _ReportScreenState extends State<ReportScreen> {
       hasRecord: false,
     ),
   ];
+
+  /// DailyNutrientStatus로부터 NutrientSlot 리스트를 생성합니다.
+  void _buildNutrientSlotsFromStatus() {
+    // 리포트 화면에 보여줄 영양소 순서
+    const displayOrder = <NutrientType>[
+      NutrientType.carb,
+      NutrientType.sodium,
+      NutrientType.protein,
+      NutrientType.fat,
+      NutrientType.calcium,
+      NutrientType.iron,
+    ];
+
+    String _nameOf(NutrientType type) {
+      switch (type) {
+        case NutrientType.carb:
+          return '탄수화물';
+        case NutrientType.sodium:
+          return '나트륨';
+        case NutrientType.protein:
+          return '단백질';
+        case NutrientType.fat:
+          return '지방';
+        case NutrientType.calcium:
+          return '칼슘';
+        case NutrientType.iron:
+          return '철분';
+        default:
+          return type.toString();
+      }
+    }
+
+    _nutrientSlots = displayOrder.map((type) {
+      final current = _todayStatus.consumed[type] ?? 0;
+      final target = _todayStatus.recommended[type] ?? 0;
+      final ratio = _todayStatus.getProgress(type); // 0.0~2.0
+      final percent = (ratio * 100).clamp(0, 200);
+
+      return NutrientSlot(
+        name: _nameOf(type),
+        current: current,
+        target: target,
+        percent: percent.toDouble(),
+      );
+    }).toList();
+  }
+
+  /// 선택된 날짜에 대한 일별 영양소 데이터를 다시 로드합니다.
+  ///
+  /// 현재는 더미 데이터를 사용하지만, 나중에 API 연동 시
+  /// userRepository.fetchDailyNutrients()를 통해 서버에서 데이터를 가져옵니다.
+  Future<void> _reloadDailyNutrientsForSelectedDate() async {
+    // TODO: [SERVER][DB] 실제 API 연동 시 userRepository를 통해 데이터 가져오기
+    // 예시:
+    // final result = await userRepository.fetchDailyNutrients(date: _selectedWeekDate);
+    // if (result == null) {
+    //   setState(() {
+    //     _hasNutrientData = false;
+    //   });
+    //   return;
+    // }
+    // _todayStatus = result;
+    // _buildNutrientSlotsFromStatus();
+    // setState(() {
+    //   _hasNutrientData = true;
+    // });
+
+    // 지금은 더미 데이터로 대체
+    _todayStatus = createDummyTodayStatus();
+    _buildNutrientSlotsFromStatus();
+
+    setState(() {
+      _hasNutrientData = true; // TODO: 실제 데이터 없으면 false 처리
+    });
+  }
 
   List<DateTime> _getWeekDates(DateTime date) {
     final week = <DateTime>[];
@@ -196,7 +238,9 @@ class _ReportScreenState extends State<ReportScreen> {
       setState(() {
         _selectedDate = picked;
         _selectedMonth = picked.month;
+        _selectedWeekDate = picked;
       });
+      _reloadDailyNutrientsForSelectedDate();
     }
   }
 
@@ -346,9 +390,11 @@ class _ReportScreenState extends State<ReportScreen> {
       final now = DateTime.now();
       _selectedWeekDate = now;
       _selectedMonth = now.month;
+      _selectedDate = now;
     });
     // PageView를 오늘 주로 이동
     _weekPageController.jumpToPage(1000);
+    _reloadDailyNutrientsForSelectedDate();
   }
 
   DateTime _getWeekStartDate(int pageOffset) {
@@ -492,6 +538,7 @@ class _ReportScreenState extends State<ReportScreen> {
                     _selectedWeekDate = weekStart;
                     _selectedMonth = weekStart.month;
                   });
+                  _reloadDailyNutrientsForSelectedDate();
                 },
                 itemBuilder: (context, page) {
                   final weekStart = _getWeekStartDate(page);

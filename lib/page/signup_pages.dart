@@ -14,6 +14,7 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
+  final TextEditingController _nicknameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _passwordCheckController = TextEditingController();
@@ -21,6 +22,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   void dispose() {
+    _nicknameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _passwordCheckController.dispose();
@@ -28,14 +30,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   Future<void> _signUp() async {
+    final nickname = _nicknameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
     final passwordCheck = _passwordCheckController.text;
 
-    if (email.isEmpty || password.isEmpty || passwordCheck.isEmpty) {
+    if (nickname.isEmpty || email.isEmpty || password.isEmpty || passwordCheck.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('이메일과 비밀번호를 모두 입력해주세요.'),
+          content: Text('닉네임, 이메일, 비밀번호를 모두 입력해주세요.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -66,7 +69,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
       final firebaseEmail = cred.user!.email ?? email;
       // 2) Django 서버에 uid 등록 (MemberApiService 사용)
       try {
-        final result = await MemberApiService.instance.registerMember(uid, email: firebaseEmail);
+        final result = await MemberApiService.instance.registerMember(
+          uid,
+          email: firebaseEmail,
+          nickname: nickname,
+        );
         debugPrint('registerMember result: $result');
 
         if (result['ok'] != true) {
@@ -136,6 +143,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 height: 300,
               ),
               const SizedBox(height: 40),
+              _buildNicknameField(),
+              const SizedBox(height: 16),
               _buildEmailField(),
               const SizedBox(height: 16),
               _buildPasswordField(),
@@ -149,6 +158,26 @@ class _SignUpScreenState extends State<SignUpScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildNicknameField() {
+    return TextField(
+      controller: _nicknameController,
+      keyboardType: TextInputType.text,
+      decoration: InputDecoration(
+        hintText: '닉네임',
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(5),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(5),
+          borderSide: const BorderSide(width: 1.0, color: Colors.black26),
+        ),
+        filled: true,
+        fillColor: Colors.white,
       ),
     );
   }

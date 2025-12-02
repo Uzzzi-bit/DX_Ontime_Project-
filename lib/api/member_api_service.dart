@@ -9,13 +9,20 @@ class MemberApiService {
 
   /// 1) 회원 등록 API
   /// POST {apiBaseUrl}/api/member/register/
-  /// body: { "uid": "firebase-uid", "email": "user@example.com" }
-  Future<Map<String, dynamic>> registerMember(String uid, {String? email}) async {
+  /// body: { "uid": "firebase-uid", "email": "user@example.com", "nickname": "닉네임" }
+  Future<Map<String, dynamic>> registerMember(
+    String uid, {
+    String? email,
+    String? nickname,
+  }) async {
     final url = Uri.parse('$apiBaseUrl/api/member/register/');
 
     final bodyMap = {'uid': uid};
     if (email != null) {
       bodyMap['email'] = email;
+    }
+    if (nickname != null) {
+      bodyMap['nickname'] = nickname;
     }
 
     final res = await http.post(
@@ -109,5 +116,57 @@ class MemberApiService {
     }
 
     return body;
+  }
+
+  /// 5) 일별 영양소 데이터 조회 API
+  /// GET {apiBaseUrl}/api/nutrients/daily?date=YYYY-MM-DD
+  ///
+  /// [date] 조회할 날짜
+  /// Returns DailyNutrientStatus를 생성할 수 있는 JSON 데이터
+  ///
+  /// Response 예시:
+  /// {
+  ///   "recommended": {
+  ///     "energy": 2200,
+  ///     "carb": 260,
+  ///     "protein": 70,
+  ///     "fat": 70,
+  ///     "sodium": 2000,
+  ///     "iron": 27,
+  ///     "folate": 600,
+  ///     "calcium": 1000,
+  ///     "vitaminD": 15,
+  ///     "omega3": 300,
+  ///     "choline": 450
+  ///   },
+  ///   "consumed": {
+  ///     "energy": 1500,
+  ///     "carb": 180,
+  ///     "protein": 50,
+  ///     "fat": 45,
+  ///     "sodium": 1800,
+  ///     "iron": 20,
+  ///     "folate": 400,
+  ///     "calcium": 600,
+  ///     "vitaminD": 10,
+  ///     "omega3": 200,
+  ///     "choline": 300
+  ///   }
+  /// }
+  ///
+  /// TODO: [SERVER][DB] HTTP 클라이언트로 일별 영양 데이터 조회 구현
+  Future<Map<String, dynamic>?> fetchDailyNutrients({required DateTime date}) async {
+    // TODO: [SERVER][DB] 실제 API 호출 구현
+    // final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    // final url = Uri.parse('$apiBaseUrl/api/nutrients/daily?date=$dateStr');
+    //
+    // final res = await http.get(url);
+    //
+    // if (res.statusCode != 200) {
+    //   throw Exception('fetchDailyNutrients 실패: ${res.statusCode} ${res.body}');
+    // }
+    //
+    // return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    return null;
   }
 }
