@@ -557,10 +557,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 child: Row(
                   children: [
-                    const SizedBox(width: 20),
                     Container(
-                      width: 45,
-                      height: 45,
+                      margin: const EdgeInsets.all(10),
+                      width: 60,
+                      height: 60,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(8),
                         image: const DecorationImage(
@@ -568,7 +568,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 36),
+                    SizedBox(width: 8),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -652,47 +652,51 @@ class _HomeScreenState extends State<HomeScreen> {
                   final product = favoriteProducts[index];
                   final iconPath = product['icon'];
 
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
+                  return Container(
+                    margin: EdgeInsets.all(4),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.max,
+                      children: [
+                        Container(
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Center(
+                            child: iconPath != null && iconPath.isNotEmpty
+                                ? Image.asset(
+                                    iconPath,
+                                    width: 60,
+                                    height: 60,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const SizedBox.shrink();
+                                    },
+                                  )
+                                : const SizedBox(height: 60),
+                          ),
                         ),
-                        child: Center(
-                          child: iconPath != null && iconPath.isNotEmpty
-                              ? Image.asset(
-                                  iconPath,
-                                  width: 60,
-                                  height: 60,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const SizedBox.shrink();
-                                  },
-                                )
-                              : const SizedBox(height: 60),
+                        const SizedBox(height: 8),
+                        Text(
+                          product['name'] ?? '',
+                          style:
+                              textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                color: Colors.black,
+                                letterSpacing: 0.5,
+                              ) ??
+                              const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black,
+                                letterSpacing: 0.5,
+                              ),
+                          textAlign: TextAlign.center,
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        product['name'] ?? '',
-                        style:
-                            textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                              color: Colors.black,
-                              letterSpacing: 0.5,
-                            ) ??
-                            const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black,
-                              letterSpacing: 0.5,
-                            ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+                      ],
+                    ),
                   );
                 },
               ),
