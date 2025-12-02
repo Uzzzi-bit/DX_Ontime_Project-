@@ -301,8 +301,8 @@ class _OvenScreenState extends State<OvenScreen> {
                         borderRadius: BorderRadius.circular(28),
                         child: Image.asset(
                           'assets/image/hourglass.png',
-                          width: 104,
-                          height: 104,
+                          width: 160,
+                          height: 160,
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
                             return const Icon(

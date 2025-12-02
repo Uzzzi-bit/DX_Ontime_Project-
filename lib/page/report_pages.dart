@@ -604,11 +604,11 @@ class _ReportScreenState extends State<ReportScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 30),
             // 영양소 분석 슬롯 (오늘 날짜일 때만 표시)
             if (_hasNutrientData && _isToday(_selectedWeekDate))
               SizedBox(
-                height: 180,
+                height: 200,
                 child: GridView.builder(
                   scrollDirection: Axis.vertical,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -644,7 +644,7 @@ class _ReportScreenState extends State<ReportScreen> {
                             '${slot.current.toInt()}/${slot.target.toInt()}mg',
                             style: const TextStyle(
                               color: ColorPalette.text100,
-                              fontSize: 14,
+                              fontSize: 10,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -864,8 +864,8 @@ class _ReportScreenState extends State<ReportScreen> {
           // 편집 아이콘을 오른쪽 상단에 배치
           if (meal.hasRecord)
             Positioned(
-              top: 8,
-              right: 8,
+              top: -16,
+              right: -16,
               child: IconButton(
                 // TODO: [AI] [DB] 편집 시 기존 분석 결과 수정 또는 재분석 기능
                 onPressed: () => _navigateToMealRecord(meal.mealType),
