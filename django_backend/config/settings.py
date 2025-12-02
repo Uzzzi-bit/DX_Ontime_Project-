@@ -16,7 +16,10 @@ SECRET_KEY = 'django-insecure-t=p59=vn4z@m3_e@ds)!0*-sc3e&uy%j=k57r&p#-f)8=48vf%
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# 공용 DB 사용 시: 다른 사람들이 서버에 접속할 수 있도록 허용
+# 개발 환경에서는 모든 호스트 허용 (프로덕션에서는 특정 IP만 허용)
+ALLOWED_HOSTS = ['*']  # 개발용: 모든 호스트 허용
+# 프로덕션에서는: ALLOWED_HOSTS = ['192.168.0.100', 'your-domain.com']
 
 
 # Application definition
@@ -66,13 +69,31 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 
-# ✅ 여기부터 DB 설정 – SQLite 로 변경
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# ✅ DB 설정
+# PostgreSQL 사용하려면 아래 USE_POSTGRESQL을 True로 변경하고 비밀번호를 입력하세요
+USE_POSTGRESQL = True  # True로 변경하면 PostgreSQL 사용
+
+if USE_POSTGRESQL:
+    # PostgreSQL 사용 (공용 DB)
+    # 아래 값들을 pgAdmin에서 설정한 값으로 수정하세요
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'dx_ontime_db',        # 데이터베이스 이름
+            'USER': 'dx_user',             # 사용자 이름
+            'PASSWORD': 'mypass1234',                # ⚠️ 여기에 pgAdmin에서 설정한 비밀번호 입력
+            'HOST': 'localhost',           # localhost 또는 서버 IP 주소
+            'PORT': '5432',                # PostgreSQL 포트
+        }
     }
-}
+else:
+    # SQLite 사용 (로컬 개발용 - 기본값)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
