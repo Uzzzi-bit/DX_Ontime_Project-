@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/color_palette.dart';
 
 class NutrientGrid extends StatelessWidget {
   const NutrientGrid({
@@ -93,7 +94,7 @@ class NutrientGrid extends StatelessWidget {
                   width: 55,
                   height: 30,
                   decoration: const BoxDecoration(
-                    color: Color(0xFFF0F0F0),
+                    color: Color(0xFFF0F0F0), // 항상 연한 회색
                   ),
                 ),
                 // 채워지는 게이지
@@ -108,7 +109,8 @@ class NutrientGrid extends StatelessWidget {
                           gradient: LinearGradient(
                             colors: [
                               Color(0xFFFEF493),
-                              Color(0xFFD2ECBF),
+                              Color(0xFFDDEDC1),
+                              Color(0xFFBCE7F0),
                             ],
                             begin: Alignment.centerLeft,
                             end: Alignment.centerRight,
@@ -117,6 +119,19 @@ class NutrientGrid extends StatelessWidget {
                       ),
                     ),
                   ),
+                // 퍼센트 텍스트 (항상 중앙 정렬)
+                Center(
+                  child: Text(
+                    '${clampedProgress.toInt()}%',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: clampedProgress == 0
+                          ? const Color(0xFF808080) // 0%일 때 회색 텍스트
+                          : ColorPalette.text100, // 게이지가 올라갔을 때 테마 블랙
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

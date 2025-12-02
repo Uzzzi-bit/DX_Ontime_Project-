@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../widget/bottom_bar_widget.dart';
 import '../widget/home/header_section.dart';
 import '../widget/home/nutrient_grid.dart';
@@ -13,6 +14,8 @@ import '../widget/home/rounded_container.dart';
 import 'chat_pages.dart';
 import 'report_pages.dart';
 import 'recipe_pages.dart';
+import '../model/user_model.dart';
+import '../repository/user_repository.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,6 +27,49 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _qaController = TextEditingController();
   String? _selectedImagePath; // 선택된 이미지 경로 저장
+
+  // Mom Care Mode 상태
+  bool _isMomCareMode = false;
+  bool _isLoading = true;
+  UserModel? _userData;
+  static const String _momCareModeKey = 'isMomCareMode';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Shared Preferences에서 Mom Care Mode 상태 불러오기
+      final prefs = await SharedPreferences.getInstance();
+      final isMomCareMode = prefs.getBool(_momCareModeKey) ?? false;
+
+      // UserRepository에서 사용자 데이터 불러오기
+      final userData = await UserRepository.getDummyUser();
+
+      if (mounted) {
+        setState(() {
+          _isMomCareMode = isMomCareMode;
+          _userData = userData;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      // 에러 발생 시 기본값 사용
+      if (mounted) {
+        setState(() {
+          _isMomCareMode = false;
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   // TODO: [SERVER] 추천 식단 업데이트 메서드
   //
@@ -41,14 +87,10 @@ class _HomeScreenState extends State<HomeScreen> {
   //   }
   // }
 
-  // TODO: [SERVER] 사용자 이름 및 임신 주차 정보 GET
-  final String _userName = '김레제';
-
-  // TODO: [SERVER] 출산 예정일 및 임신 시작일 정보 GET
-  // 출산 예정일: 2026.07.01
-  final DateTime _dueDate = DateTime(2026, 7, 1);
-  // 임시: 현재 임신 주차를 20주차로 고정
-  static const int _fixedPregnancyWeek = 20;
+  // 사용자 정보 (UserRepository에서 로드)
+  String get _userName => _userData?.nickname ?? '김레제';
+  DateTime get _dueDate => _userData?.dueDate ?? DateTime(2026, 7, 1);
+  int get _pregnancyWeek => _userData?.pregnancyWeek ?? 20;
 
   // TODO: [DB] 금일 칼로리 섭취량 및 목표량 GET
   double _currentCalorie = 1000.0; // 임시 데이터
@@ -56,10 +98,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // TODO: [DB] 금일 영양소 섭취 현황 데이터 로드
   // 영양소 섭취량 (0.0 ~ 100.0 퍼센트) - 리포트 페이지와 영양제 체크 시 증가
+  // [테스트용] 80%, 90% 확인을 위해 일부 수치 조절
   Map<_NutrientType, double> _nutrientProgress = {
     _NutrientType.iron: 70.0, // 철분 기본값
-    _NutrientType.vitaminD: 0.0, // 비타민D 기본값
-    _NutrientType.folate: 0.0, // 엽산 기본값
+    _NutrientType.vitaminD: 80.0, // 비타민D - 테스트용 80%
+    _NutrientType.folate: 90.0, // 엽산 - 테스트용 90%
     _NutrientType.omega3: 0.0, // 오메가-3 기본값
     _NutrientType.calcium: 0.0, // 칼슘 기본값
     _NutrientType.choline: 0.0, // 콜린 기본값
@@ -229,20 +272,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
-  // 임신 주차 계산 (임시: 20주차로 고정)
+  // 임신 주차 계산
   int _getPregnancyWeek() {
-    // TODO: [SERVER] 실제 임신 주차 정보로 대체
-    return _fixedPregnancyWeek;
+    return _pregnancyWeek;
   }
 
   // 임신 진행률 계산 (0.0 ~ 1.0) - 출산예정일까지의 남은 기간 기준
-  // 20주차 = 140일 경과, 전체 280일 중 50% 진행
   double _getPregnancyProgress() {
-    // TODO: [SERVER] 실제 임신 진행률로 대체
-    // 임시: 20주차 = 140일 경과 / 280일 = 0.5 (50%)
-    const int currentWeek = _fixedPregnancyWeek;
+    final currentWeek = _pregnancyWeek;
     const int totalWeeks = 40;
-    const double progress = currentWeek / totalWeeks;
+    final double progress = currentWeek / totalWeeks;
     return progress.clamp(0.0, 1.0);
   }
 
@@ -342,8 +381,56 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Mode OFF 화면 빌드
+  Widget _buildModeOffView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // 이미지 표시
+            Image.asset(
+              'assets/image/img_app_home.png',
+              width: double.infinity,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(
+                  Icons.image,
+                  size: 200,
+                  color: Color(0xFFD0D0D0),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // 로딩 중일 때
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+        bottomNavigationBar: const BottomBarWidget(currentRoute: '/'),
+      );
+    }
+
+    // Mom Care Mode가 OFF일 때
+    if (!_isMomCareMode) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: _buildModeOffView(),
+        bottomNavigationBar: const BottomBarWidget(currentRoute: '/'),
+      );
+    }
+
+    // Mom Care Mode가 ON일 때 - 기존 대시보드
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
     final now = DateTime.now();
@@ -447,6 +534,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         current: _currentCalorie,
                                         target: _targetCalorie,
                                         gradientColors: const [
+                                          Color(0xFFBCE7F0),
                                           Color(0xFFFEF493),
                                           Color(0xFFDDEDC1),
                                           Color(0xFFBCE7F0),

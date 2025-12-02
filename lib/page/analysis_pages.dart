@@ -29,6 +29,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     super.dispose();
   }
 
+  // TODO: [AI] [DB] 사진 선택 및 AI 이미지 분석
   Future<void> _handleImageSelection(ImageSource source) async {
     try {
       final picked = await _picker.pickImage(source: source);
@@ -37,6 +38,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         _selectedImage = File(picked.path);
         _currentStep = _AnalysisStep.analyzingImage;
       });
+      // TODO: [AI] 실제 AI 서버에 이미지 분석 요청
+      // await _analyzeImageWithAI(File(picked.path));
       _simulateImageAnalysis();
     } catch (e) {
       if (!mounted) return;
@@ -45,6 +48,33 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       );
     }
   }
+
+  // TODO: [AI] AI 이미지 분석 함수 구현
+  // Future<void> _analyzeImageWithAI(File imageFile) async {
+  //   try {
+  //     // 1. 이미지를 서버에 업로드
+  //     // final imageUrl = await api.uploadImageForAnalysis(imageFile);
+  //
+  //     // 2. AI 서버에 분석 요청
+  //     // final analysisResult = await api.analyzeMealImage(
+  //     //   imageFile: imageFile,
+  //     //   // 또는 imageUrl: imageUrl,
+  //     // );
+  //
+  //     // 3. 분석 결과 처리
+  //     // setState(() {
+  //     //   _currentStep = _AnalysisStep.reviewFoods;
+  //     //   _foodItems.clear();
+  //     //   _foodItems.addAll(analysisResult.foods.map((f) => f.name));
+  //     // });
+  //   } catch (e) {
+  //     // 에러 처리
+  //     if (!mounted) return;
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('이미지 분석 중 오류가 발생했습니다: $e')),
+  //     );
+  //   }
+  // }
 
   void _simulateImageAnalysis() {
     Future.delayed(const Duration(seconds: 3), () {
@@ -105,10 +135,14 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     }
   }
 
+  // TODO: [AI] [DB] 영양소 분석 및 데이터베이스 저장
   void _startNutrientAnalysis() {
     setState(() {
       _currentStep = _AnalysisStep.nutrientAnalysis;
     });
+
+    // TODO: [AI] 실제 AI 서버에 영양소 분석 요청
+    // _analyzeNutrientsAndSave();
 
     Future.delayed(const Duration(seconds: 3), () {
       if (!mounted) return;
@@ -118,6 +152,48 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       Navigator.pop(context);
     });
   }
+
+  // TODO: [AI] [DB] 영양소 분석 및 저장 함수 구현
+  // Future<void> _analyzeNutrientsAndSave() async {
+  //   try {
+  //     // 1. 최종 음식 목록을 AI 서버에 전송하여 영양소 분석
+  //     // final nutrientAnalysis = await api.analyzeNutrients(
+  //     //   foods: _foodItems,
+  //     //   mealType: widget.mealType, // report_pages에서 전달받은 mealType
+  //     //   date: widget.selectedDate, // report_pages에서 전달받은 date
+  //     // );
+  //
+  //     // 2. 분석된 사진을 서버에 업로드
+  //     // final imageUrl = await api.uploadMealImage(_selectedImage!);
+  //
+  //     // 3. 데이터베이스에 저장
+  //     // await api.saveMealRecord(
+  //     //   mealType: widget.mealType,
+  //     //   date: widget.selectedDate,
+  //     //   imageUrl: imageUrl,
+  //     //   analysisResult: nutrientAnalysis,
+  //     //   menuText: _foodItems.join(', '),
+  //     // );
+  //
+  //     // 4. 리포트 화면에 결과 전달 (콜백 또는 상태 관리)
+  //     // if (widget.onAnalysisComplete != null) {
+  //     //   widget.onAnalysisComplete!({
+  //     //     'imageUrl': imageUrl,
+  //     //     'analysisResult': nutrientAnalysis,
+  //     //     'menuText': _foodItems.join(', '),
+  //     //   });
+  //     // }
+  //
+  //     // 5. 리포트 화면으로 돌아가기
+  //     // Navigator.pop(context);
+  //   } catch (e) {
+  //     // 에러 처리
+  //     if (!mounted) return;
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('분석 중 오류가 발생했습니다: $e')),
+  //     );
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -241,6 +317,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             onPressed: () => _handleImageSelection(ImageSource.camera),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
+              foregroundColor: ColorPalette.primary200,
             ),
             icon: const Icon(Icons.camera_alt_outlined),
             label: const Text('바로 촬영'),
@@ -252,6 +329,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             onPressed: () => _handleImageSelection(ImageSource.gallery),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
+              foregroundColor: ColorPalette.primary200,
             ),
             icon: const Icon(Icons.photo_library_outlined),
             label: const Text('사진 선택'),

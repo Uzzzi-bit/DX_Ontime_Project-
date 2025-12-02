@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/color_palette.dart';
 import '../widget/bottom_bar_widget.dart';
 
@@ -11,6 +12,25 @@ class MomCareSettingScreen extends StatefulWidget {
 
 class _MomCareSettingScreenState extends State<MomCareSettingScreen> {
   bool _isMomCareOn = false;
+  static const String _momCareModeKey = 'isMomCareMode';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMomCareMode();
+  }
+
+  Future<void> _loadMomCareMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isMomCareOn = prefs.getBool(_momCareModeKey) ?? false;
+    });
+  }
+
+  Future<void> _saveMomCareMode(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_momCareModeKey, value);
+  }
 
   static const _primaryText = ColorPalette.textPrimary;
   static const _secondaryText = ColorPalette.textSecondary;
@@ -126,8 +146,9 @@ class _MomCareSettingScreenState extends State<MomCareSettingScreen> {
                 value: _isMomCareOn,
                 activeColor: _surface,
                 activeTrackColor: _accent,
-                onChanged: (value) {
+                onChanged: (value) async {
                   setState(() => _isMomCareOn = value);
+                  await _saveMomCareMode(value);
                 },
               ),
             ],
