@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/color_palette.dart';
 import '../service/storage_service.dart';
@@ -286,20 +287,23 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: SafeArea(
                   child: Row(
                     children: [
-                      InkWell(
-                        onTap: _handleImagePicker,
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: ColorPalette.bg200,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Icon(
-                            Icons.add,
-                            color: ColorPalette.text100,
-                            size: 24,
+                      Bounceable(
+                        onTap: () {},
+                        child: InkWell(
+                          onTap: _handleImagePicker,
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: ColorPalette.bg200,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Icon(
+                              Icons.add,
+                              color: ColorPalette.text100,
+                              size: 24,
+                            ),
                           ),
                         ),
                       ),
@@ -335,20 +339,23 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      InkWell(
-                        onTap: _handleSendMessage,
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          width: 28,
-                          height: 28,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: ColorPalette.primary100,
-                          ),
-                          child: const Icon(
-                            Icons.send,
-                            color: ColorPalette.text100,
-                            size: 16,
+                      Bounceable(
+                        onTap: () {},
+                        child: InkWell(
+                          onTap: _handleSendMessage,
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            width: 45,
+                            height: 45,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: ColorPalette.primary100,
+                            ),
+                            child: const Icon(
+                              Icons.send,
+                              color: ColorPalette.text100,
+                              size: 20,
+                            ),
                           ),
                         ),
                       ),

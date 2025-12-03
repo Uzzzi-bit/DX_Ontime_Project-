@@ -4,6 +4,7 @@ import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:prototype/api_config.dart';
@@ -284,19 +285,22 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
                   const SizedBox(height: 24),
                   _buildAllergySection(theme),
                   const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: _isLoading ? null : _handleSave,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: ColorPalette.primary200,
-                        foregroundColor: ColorPalette.bg100,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  Bounceable(
+                    onTap: () {},
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: _isLoading ? null : _handleSave,
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          backgroundColor: ColorPalette.primary200,
+                          foregroundColor: ColorPalette.bg100,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
+                        child: Text(_isLoading ? '저장 중...' : '저장하기'),
                       ),
-                      child: Text(_isLoading ? '저장 중...' : '저장하기'),
                     ),
                   ),
                 ],

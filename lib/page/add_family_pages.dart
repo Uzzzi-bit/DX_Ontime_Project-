@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_bounceable/flutter_bounceable.dart';
 import '../theme/color_palette.dart';
 import '../widget/bottom_bar_widget.dart';
 import '../api/family_api_service.dart';
@@ -262,33 +263,36 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
                       ),
               ),
               const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: (_selectedIds.isEmpty || _isLoading) ? null : _handleSubmit,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: colorScheme.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+              Bounceable(
+                onTap: () {},
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: (_selectedIds.isEmpty || _isLoading) ? null : _handleSubmit,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colorScheme.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : Text(
+                            _selectedIds.isEmpty ? '구성원을 선택해 주세요' : '${_selectedIds.length}명 추가하기',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : Text(
-                          _selectedIds.isEmpty ? '구성원을 선택해 주세요' : '${_selectedIds.length}명 추가하기',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
                 ),
               ),
               const SizedBox(height: 8),

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../theme/color_palette.dart';
 
@@ -197,20 +198,23 @@ class EatCheckSection extends StatelessWidget {
           ),
           child: Row(
             children: [
-              InkWell(
-                onTap: () => _showImagePicker(context),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color(0xFFBCE7F0),
-                  ),
-                  child: const Icon(
-                    Icons.add,
-                    size: 18,
-                    color: Color(0xFF0F0F0F),
+              Bounceable(
+                onTap: () {},
+                child: InkWell(
+                  onTap: () => _showImagePicker(context),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFFBCE7F0),
+                    ),
+                    child: const Icon(
+                      Icons.add,
+                      size: 18,
+                      color: Color(0xFF0F0F0F),
+                    ),
                   ),
                 ),
               ),
@@ -232,20 +236,23 @@ class EatCheckSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              InkWell(
-                onTap: onSubmit,
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color(0xFFBCE7F0),
-                  ),
-                  child: const Icon(
-                    Icons.send,
-                    size: 16,
-                    color: Color(0xFF0F0F0F),
+              Bounceable(
+                onTap: () {},
+                child: InkWell(
+                  onTap: onSubmit,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFFBCE7F0),
+                    ),
+                    child: const Icon(
+                      Icons.send,
+                      size: 16,
+                      color: Color(0xFF0F0F0F),
+                    ),
                   ),
                 ),
               ),

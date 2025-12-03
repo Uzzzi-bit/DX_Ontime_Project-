@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:intl/intl.dart';
 import '../widget/bottom_bar_widget.dart';
 import '../theme/color_palette.dart';
@@ -578,43 +579,46 @@ class _ReportScreenState extends State<ReportScreen> {
                       }
 
                       return Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedWeekDate = date;
-                            });
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 2),
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            decoration: BoxDecoration(
-                              color: isSelected ? ColorPalette.primary100.withOpacity(0.3) : Colors.transparent,
-                              border: Border.all(
-                                color: isSelected ? ColorPalette.primary100 : ColorPalette.bg300,
+                        child: Bounceable(
+                          onTap: () {},
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedWeekDate = date;
+                              });
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 2),
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isSelected ? ColorPalette.primary100.withOpacity(0.3) : Colors.transparent,
+                                border: Border.all(
+                                  color: isSelected ? ColorPalette.primary100 : ColorPalette.bg300,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  weekdayNames[weekdayIndex],
-                                  style: TextStyle(
-                                    color: isSelected ? ColorPalette.text100 : ColorPalette.text200,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w400,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    weekdayNames[weekdayIndex],
+                                    style: TextStyle(
+                                      color: isSelected ? ColorPalette.text100 : ColorPalette.text200,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w400,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${date.day}',
-                                  style: TextStyle(
-                                    color: isSelected ? ColorPalette.text100 : ColorPalette.text200,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${date.day}',
+                                    style: TextStyle(
+                                      color: isSelected ? ColorPalette.text100 : ColorPalette.text200,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -627,31 +631,35 @@ class _ReportScreenState extends State<ReportScreen> {
             const SizedBox(height: 24),
             // TODO: [AI] AI 추천 식단 배너 - AI 서버에서 추천 식단 정보를 가져와야 함
             // TODO: [DB] 부족한 영양소 정보는 데이터베이스에서 분석하여 가져오기
-            InkWell(
-              onTap: _navigateToRecipe,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [ColorPalette.gradientYellow.withOpacity(0.1), ColorPalette.primary100.withOpacity(0.1)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+            Bounceable(
+              onTap: () {},
+              child: InkWell(
+                onTap: _navigateToRecipe,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [ColorPalette.gradientYellow.withOpacity(0.1), ColorPalette.primary100.withOpacity(0.1)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: ColorPalette.bg300),
                   ),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: ColorPalette.bg300),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'AI 추천 식단',
-                      style: TextStyle(
-                        color: ColorPalette.text100,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'AI 추천 식단',
+                        style: TextStyle(
+                          color: ColorPalette.text100,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
+<<<<<<< HEAD
                     ),
                     const SizedBox(height: 8),
                     // TODO: [AI] AI가 생성한 추천 메시지는 AI 서버에서 가져오기
@@ -663,9 +671,21 @@ class _ReportScreenState extends State<ReportScreen> {
                         fontSize: 14,
                         fontWeight: FontWeight.w400,
                         height: 1.4,
+=======
+                      const SizedBox(height: 8),
+                      // TODO: [AI] AI가 생성한 추천 메시지는 AI 서버에서 가져오기
+                      Text(
+                        '$_userName님, 다음 식사는 $_lackingNutrient 보충을 위해 $_recommendedFood은(는) 어떤가요? 🥗',
+                        style: const TextStyle(
+                          color: ColorPalette.text100,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                          height: 1.4,
+                        ),
+>>>>>>> 1f4b5fa68d10300cb53e84e5223afff2b4063d7b
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
