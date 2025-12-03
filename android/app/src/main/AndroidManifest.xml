@@ -1,4 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 네트워크 요청을 위한 인터넷 권한 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 카메라 접근 권한 -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- 앨범 접근 권한 (Android 13 이상) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- 앨범 접근 권한 (Android 12 이하) -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- 카메라 기능 사용 선언 -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    
     <application
         android:label="dx_project_prototype"
         android:name="${applicationName}"

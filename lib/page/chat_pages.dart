@@ -58,12 +58,18 @@ class _ChatScreenState extends State<ChatScreen> {
 
       // 초기 이미지가 있으면 업로드
       if (widget.initialImagePath != null) {
-        _uploadImage(File(widget.initialImagePath!));
-      }
+        final imgFile = File(widget.initialImagePath!);
+        _uploadImage(imgFile);
 
-      // 초기 텍스트에 대한 AI 응답
-      if (widget.initialText != null && widget.initialText!.isNotEmpty) {
-        _fetchCanEatFromText(widget.initialText!);
+        // [수정] 초기 이미지가 있다면 이미지 분석 요청을 보내야 함
+        // (XFile로 변환하여 요청)
+        _sendRequestToAI(
+          query: '이 음식 먹어도 되나요?',
+          imageFile: XFile(widget.initialImagePath!),
+        );
+      } else if (widget.initialText != null && widget.initialText!.isNotEmpty) {
+        // 텍스트만 있는 경우
+        _sendRequestToAI(query: widget.initialText!);
       }
     }
   }
@@ -75,28 +81,20 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  /// AI 연결 전 고정 답변을 반환합니다.
   String _getDefaultResponse(String query) {
-    // 사용자 입력을 기반으로 간단한 키워드 매칭
     final lowerQuery = query.toLowerCase();
 
     if (lowerQuery.contains('연어') || lowerQuery.contains('생선') || lowerQuery.contains('회')) {
-      return '연어와 생선류에 대한 안내\n\n임신 중에는 생선을 섭취할 때 주의가 필요해요. 연어는 오메가-3가 풍부해 좋지만, 생선회나 날생선은 식중독 위험이 있어 피하는 것이 좋습니다. 완전히 익힌 생선은 안전하게 드실 수 있어요. 다만, 상어, 황새치, 참치 등 수은 함량이 높은 생선은 주의가 필요합니다.';
+      return '연어와 생선류에 대한 안내\n\n임신 중에는 생선을 섭취할 때 주의가 필요해요. 연어는 오메가-3가 풍부해 좋지만, 생선회나 날생선은 식중독 위험이 있어 피하는 것이 좋습니다. 완전히 익힌 생선은 안전하게 드실 수 있어요.';
     } else if (lowerQuery.contains('커피') || lowerQuery.contains('카페인')) {
-      return '커피와 카페인에 대한 안내\n\n임신 중 카페인은 하루 200mg 이하로 제한하는 것이 좋아요. 이는 일반적인 커피 1~2잔 정도에 해당합니다. 과도한 카페인 섭취는 저체중 출산이나 조산 위험을 높일 수 있으니 적당히 드시는 것이 좋습니다.';
+      return '커피와 카페인에 대한 안내\n\n임신 중 카페인은 하루 200mg 이하로 제한하는 것이 좋아요. 이는 일반적인 커피 1~2잔 정도에 해당합니다.';
     } else if (lowerQuery.contains('술') || lowerQuery.contains('알코올') || lowerQuery.contains('와인')) {
-      return '알코올 섭취에 대한 안내\n\n임신 중에는 어떤 양의 알코올도 안전하지 않습니다. 알코올은 태아의 발달에 영향을 줄 수 있어 완전히 피하는 것이 가장 좋아요. 술, 와인, 맥주 등 모든 알코올 음료는 임신 기간 동안 금지됩니다.';
-    } else if (lowerQuery.contains('치즈') || lowerQuery.contains('우유') || lowerQuery.contains('유제품')) {
-      return '유제품 섭취에 대한 안내\n\n우유와 일반 치즈는 안전하게 드실 수 있어요. 다만, 생우유나 비살균 유제품, 부드러운 치즈(브리, 카망베르 등)는 리스테리아 감염 위험이 있어 피하는 것이 좋습니다. 완전히 익힌 치즈나 살균 처리된 유제품은 안전하게 드실 수 있어요.';
-    } else if (lowerQuery.contains('날') || lowerQuery.contains('회') || lowerQuery.contains('생')) {
-      return '날음식 섭취에 대한 안내\n\n임신 중에는 날음식이나 덜 익힌 음식을 피하는 것이 좋아요. 생선회, 육회, 날계란 등은 식중독이나 기생충 감염 위험이 있습니다. 모든 음식은 완전히 익혀서 드시는 것이 가장 안전합니다.';
+      return '알코올 섭취에 대한 안내\n\n임신 중에는 어떤 양의 알코올도 안전하지 않습니다. 태아의 발달에 영향을 줄 수 있어 완전히 피하는 것이 가장 좋아요.';
     } else {
-      // 일반적인 안내 메시지
-      return '임산부 음식 섭취 안내\n\n임신 중에는 균형 잡힌 식단이 중요해요. 신선한 채소와 과일, 완전히 익힌 단백질(닭고기, 생선, 계란), 통곡물을 중심으로 드시는 것이 좋습니다. 생음식, 날음식, 비살균 유제품, 과도한 카페인, 알코올은 피하는 것이 좋아요. 구체적인 음식에 대한 질문이 있으시면 언제든 물어보세요!';
+      return '임산부 음식 섭취 안내\n\n임신 중에는 균형 잡힌 식단이 중요해요. 신선한 채소와 과일, 완전히 익힌 단백질을 드시는 것이 좋습니다. 구체적인 음식에 대한 질문이 있으시면 언제든 물어보세요!';
     }
   }
 
-  /// 스크롤을 맨 아래로 이동시키는 헬퍼 함수
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -109,82 +107,71 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  Future<void> _fetchCanEatFromText(String query) async {
+  /// [핵심 수정] 텍스트와 이미지를 모두 처리하는 통합 함수로 변경했습니다.
+  Future<void> _sendRequestToAI({required String query, XFile? imageFile}) async {
     if (!mounted) return;
 
     setState(() {
       _isLoading = true;
     });
 
+    // 요청 시작하자마자 스크롤 내려줌 (사용자 경험 향상)
+    _scrollToBottom();
+
     try {
-      // 10초 타임아웃 설정 - 연결이 안 되면 빠르게 고정 답변으로 전환
-      final result = await fetchCanEatFromText(query).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          // 타임아웃 시 에러 응답 반환
-          return CanEatResponse(
-            status: 'error',
-            headline: '분석에 실패했어요.',
-            reason: '네트워크 상태를 확인하거나, 잠시 후 다시 시도해주세요.',
-            targetType: '',
-            itemName: '',
+      // API 호출 (이미지가 있으면 imageFile도 같이 전달됨)
+      final result =
+          await fetchCanEat(
+            query: query,
+            imageFile: imageFile,
+          ).timeout(
+            const Duration(seconds: 15), // 타임아웃 15초로 넉넉하게
+            onTimeout: () {
+              return CanEatResponse(
+                status: 'error',
+                headline: '분석에 실패했어요.',
+                reason: '네트워크 상태를 확인하거나, 잠시 후 다시 시도해주세요.',
+                targetType: '',
+                itemName: '',
+              );
+            },
           );
-        },
-      );
 
       if (!mounted) return;
 
-      // API가 연결되지 않았거나 에러가 발생한 경우 고정 답변 사용
       if (result.status == 'error') {
         final defaultResponse = _getDefaultResponse(query);
         setState(() {
-          _messages.add(
-            ChatMessage(
-              isUser: false,
-              text: defaultResponse,
-            ),
-          );
-          _isLoading = false;
+          _messages.add(ChatMessage(isUser: false, text: defaultResponse));
         });
       } else {
-        // 정상 응답인 경우 headline과 reason을 합쳐서 AI 응답 메시지로 추가
         final responseText = '${result.headline}\n\n${result.reason}';
         setState(() {
-          _messages.add(
-            ChatMessage(
-              isUser: false,
-              text: responseText,
-            ),
-          );
-          _isLoading = false;
+          _messages.add(ChatMessage(isUser: false, text: responseText));
         });
       }
     } catch (e) {
       if (!mounted) return;
-      // 예외 발생 시에도 고정 답변 사용
       final defaultResponse = _getDefaultResponse(query);
       setState(() {
-        _messages.add(
-          ChatMessage(
-            isUser: false,
-            text: defaultResponse,
-          ),
-        );
-        _isLoading = false;
+        _messages.add(ChatMessage(isUser: false, text: defaultResponse));
       });
+    } finally {
+      // 로딩 끝내고 스크롤 이동
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _scrollToBottom();
+      }
     }
-
-    // 스크롤을 맨 아래로
-    _scrollToBottom();
   }
 
   Future<void> _handleImagePicker() async {
     final result = await showDialog<ImageSource>(
       context: context,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 20),
           child: Column(
@@ -203,10 +190,7 @@ class _ChatScreenState extends State<ChatScreen> {
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  '취소',
-                  style: TextStyle(color: ColorPalette.primary200),
-                ),
+                child: const Text('취소', style: TextStyle(color: ColorPalette.primary200)),
               ),
             ],
           ),
@@ -218,7 +202,7 @@ class _ChatScreenState extends State<ChatScreen> {
       try {
         final XFile? image = await _imagePicker.pickImage(source: result);
         if (image != null && mounted) {
-          final imageFile = File(image.path);
+          // 1. UI에 이미지 메시지 추가
           setState(() {
             _messages.add(
               ChatMessage(
@@ -229,14 +213,14 @@ class _ChatScreenState extends State<ChatScreen> {
             );
           });
 
-          // 이미지 업로드 (백그라운드)
-          _uploadImage(imageFile);
+          // 2. Firebase 업로드 (백그라운드)
+          _uploadImage(File(image.path));
 
-          // 이미지 전송 후 스크롤
-          _scrollToBottom();
-
-          // 이미지에 대한 AI 분석 요청
-          _fetchCanEatFromText('방금 올린 사진의 음식 먹어도 되나요?');
+          // 3. [핵심] AI에게 이미지 파일 실어서 전송
+          _sendRequestToAI(
+            query: '이 음식 먹어도 되나요?', // AI에게 던지는 힌트 질문
+            imageFile: image, // 실제 이미지 파일 전달
+          );
         }
       } catch (e) {
         if (mounted) {
@@ -248,28 +232,20 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  /// 이미지를 Firebase Storage에 업로드하고 Firestore에 저장합니다.
   Future<void> _uploadImage(File imageFile) async {
     try {
       final storageService = StorageService();
       final imageRepository = ImageRepository();
-
-      // 1. Firebase Storage에 이미지 업로드
       final imageUrl = await storageService.uploadImage(
         imageFile: imageFile,
         folder: 'chat_images',
       );
-
-      // 2. Firestore에 이미지 정보 저장
       await imageRepository.saveImageWithUrl(
         imageUrl: imageUrl,
         imageType: ImageType.chat,
         source: ImageSourceType.aiChat,
       );
-
-      // TODO: [AI] AI 분석 결과가 나오면 updateIngredientInfo()로 ingredient_info 업데이트
     } catch (e) {
-      // 업로드 실패는 조용히 처리 (사용자 경험을 위해)
       debugPrint('이미지 업로드 실패: $e');
     }
   }
@@ -277,28 +253,20 @@ class _ChatScreenState extends State<ChatScreen> {
   void _handleSendMessage() {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
-    if (_isLoading) return; // 로딩 중에는 중복 요청 방지
+    if (_isLoading) return;
 
-    // 사용자 메시지 추가
     setState(() {
-      _messages.add(
-        ChatMessage(
-          isUser: true,
-          text: text,
-        ),
-      );
+      _messages.add(ChatMessage(isUser: true, text: text));
       _textController.clear();
     });
 
-    // 메시지 추가 후 즉시 스크롤
-    _scrollToBottom();
-
-    // can-eat API 호출
-    _fetchCanEatFromText(text);
+    // 텍스트만 전송
+    _sendRequestToAI(query: text);
   }
 
   @override
   Widget build(BuildContext context) {
+    // ... (build 메서드는 기존과 동일, 변경 없음)
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -526,26 +494,30 @@ class _ChatScreenState extends State<ChatScreen> {
             Flexible(
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 280),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14), // 내부 여백 증가
                 decoration: BoxDecoration(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Container(
-                  padding: EdgeInsets.all(20),
-                  constraints: BoxConstraints(
-                    maxWidth: 450,
+                  color: Colors.white, // 흰색 배경을 바깥 컨테이너에 적용 (UI 버그 수정)
+                  borderRadius: const BorderRadius.only(
+                    topRight: Radius.circular(25),
+                    bottomLeft: Radius.circular(25),
+                    bottomRight: Radius.circular(25),
                   ),
-                  color: Colors.white,
-                  child: Text(
-                    text,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w300,
-                      color: isLoading ? ColorPalette.text300 : ColorPalette.text100,
-                      letterSpacing: 0.5,
-                      height: 1.3,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
                     ),
+                  ],
+                ),
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 15, // 폰트 사이즈 살짝 키움 (가독성)
+                    fontWeight: FontWeight.w400, // 굵기 살짝 조정
+                    color: isLoading ? ColorPalette.text300 : ColorPalette.text100,
+                    letterSpacing: 0.5,
+                    height: 1.4, // 줄간격 조정
                   ),
                 ),
               ),

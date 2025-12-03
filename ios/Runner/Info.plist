@@ -45,5 +45,14 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>음식 사진을 분석하기 위해 앨범 접근 권한이 필요합니다.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>음식 사진을 촬영하기 위해 카메라 접근 권한이 필요합니다.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

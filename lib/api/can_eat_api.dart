@@ -3,12 +3,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import '../config/gemini_config.dart'; // ✅ 설정 파일 import
 
 /// 🔗 AI 백엔드 기본 URL
-///
-/// - Flutter Web / iOS 시뮬레이터에서 로컬 FastAPI 쓸 때:  http://localhost:8000
-/// - Android 에뮬레이터에서 로컬 FastAPI 쓸 때:        http://10.0.2.2:8000
-const String kAiBaseUrl = 'http://localhost:8000';
+/// kAiBaseUrl은 gemini_config.dart에서 가져옵니다.
 
 class CanEatResponse {
   final String status; // "ok" | "caution" | "avoid" | "error"
@@ -27,21 +25,6 @@ class CanEatResponse {
 }
 
 /// 공통 요청 함수
-///
-/// - query만 있을 수도 있고
-/// - imageFile만 있을 수도 있고
-/// - query + imageFile 둘 다 있을 수도 있음
-///
-/// 백엔드 쪽 스펙:
-/// - POST /api/can-eat (multipart/form-data)
-///   - fields:
-///     - query (optional)
-///     - nickname (optional)
-///     - week (optional)
-///     - bmi (optional)
-///     - conditions (optional)
-///   - files:
-///     - image (optional)
 Future<CanEatResponse> fetchCanEat({
   String? query,
   XFile? imageFile,
@@ -50,10 +33,18 @@ Future<CanEatResponse> fetchCanEat({
   double? bmi,
   String? conditions,
 }) async {
+  // ✅ gemini_config.dart의 kAiBaseUrl 사용
   final uri = Uri.parse('$kAiBaseUrl/api/can-eat');
 
   try {
     final request = http.MultipartRequest('POST', uri);
+
+    // ✅ [추가됨] 헤더에 API 키 추가
+    // 백엔드 인증 방식에 따라 'Authorization' 혹은 'x-api-key' 등을 사용합니다.
+    request.headers['Authorization'] = 'Bearer ${GeminiConfig.apiKey}';
+
+    // 만약 백엔드가 'x-api-key'라는 이름을 원한다면 아래 주석을 풀고 위 코드를 주석 처리하세요.
+    // request.headers['x-api-key'] = GeminiConfig.apiKey;
 
     // 🔤 텍스트 필드들 (있을 때만 세팅)
     if (query != null && query.trim().isNotEmpty) {
