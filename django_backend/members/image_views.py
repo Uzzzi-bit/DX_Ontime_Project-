@@ -25,6 +25,8 @@ def save_image(request):
       "ingredient_info": null
     }
     """
+    print(f'>>> save_image 호출됨: method={request.method}, path={request.path}')
+    
     if request.method == 'GET':
         return get_images(request)
     
@@ -33,7 +35,9 @@ def save_image(request):
 
     try:
         body = json.loads(request.body.decode())
-    except json.JSONDecodeError:
+        print(f'>>> 요청 본문: {body}')
+    except json.JSONDecodeError as e:
+        print(f'>>> JSON 디코딩 오류: {e}')
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
     member_id = body.get('member_id')
@@ -42,11 +46,19 @@ def save_image(request):
     source = body.get('source')
     ingredient_info = body.get('ingredient_info')
 
+    print(f'>>> 파싱된 데이터:')
+    print(f'   - member_id: {member_id}')
+    print(f'   - image_type: {image_type}')
+    print(f'   - source: {source}')
+    print(f'   - image_url 길이: {len(image_url) if image_url else 0}')
+
     if not (member_id and image_url and image_type and source):
+        print(f'>>> 필수 필드 누락')
         return JsonResponse({'error': '필수 필드 누락: member_id, image_url, image_type, source'}, status=400)
 
     try:
         # 이미지 정보 저장
+        print(f'>>> DB에 이미지 저장 시도...')
         image = Image.objects.create(
             member_id=member_id,
             image_url=image_url,
@@ -55,6 +67,7 @@ def save_image(request):
             ingredient_info=ingredient_info,
             created_at=timezone.now(),
         )
+        print(f'>>> ✅ 이미지 저장 성공: id={image.id}, member_id={image.member_id}')
 
         return JsonResponse({
             'ok': True,
@@ -68,6 +81,7 @@ def save_image(request):
         }, status=201)
 
     except Exception as e:
+        print(f'>>> ❌ 이미지 저장 실패: {e}')
         traceback.print_exc()
         return JsonResponse(
             {'error': 'Server error in save_image', 'detail': str(e)},

@@ -27,32 +27,63 @@ class ImageApiService {
     required String source,
     String? ingredientInfo,
   }) async {
-    final url = Uri.parse('$apiBaseUrl/api/images/');
+    try {
+      final url = Uri.parse('$apiBaseUrl/api/images/');
+      
+      print('🌐 Django API 호출: $url');
+      print('   요청 데이터:');
+      print('   - member_id: $memberId');
+      print('   - image_type: $imageType');
+      print('   - source: $source');
+      print('   - image_url 길이: ${imageUrl.length}');
 
-    final bodyMap = {
-      'member_id': memberId,
-      'image_url': imageUrl,
-      'image_type': imageType,
-      'source': source,
-    };
+      final bodyMap = {
+        'member_id': memberId,
+        'image_url': imageUrl,
+        'image_type': imageType,
+        'source': source,
+      };
 
-    if (ingredientInfo != null) {
-      bodyMap['ingredient_info'] = ingredientInfo;
+      if (ingredientInfo != null) {
+        bodyMap['ingredient_info'] = ingredientInfo;
+      }
+
+      print('📤 POST 요청 전송 중...');
+      final res = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(bodyMap),
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Django API 요청 타임아웃 (10초 초과)');
+        },
+      );
+
+      print('📥 응답 수신: ${res.statusCode}');
+      print('   응답 본문: ${res.body}');
+
+      if (res.statusCode != 200 && res.statusCode != 201) {
+        final errorBody = utf8.decode(res.bodyBytes);
+        print('❌ Django API 오류 응답:');
+        print('   상태 코드: ${res.statusCode}');
+        print('   응답 본문: $errorBody');
+        throw Exception('saveImage 실패: ${res.statusCode} $errorBody');
+      }
+
+      final body = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      print('✅ Django API 성공: $body');
+      
+      return body;
+    } catch (e) {
+      print('❌ ImageApiService.saveImage 오류:');
+      print('   오류: $e');
+      print('   타입: ${e.runtimeType}');
+      if (e is Exception) {
+        print('   메시지: ${e.toString()}');
+      }
+      rethrow;
     }
-
-    final res = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(bodyMap),
-    );
-
-    final body = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-
-    if (res.statusCode != 200 && res.statusCode != 201) {
-      throw Exception('saveImage 실패: ${res.statusCode} $body');
-    }
-
-    return body;
   }
 
   /// 이미지 정보를 업데이트합니다 (주로 ingredient_info 업데이트용).

@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import '../model/image_model.dart';
 import '../api/image_api_service.dart';
 
@@ -159,17 +158,31 @@ class ImageRepository {
 
       // 2. Django DB에도 저장 (공용 DB 접근을 위해)
       try {
-        await ImageApiService.instance.saveImage(
+        print('📤 Django DB에 이미지 저장 시도...');
+        print('   - memberId: $finalMemberId');
+        print('   - imageUrl: $imageUrl');
+        print('   - imageType: $imageType');
+        print('   - source: $source');
+        
+        final result = await ImageApiService.instance.saveImage(
           memberId: finalMemberId,
           imageUrl: imageUrl,
           imageType: imageType,
           source: source,
           ingredientInfo: ingredientInfo,
         );
-      } catch (e) {
+        
+        print('✅ Django DB 저장 성공: $result');
+      } catch (e, stackTrace) {
         // Django 저장 실패해도 Firestore는 성공했으므로 계속 진행
-        // 하지만 에러 로그는 남김
-        debugPrint('⚠️ Django DB 저장 실패 (Firestore는 성공): $e');
+        // 하지만 에러 로그는 상세하게 남김
+        print('❌ Django DB 저장 실패 (Firestore는 성공)');
+        print('   오류: $e');
+        print('   타입: ${e.runtimeType}');
+        print('   스택 트레이스: $stackTrace');
+        
+        // 사용자에게도 알림 (선택사항 - 필요시 주석 해제)
+        // debugPrint('⚠️ 공용 데이터베이스 저장에 실패했습니다. Firebase에는 저장되었습니다.');
       }
 
       return firestoreDocId;
