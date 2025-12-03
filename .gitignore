@@ -43,3 +43,14 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# API 키 및 민감한 설정 파일
+lib/config/gemini_config.dart
+*.env
+.env
+.env.local
+.env.*.local
+
+# FastAPI 환경 변수 파일
+ai_backend/.env
+ai_backend/.env.local
