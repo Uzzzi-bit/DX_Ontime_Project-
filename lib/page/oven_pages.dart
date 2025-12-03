@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_bounceable/flutter_bounceable.dart';
 import '../theme/color_palette.dart';
 import 'recipe_pages.dart'; // OvenSettings import를 위해
 
@@ -207,30 +208,33 @@ class _OvenScreenState extends State<OvenScreen> {
                     final isSelected = mode == _selectedMode;
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedMode = mode;
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: isSelected ? ColorPalette.primary100 : Colors.transparent,
-                            border: Border.all(
-                              color: ColorPalette.primary100,
-                              width: 1,
+                      child: Bounceable(
+                        onTap: () {},
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedMode = mode;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isSelected ? ColorPalette.primary100 : Colors.transparent,
+                              border: Border.all(
+                                color: ColorPalette.primary100,
+                                width: 1,
+                              ),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Center(
-                            child: Text(
-                              mode,
-                              style: TextStyle(
-                                color: isSelected ? const Color(0xFF0F0F0F) : const Color(0xFF49454F),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 0.1,
+                            child: Center(
+                              child: Text(
+                                mode,
+                                style: TextStyle(
+                                  color: isSelected ? const Color(0xFF0F0F0F) : const Color(0xFF49454F),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: 0.1,
+                                ),
                               ),
                             ),
                           ),
@@ -277,64 +281,67 @@ class _OvenScreenState extends State<OvenScreen> {
             ),
             const SizedBox(height: 24),
             // 요리 시간 영역
-            GestureDetector(
-              onTap: _showTimePicker,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: ColorPalette.bg200,
-                  border: Border.all(color: const Color(0xFFE8E8E8)),
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Column(
-                  children: [
-                    // 모래시계 아이콘
-                    Container(
-                      width: 104,
-                      height: 104,
-                      decoration: BoxDecoration(
-                        color: Colors.transparent,
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(28),
-                        child: Image.asset(
-                          'assets/image/hourglass.png',
-                          width: 160,
-                          height: 160,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(
-                              Icons.access_time,
-                              size: 48,
-                              color: ColorPalette.text100,
-                            );
-                          },
+            Bounceable(
+              onTap: () {},
+              child: GestureDetector(
+                onTap: _showTimePicker,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: ColorPalette.bg200,
+                    border: Border.all(color: const Color(0xFFE8E8E8)),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Column(
+                    children: [
+                      // 모래시계 아이콘
+                      Container(
+                        width: 104,
+                        height: 104,
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(28),
+                          child: Image.asset(
+                            'assets/image/hourglass.png',
+                            width: 160,
+                            height: 160,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(
+                                Icons.access_time,
+                                size: 48,
+                                color: ColorPalette.text100,
+                              );
+                            },
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      '요리 시간',
-                      style: TextStyle(
-                        color: ColorPalette.text100,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
+                      const SizedBox(height: 16),
+                      const Text(
+                        '요리 시간',
+                        style: TextStyle(
+                          color: ColorPalette.text100,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '$_minutes분 $_seconds초',
-                      style: const TextStyle(
-                        color: ColorPalette.text100,
-                        fontSize: 32,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
+                      const SizedBox(height: 8),
+                      Text(
+                        '$_minutes분 $_seconds초',
+                        style: const TextStyle(
+                          color: ColorPalette.text100,
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -354,22 +361,25 @@ class _OvenScreenState extends State<OvenScreen> {
             // 오븐에 전송 버튼
             SizedBox(
               width: double.infinity,
-              child: FilledButton(
-                onPressed: _sendToOven,
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF5BB5C8),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(33),
+              child: Bounceable(
+                onTap: () {},
+                child: FilledButton(
+                  onPressed: _sendToOven,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF5BB5C8),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(33),
+                    ),
                   ),
-                ),
-                child: const Text(
-                  '오븐에 전송',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
+                  child: const Text(
+                    '오븐에 전송',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
               ),
@@ -516,35 +526,41 @@ class _TimePickerDialogState extends State<_TimePickerDialog> {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    '취소',
-                    style: TextStyle(
-                      color: ColorPalette.text200,
-                      fontSize: 16,
+                Bounceable(
+                  onTap: () {},
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      '취소',
+                      style: TextStyle(
+                        color: ColorPalette.text200,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 16),
-                FilledButton(
-                  onPressed: () {
-                    widget.onTimeSelected(_selectedMinutes, _selectedSeconds);
-                    Navigator.pop(context);
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF5BB5C8),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                Bounceable(
+                  onTap: () {},
+                  child: FilledButton(
+                    onPressed: () {
+                      widget.onTimeSelected(_selectedMinutes, _selectedSeconds);
+                      Navigator.pop(context);
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF5BB5C8),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
-                  ),
-                  child: const Text(
-                    '확인',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                    child: const Text(
+                      '확인',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),

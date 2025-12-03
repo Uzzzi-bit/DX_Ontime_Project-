@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/color_palette.dart';
 
@@ -218,7 +219,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               if (_currentStep != _AnalysisStep.nutrientAnalysis) const SizedBox(height: 12),
               if (_currentStep != _AnalysisStep.nutrientAnalysis) _buildFoodList(),
               const SizedBox(height: 24),
-              _buildActionButton(),
+              Bounceable(
+                onTap: () {},
+                child: _buildActionButton(),
+              ),
             ],
           ),
         ),
@@ -313,26 +317,32 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     return Row(
       children: [
         Expanded(
-          child: ElevatedButton.icon(
-            onPressed: () => _handleImageSelection(ImageSource.camera),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              foregroundColor: ColorPalette.primary200,
+          child: Bounceable(
+            onTap: () {},
+            child: ElevatedButton.icon(
+              onPressed: () => _handleImageSelection(ImageSource.camera),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                foregroundColor: ColorPalette.primary200,
+              ),
+              icon: const Icon(Icons.camera_alt_outlined),
+              label: const Text('바로 촬영'),
             ),
-            icon: const Icon(Icons.camera_alt_outlined),
-            label: const Text('바로 촬영'),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: ElevatedButton.icon(
-            onPressed: () => _handleImageSelection(ImageSource.gallery),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              foregroundColor: ColorPalette.primary200,
+          child: Bounceable(
+            onTap: () {},
+            child: ElevatedButton.icon(
+              onPressed: () => _handleImageSelection(ImageSource.gallery),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                foregroundColor: ColorPalette.primary200,
+              ),
+              icon: const Icon(Icons.photo_library_outlined),
+              label: const Text('사진 선택'),
             ),
-            icon: const Icon(Icons.photo_library_outlined),
-            label: const Text('사진 선택'),
           ),
         ),
       ],
@@ -415,17 +425,20 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            InkWell(
-              onTap: _handleAddFood,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: ColorPalette.primary200,
-                  borderRadius: BorderRadius.circular(12),
+            Bounceable(
+              onTap: () {},
+              child: InkWell(
+                onTap: _handleAddFood,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: ColorPalette.primary200,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.add, color: ColorPalette.bg100),
                 ),
-                child: const Icon(Icons.add, color: ColorPalette.bg100),
               ),
             ),
           ],

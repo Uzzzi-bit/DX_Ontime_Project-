@@ -2,6 +2,7 @@
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bounceable/flutter_bounceable.dart';
 
 import 'package:prototype/api/member_api_service.dart';
 import 'package:prototype/page/home_pages.dart';
@@ -151,9 +152,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
               const SizedBox(height: 16),
               _buildPasswordCheckField(),
               const SizedBox(height: 24),
-              _buildSignUpButton(),
+              Bounceable(onTap: () {}, child: _buildSignUpButton()),
               const Spacer(),
-              _buildBackToLoginButton(context),
+              Bounceable(onTap: () {}, child: _buildBackToLoginButton(context)),
               const SizedBox(height: 40),
             ],
           ),

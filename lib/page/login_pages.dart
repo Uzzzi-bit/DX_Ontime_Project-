@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:prototype/api/member_api_service.dart';
 import 'package:prototype/page/home_pages.dart';
 import 'package:prototype/page/signup_pages.dart';
+import 'package:flutter_bounceable/flutter_bounceable.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -40,10 +41,10 @@ class _LoginScreenState extends State<LoginScreen> {
               Container(height: 16),
               _buildPasswordField(),
               Container(height: 16),
-              _buildLoginButton(context),
+              Bounceable(onTap: () {}, child: _buildLoginButton(context)),
               Container(height: 56),
               const Spacer(),
-              _buildSignUpButton(context),
+              Bounceable(onTap: () {}, child: _buildSignUpButton(context)),
               Container(height: 40),
             ],
           ),

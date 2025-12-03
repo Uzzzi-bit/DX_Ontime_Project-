@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bounceable/flutter_bounceable.dart';
 import '../widget/bottom_bar_widget.dart';
 import '../theme/color_palette.dart';
 import 'oven_pages.dart';
@@ -331,30 +332,33 @@ class _RecipeScreenState extends State<RecipeScreen> {
                 final recipe = _recipes[index];
                 final isSelected = index == _selectedMenuIndex;
                 return Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedMenuIndex = index;
-                      });
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isSelected ? ColorPalette.primary100 : ColorPalette.bg100,
-                        border: Border.all(
-                          color: isSelected ? ColorPalette.primary100 : ColorPalette.primary100.withOpacity(0.5),
+                  child: Bounceable(
+                    onTap: () {},
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedMenuIndex = index;
+                        });
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected ? ColorPalette.primary100 : ColorPalette.bg100,
+                          border: Border.all(
+                            color: isSelected ? ColorPalette.primary100 : ColorPalette.primary100.withOpacity(0.5),
+                          ),
+                          borderRadius: BorderRadius.circular(23),
                         ),
-                        borderRadius: BorderRadius.circular(23),
-                      ),
-                      child: Text(
-                        recipe.title,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: ColorPalette.text200,
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.5,
+                        child: Text(
+                          recipe.title,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: ColorPalette.text200,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
                     ),
@@ -602,25 +606,28 @@ class _RecipeScreenState extends State<RecipeScreen> {
               ),
               const SizedBox(height: 16),
               Center(
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => OvenScreen(
-                          recipe: selectedRecipe,
-                          initialSettings: selectedRecipe.ovenSettings,
+                child: Bounceable(
+                  onTap: () {},
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => OvenScreen(
+                            recipe: selectedRecipe,
+                            initialSettings: selectedRecipe.ovenSettings,
+                          ),
                         ),
+                      );
+                    },
+                    child: const Text(
+                      '광파오븐으로 보내기',
+                      style: TextStyle(
+                        color: ColorPalette.primary200,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.5,
                       ),
-                    );
-                  },
-                  child: const Text(
-                    '광파오븐으로 보내기',
-                    style: TextStyle(
-                      color: ColorPalette.primary200,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.5,
                     ),
                   ),
                 ),
