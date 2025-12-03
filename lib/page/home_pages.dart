@@ -5,6 +5,7 @@ import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../widget/bottom_bar_widget.dart';
 import '../widget/home/header_section.dart';
 import '../widget/home/nutrient_grid.dart';
@@ -16,7 +17,7 @@ import 'chat_pages.dart';
 import 'report_pages.dart';
 import 'recipe_pages.dart';
 import '../model/user_model.dart';
-import '../repository/user_repository.dart';
+import '../api/member_api_service.dart';
 import '../model/supplement_effects.dart';
 import '../model/nutrient_type.dart';
 import '../utils/responsive_helper.dart';
@@ -56,8 +57,38 @@ class _HomeScreenState extends State<HomeScreen> {
       final prefs = await SharedPreferences.getInstance();
       final isMomCareMode = prefs.getBool(_momCareModeKey) ?? false;
 
-      // UserRepository에서 사용자 데이터 불러오기
-      final userData = await UserRepository.getDummyUser();
+      // Firebase 사용자 정보 가져오기
+      final user = FirebaseAuth.instance.currentUser;
+      String? userNickname;
+      DateTime? userDueDate;
+      int? userPregnancyWeek;
+
+      if (user != null) {
+        try {
+          // Django API에서 사용자 건강 정보 가져오기
+          final healthInfo = await MemberApiService.instance.getHealthInfo(user.uid);
+          userNickname = healthInfo['nickname'] as String?;
+          userPregnancyWeek = healthInfo['pregnancy_week'] as int? ?? healthInfo['pregWeek'] as int?;
+
+          // dueDate 파싱
+          final dueDateStr = healthInfo['dueDate'] as String?;
+          if (dueDateStr != null) {
+            userDueDate = DateTime.parse(dueDateStr);
+          }
+
+          debugPrint('✅ [HomeScreen] 사용자 정보 로드: nickname=$userNickname, week=$userPregnancyWeek');
+        } catch (e) {
+          debugPrint('⚠️ [HomeScreen] 건강 정보 로드 실패 (기본값 사용): $e');
+        }
+      }
+
+      // UserModel 생성 (실제 데이터 또는 기본값)
+      final userData = UserModel(
+        nickname: userNickname ?? '사용자',
+        pregnancyWeek: userPregnancyWeek ?? 20,
+        statusMessage: '건강한 임신 생활을 응원합니다!',
+        dueDate: userDueDate ?? DateTime(2026, 7, 1),
+      );
 
       if (mounted) {
         setState(() {
@@ -74,13 +105,20 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _isMomCareMode = false;
           _isLoading = false;
+          // 기본 UserModel 생성
+          _userData = UserModel(
+            nickname: '사용자',
+            pregnancyWeek: 20,
+            statusMessage: '건강한 임신 생활을 응원합니다!',
+            dueDate: DateTime(2026, 7, 1),
+          );
         });
       }
     }
   }
 
-  // 사용자 정보 (UserRepository에서 로드)
-  String get _userName => _userData?.nickname ?? '김레제';
+  // 사용자 정보 (Django API에서 로드)
+  String get _userName => _userData?.nickname ?? '사용자';
   DateTime get _dueDate => _userData?.dueDate ?? DateTime(2026, 7, 1);
   int get _pregnancyWeek => _userData?.pregnancyWeek ?? 20;
 

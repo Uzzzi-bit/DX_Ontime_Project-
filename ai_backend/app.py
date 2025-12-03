@@ -2,10 +2,13 @@ import os
 import json
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import google.generativeai as genai
+import base64
+from PIL import Image
+import io
 
 
 # =========================
@@ -109,6 +112,8 @@ class ChatRequest(BaseModel):
     week: int = 12
     conditions: Optional[str] = "없음"
     user_message: str
+    chat_history: Optional[list] = None
+    image_base64: Optional[str] = None  # base64 인코딩된 이미지
 
 
 class ChatResponse(BaseModel):
@@ -197,9 +202,10 @@ async def recommend_recipes(req: RecipesRequest):
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
-    """일반 대화형 채팅 엔드포인트 - can_eat_prompt.txt 사용"""
+    """일반 대화형 채팅 엔드포인트 - can_eat_prompt.txt 사용 (이미지 지원)"""
+    # 프롬프트 생성 (can_eat_prompt.txt 사용)
     prompt = render_template(
-        CHAT_TEMPLATE,
+        CAN_EAT_TEMPLATE,  # can_eat_prompt.txt 사용
         RULES_JSON=RULES_JSON,
         FOOD_KB_MD=FOOD_KB_MD,
         nickname=req.nickname,
@@ -209,7 +215,24 @@ async def chat(req: ChatRequest):
     )
 
     model = genai.GenerativeModel(MODEL_ID)
-    gemini_resp = model.generate_content(prompt)
+    
+    # 이미지가 있으면 이미지와 함께 전송
+    if req.image_base64:
+        try:
+            # base64 디코딩
+            image_data = base64.b64decode(req.image_base64)
+            image = Image.open(io.BytesIO(image_data))
+            
+            # 이미지와 텍스트를 함께 전송
+            gemini_resp = model.generate_content([prompt, image])
+        except Exception as e:
+            # 이미지 처리 실패 시 텍스트만 전송
+            print(f"이미지 처리 오류: {e}")
+            gemini_resp = model.generate_content(prompt)
+    else:
+        # 이미지가 없으면 텍스트만 전송
+        gemini_resp = model.generate_content(prompt)
+    
     raw = gemini_resp.text.strip()
 
     # 마크다운 코드 블록 제거 (```json ... ``` 형식)
