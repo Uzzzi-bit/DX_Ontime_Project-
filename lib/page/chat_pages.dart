@@ -6,6 +6,7 @@ import '../theme/color_palette.dart';
 import '../service/storage_service.dart';
 import '../repository/image_repository.dart';
 import '../model/image_model.dart';
+import '../api/can_eat_api.dart';
 
 class ChatMessage {
   final bool isUser;
@@ -37,10 +38,15 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
+  final TextEditingController _canEatController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
   final ImagePicker _imagePicker = ImagePicker();
   bool _isLoading = false;
+
+  // 임산부 음식 섭취 가능 여부 확인 관련 상태
+  CanEatResponse? _lastCanEatResult;
+  bool _isCheckingCanEat = false;
 
   @override
   void initState() {
@@ -54,12 +60,12 @@ class _ChatScreenState extends State<ChatScreen> {
           imagePath: widget.initialImagePath,
         ),
       );
-      
+
       // 초기 이미지가 있으면 업로드
       if (widget.initialImagePath != null) {
         _uploadImage(File(widget.initialImagePath!));
       }
-      
+
       // AI 응답 시뮬레이션
       _simulateAIResponse();
     }
@@ -68,6 +74,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _textController.dispose();
+    _canEatController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -153,10 +160,10 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             );
           });
-          
+
           // 이미지 업로드 (백그라운드)
           _uploadImage(imageFile);
-          
+
           _simulateAIResponse();
         }
       } catch (e) {
@@ -193,6 +200,24 @@ class _ChatScreenState extends State<ChatScreen> {
       // 업로드 실패는 조용히 처리 (사용자 경험을 위해)
       debugPrint('이미지 업로드 실패: $e');
     }
+  }
+
+  Future<void> _onCheckCanEat() async {
+    final text = _canEatController.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() {
+      _isCheckingCanEat = true;
+      _lastCanEatResult = null;
+    });
+
+    final result = await fetchCanEatResult(text);
+    if (!mounted) return;
+
+    setState(() {
+      _isCheckingCanEat = false;
+      _lastCanEatResult = result;
+    });
   }
 
   void _handleSendMessage() {
@@ -266,10 +291,120 @@ class _ChatScreenState extends State<ChatScreen> {
         child: SafeArea(
           child: Column(
             children: [
+              // 임산부 음식 섭취 가능 여부 확인 UI
+              Container(
+                padding: const EdgeInsets.fromLTRB(24, 80, 24, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '이 음식, 먹어도 될까요?',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: ColorPalette.text100,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: ColorPalette.bg100,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: ColorPalette.bg300),
+                            ),
+                            child: TextField(
+                              controller: _canEatController,
+                              decoration: const InputDecoration(
+                                hintText: '예: 연어롤 먹어도 돼?',
+                                hintStyle: TextStyle(
+                                  color: ColorPalette.text300,
+                                  fontSize: 14,
+                                ),
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(vertical: 12),
+                              ),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: ColorPalette.text100,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: _isCheckingCanEat ? null : _onCheckCanEat,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ColorPalette.primary100,
+                            foregroundColor: ColorPalette.text100,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: _isCheckingCanEat
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(ColorPalette.text100),
+                                  ),
+                                )
+                              : const Text(
+                                  '확인',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (_lastCanEatResult != null)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _lastCanEatResult!.headline,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: ColorPalette.text100,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _lastCanEatResult!.reason,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                height: 1.4,
+                                color: ColorPalette.text100,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
               Expanded(
                 child: ListView.builder(
                   controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(24, 80, 24, 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   itemCount: _messages.length + (_isLoading ? 1 : 0),
                   itemBuilder: (context, index) {
                     if (index == _messages.length && _isLoading) {

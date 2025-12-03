@@ -659,30 +659,17 @@ class _ReportScreenState extends State<ReportScreen> {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-<<<<<<< HEAD
-                    ),
-                    const SizedBox(height: 8),
-                    // TODO: [AI] AI가 생성한 추천 메시지는 AI 서버에서 가져오기
-                    Text(
-                      _bannerMessageFromAi ??
-                          '$_userName님, 다음 식사는 $_lackingNutrient 보충을 위해 $_recommendedFood은(는) 어떤가요? 🥗',
-                      style: const TextStyle(
-                        color: ColorPalette.text100,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        height: 1.4,
-=======
                       const SizedBox(height: 8),
                       // TODO: [AI] AI가 생성한 추천 메시지는 AI 서버에서 가져오기
                       Text(
-                        '$_userName님, 다음 식사는 $_lackingNutrient 보충을 위해 $_recommendedFood은(는) 어떤가요? 🥗',
+                        _bannerMessageFromAi ??
+                            '$_userName님, 다음 식사는 $_lackingNutrient 보충을 위해 $_recommendedFood은(는) 어떤가요? 🥗',
                         style: const TextStyle(
                           color: ColorPalette.text100,
                           fontSize: 14,
                           fontWeight: FontWeight.w400,
                           height: 1.4,
                         ),
->>>>>>> 1f4b5fa68d10300cb53e84e5223afff2b4063d7b
                       ),
                     ],
                   ),
