@@ -82,6 +82,7 @@ class _MomCareSettingScreenState extends State<MomCareSettingScreen> {
       backgroundColor: _background,
       appBar: AppBar(
         automaticallyImplyLeading: false,
+        backgroundColor: Colors.transparent,
         leading: IconButton(
           onPressed: () {
             if (Navigator.canPop(context)) {
@@ -96,7 +97,6 @@ class _MomCareSettingScreenState extends State<MomCareSettingScreen> {
           '맘케어 모드',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
-        backgroundColor: _surface,
         iconTheme: const IconThemeData(color: ColorPalette.textPrimary),
       ),
       body: SafeArea(

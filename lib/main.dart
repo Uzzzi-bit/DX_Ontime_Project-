@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
 
 // ✅ intl: 한국어 날짜 포맷용
 import 'package:intl/date_symbol_data_local.dart';
@@ -42,6 +43,7 @@ class HealthApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+
       home: const AuthWrapper(),
       routes: {
         '/chat': (_) => const ChatScreen(),

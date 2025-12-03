@@ -200,6 +200,7 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
       backgroundColor: ColorPalette.bg200,
       appBar: AppBar(
         automaticallyImplyLeading: false,
+        backgroundColor: Colors.transparent,
         leading: IconButton(
           onPressed: () {
             if (Navigator.canPop(context)) {
@@ -214,8 +215,7 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
           '건강 정보 입력',
           style: theme.textTheme.bodyMedium,
         ),
-        backgroundColor: ColorPalette.bg100,
-        surfaceTintColor: ColorPalette.bg100,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(color: ColorPalette.text100),
       ),

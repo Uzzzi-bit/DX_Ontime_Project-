@@ -266,6 +266,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     return Scaffold(
       backgroundColor: ColorPalette.bg200,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
         title: const Text('식단 분석'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
