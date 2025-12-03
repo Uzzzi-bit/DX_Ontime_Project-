@@ -196,6 +196,7 @@ def get_health_info(request, uid):
 
     data = {
         'memberId': member.firebase_uid,
+        'nickname': member.nickname,  # 닉네임 추가
         'birthYear': preg.birth_year,
         'heightCm': preg.height_cm,
         'weightKg': preg.weight_kg,
