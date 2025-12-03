@@ -27,8 +27,8 @@ class SupplementEffects {
     'vitaminD': {
       NutrientType.vitaminD: 20.0,
     },
-    'choline': {
-      NutrientType.choline: 20.0,
+    'vitaminB': {
+      NutrientType.vitaminB: 20.0,
     },
   };
 

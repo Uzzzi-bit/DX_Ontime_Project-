@@ -137,7 +137,7 @@ class MemberApiService {
   ///     "calcium": 1000,
   ///     "vitaminD": 15,
   ///     "omega3": 300,
-  ///     "choline": 450
+    ///     "vitaminB": 450
   ///   },
   ///   "consumed": {
   ///     "energy": 1500,

@@ -12,5 +12,5 @@ enum NutrientType {
   folate,
   omega3,
   calcium,
-  choline,
+  vitaminB,
 }

@@ -97,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
     NutrientType.folate: 90.0, // 엽산 - 테스트용 90%
     NutrientType.omega3: 0.0, // 오메가-3 기본값
     NutrientType.calcium: 0.0, // 칼슘 기본값
-    NutrientType.choline: 0.0, // 콜린 기본값
+    NutrientType.vitaminB: 0.0, // 비타민B 기본값
   };
 
   // 화면에 보여줄 실제 영양소 섭취량 (기본값 + 영양제 효과 포함)
@@ -131,9 +131,9 @@ class _HomeScreenState extends State<HomeScreen> {
       nutrient: NutrientType.vitaminD,
     ),
     _SupplementOption(
-      id: 'choline',
-      label: '콜린',
-      nutrient: NutrientType.choline,
+      id: 'vitaminB',
+      label: '비타민B',
+      nutrient: NutrientType.vitaminB,
     ),
   ];
 
@@ -230,7 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
           {'label': '엽산', 'progress': 0.0},
           {'label': '오메가-3', 'progress': 0.0},
           {'label': '칼슘', 'progress': 0.0},
-          {'label': '콜린', 'progress': 0.0},
+          {'label': '비타민B', 'progress': 0.0},
         ];
       }
       return [
@@ -239,7 +239,7 @@ class _HomeScreenState extends State<HomeScreen> {
         {'label': '엽산', 'progress': _nutrientProgress[NutrientType.folate] ?? 0.0},
         {'label': '오메가-3', 'progress': _nutrientProgress[NutrientType.omega3] ?? 0.0},
         {'label': '칼슘', 'progress': _nutrientProgress[NutrientType.calcium] ?? 0.0},
-        {'label': '콜린', 'progress': _nutrientProgress[NutrientType.choline] ?? 0.0},
+        {'label': '비타민B', 'progress': _nutrientProgress[NutrientType.vitaminB] ?? 0.0},
       ];
     } catch (e, stackTrace) {
       debugPrint('에러: _nutrientData getter에서 에러 발생: $e');
@@ -251,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
         {'label': '엽산', 'progress': 0.0},
         {'label': '오메가-3', 'progress': 0.0},
         {'label': '칼슘', 'progress': 0.0},
-        {'label': '콜린', 'progress': 0.0},
+        {'label': '비타민B', 'progress': 0.0},
       ];
     }
   }
@@ -911,7 +911,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   offset: Offset(0, -ResponsiveHelper.height(context, 0.21)), // 흰색 박스 배경 침투 조절
                   child: RoundedContainer(
                     child: Padding(
-                      padding: ResponsiveHelper.padding(context, all: 20.0),
+                      padding: ResponsiveHelper.padding(context, all: 16.0), // 패딩을 20에서 16으로 줄여 공간 확보
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -975,14 +975,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Expanded 대신 고정 너비 사용
-                              SizedBox(
-                                width: ResponsiveHelper.width(context, 0.32),
+                              // 칼로리 게이지 영역 - flex 비율을 줄여서 오른쪽으로 이동
+                              Expanded(
+                                flex: 2,
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     SizedBox(
-                                      width: ResponsiveHelper.width(context, 0.32),
+                                      width: double.infinity,
                                       height: ResponsiveHelper.height(context, 0.14),
                                       child: CalorieArcGauge(
                                         current: _currentCalorie,
@@ -1020,29 +1020,33 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                     Transform.translate(
                                       offset: Offset(0, -ResponsiveHelper.height(context, 0.012)),
-                                      child: Text(
-                                        '${_currentCalorie.toStringAsFixed(0)}Kcal',
-                                        style:
-                                            textTheme.displaySmall?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: ResponsiveHelper.fontSize(context, 22),
-                                              height: 1.0,
-                                              letterSpacing: 0.5,
-                                            ) ??
-                                            TextStyle(
-                                              fontSize: ResponsiveHelper.fontSize(context, 22),
-                                              fontWeight: FontWeight.w700,
-                                              height: 1.0,
-                                              letterSpacing: 0.5,
-                                            ),
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          '${_currentCalorie.toStringAsFixed(0)}Kcal',
+                                          style:
+                                              textTheme.displaySmall?.copyWith(
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: ResponsiveHelper.fontSize(context, 22),
+                                                height: 1.0,
+                                                letterSpacing: 0.5,
+                                              ) ??
+                                              TextStyle(
+                                                fontSize: ResponsiveHelper.fontSize(context, 22),
+                                                fontWeight: FontWeight.w700,
+                                                height: 1.0,
+                                                letterSpacing: 0.5,
+                                              ),
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                              SizedBox(width: ResponsiveHelper.width(context, 0.032)),
-                              // Expanded 대신 Flexible 사용 (너비만 유연하게)
-                              Flexible(
+                              SizedBox(width: ResponsiveHelper.width(context, 0.003)), // 간격 더 줄이기
+                              // NutrientGrid 영역 - flex 비율을 늘려서 더 많은 공간 확보
+                              Expanded(
+                                flex: 8,
                                 child: SizedBox(
                                   // NutrientGrid의 최소 높이 보장
                                   height: ResponsiveHelper.height(context, 0.14),
@@ -1249,7 +1253,11 @@ class CalorieArcGauge extends StatelessWidget {
                   gradientColors: gradientColors,
                 ),
               ),
-              child,
+              // 아기 이미지를 위로 이동하여 아크 게이지와 가까워지도록 조정
+              Transform.translate(
+                offset: Offset(0, -height * 0.15), // 높이의 15%만큼 위로 이동
+                child: child,
+              ),
             ],
           ),
         );

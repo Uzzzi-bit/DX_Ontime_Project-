@@ -24,7 +24,7 @@ const defaultMidPregnancyConfig = RecommendedNutrientConfig(
     NutrientType.calcium: 1000, // mg
     NutrientType.vitaminD: 15, // ug (600 IU)
     NutrientType.omega3: 300, // mg
-    NutrientType.choline: 450, // mg (원하면 조정)
+    NutrientType.vitaminB: 450, // mg (원하면 조정)
   },
 );
 
@@ -112,8 +112,8 @@ NutrientType? _nutrientTypeFromString(String key) {
       return NutrientType.omega3;
     case 'calcium':
       return NutrientType.calcium;
-    case 'choline':
-      return NutrientType.choline;
+    case 'vitaminB':
+      return NutrientType.vitaminB;
     default:
       return null;
   }
