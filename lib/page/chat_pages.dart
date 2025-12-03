@@ -2,14 +2,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/color_palette.dart';
 import '../service/storage_service.dart';
 import '../repository/image_repository.dart';
 import '../model/image_model.dart';
 import '../api/can_eat_api.dart';
-import '../api/ai_chat_api.dart';
-import '../api/member_api_service.dart';
 
 class ChatMessage {
   final bool isUser;
@@ -45,17 +42,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
   final ImagePicker _imagePicker = ImagePicker();
-  final AiChatApiService _chatApiService = AiChatApiService();
-  final MemberApiService _memberApiService = MemberApiService.instance;
   bool _isLoading = false;
-  bool _isInitialized = false;
-
-  // 사용자 정보
-  String? _userNickname;
-  int? _currentPregWeek;
-  String? _conditions;
-  String? _allergies;
-  bool _hasGestationalDiabetes = false;
 
   // 임산부 음식 섭취 가능 여부 확인 관련 상태
   CanEatResponse? _lastCanEatResult;
@@ -64,8 +51,6 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeChat();
-
     // 홈 화면에서 전달받은 초기 메시지 추가
     if (widget.initialText != null || widget.initialImagePath != null) {
       _messages.add(
@@ -76,96 +61,13 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       );
 
-      // 초기 이미지가 있으면 업로드 및 AI 분석
+      // 초기 이미지가 있으면 업로드
       if (widget.initialImagePath != null) {
         _uploadImage(File(widget.initialImagePath!));
-        _sendImageToAI(File(widget.initialImagePath!));
-      } else if (widget.initialText != null && widget.initialText!.isNotEmpty) {
-        _sendMessageToAI(widget.initialText!);
-      }
-    }
-  }
-
-  /// 임신 주차 자동 계산 (dueDate 기반)
-  /// dueDate로부터 현재 날짜까지의 주차를 자동으로 계산
-  /// 1주일이 지나면 자동으로 +1 증가
-  int _calculatePregWeek(DateTime? dueDate) {
-    if (dueDate == null) return 0;
-
-    final now = DateTime.now();
-    // 임신 기간은 보통 280일 (40주)
-    // 임신 시작일 = dueDate - 280일
-    final pregnancyStartDate = dueDate.subtract(const Duration(days: 280));
-
-    // 현재 날짜와 임신 시작일의 차이를 주차로 계산
-    final daysSinceStart = now.difference(pregnancyStartDate).inDays;
-    final currentWeek = (daysSinceStart ~/ 7) + 1; // 1주차부터 시작
-
-    return currentWeek.clamp(1, 40);
-  }
-
-  /// 채팅 초기화 (사용자 정보 로드)
-  Future<void> _initializeChat() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        debugPrint('사용자가 로그인하지 않았습니다.');
-        _userNickname = '사용자';
-        _currentPregWeek = 12;
-        _isInitialized = true;
-        return;
       }
 
-      // 사용자 정보 가져오기
-      try {
-        // 건강 정보 가져오기 (dueDate, pregWeek, allergies 등)
-        final healthInfo = await _memberApiService.getHealthInfo(user.uid);
-
-        _userNickname = healthInfo['nickname']?.toString() ?? '사용자';
-
-        final dueDateStr = healthInfo['dueDate'];
-        DateTime? dueDate;
-
-        if (dueDateStr != null) {
-          dueDate = DateTime.tryParse(dueDateStr.toString());
-        }
-
-        // 주차 자동 계산 (dueDate 기반)
-        if (dueDate != null) {
-          _currentPregWeek = _calculatePregWeek(dueDate);
-        } else {
-          // dueDate가 없으면 저장된 pregWeek 사용
-          _currentPregWeek = healthInfo['pregWeek'] as int? ?? 12;
-        }
-
-        // 알레르기 정보
-        if (healthInfo['allergies'] is List) {
-          _allergies = (healthInfo['allergies'] as List).join(', ');
-        } else if (healthInfo['allergies'] is String) {
-          _allergies = healthInfo['allergies'] as String;
-        }
-
-        // 임신성 당뇨
-        _hasGestationalDiabetes = healthInfo['hasGestationalDiabetes'] ?? false;
-
-        // 진단/질환 정보
-        _conditions = _hasGestationalDiabetes ? '임신성 당뇨' : '없음';
-
-        _isInitialized = true;
-      } catch (e) {
-        debugPrint('사용자 정보 로드 실패: $e');
-        // 정보가 없어도 기본값으로 진행
-        _userNickname = '사용자';
-        _currentPregWeek = 12;
-        _conditions = '없음';
-        _allergies = '';
-        _isInitialized = true;
-      }
-    } catch (e) {
-      debugPrint('채팅 초기화 실패: $e');
-      _userNickname = '사용자';
-      _currentPregWeek = 12;
-      _isInitialized = true;
+      // AI 응답 시뮬레이션
+      _simulateAIResponse();
     }
   }
 
@@ -177,133 +79,35 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  /// 대화 히스토리 생성 (FastAPI에 전달할 형식)
-  List<Map<String, String>> _buildChatHistory() {
-    final history = <Map<String, String>>[];
-    for (final msg in _messages) {
-      history.add({
-        'role': msg.isUser ? 'user' : 'assistant',
-        'content': msg.text,
+  Future<void> _simulateAIResponse() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    await Future.delayed(const Duration(seconds: 1));
+
+    if (mounted) {
+      setState(() {
+        _messages.add(
+          ChatMessage(
+            isUser: false,
+            text: '네. 현재 임신 N주차인 김레제님에게 해당 음식은 먹어도 됩니다!',
+          ),
+        );
+        _isLoading = false;
+      });
+
+      // 스크롤을 맨 아래로
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
       });
     }
-    return history;
-  }
-
-  /// 텍스트 메시지를 AI에게 전송 (FastAPI 사용)
-  Future<void> _sendMessageToAI(String message) async {
-    if (!_isInitialized) {
-      await _initializeChat();
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // 대화 히스토리 생성 (현재 메시지 제외)
-      final chatHistory = _buildChatHistory();
-
-      final response = await _chatApiService.sendMessage(
-        nickname: _userNickname ?? '사용자',
-        week: _currentPregWeek ?? 12,
-        conditions: _conditions,
-        allergies: _allergies,
-        hasGestationalDiabetes: _hasGestationalDiabetes,
-        userMessage: message,
-        chatHistory: chatHistory,
-      );
-
-      if (mounted) {
-        setState(() {
-          _messages.add(
-            ChatMessage(
-              isUser: false,
-              text: response,
-            ),
-          );
-          _isLoading = false;
-        });
-
-        _scrollToBottom();
-      }
-    } catch (e) {
-      debugPrint('AI 채팅 오류: $e');
-      if (mounted) {
-        setState(() {
-          _messages.add(
-            ChatMessage(
-              isUser: false,
-              text: '죄송합니다. 응답을 생성하는 중 오류가 발생했습니다. 다시 시도해주세요.',
-            ),
-          );
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  /// 이미지를 AI에게 전송하여 분석 (can-eat API 사용)
-  Future<void> _sendImageToAI(File imageFile) async {
-    if (!_isInitialized) {
-      await _initializeChat();
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // 이미지는 can-eat API를 사용하여 분석
-      // 이미지 설명을 텍스트로 변환 (실제로는 이미지 분석 필요)
-      final query = '이 음식이 임신 중에 안전한지 분석해주세요.';
-
-      final canEatResult = await fetchCanEatResult(
-        query,
-        nickname: _userNickname,
-        week: _currentPregWeek,
-        conditions: _conditions,
-      );
-
-      if (mounted) {
-        setState(() {
-          _messages.add(
-            ChatMessage(
-              isUser: false,
-              text: '${canEatResult.headline}\n\n${canEatResult.reason}',
-            ),
-          );
-          _isLoading = false;
-        });
-
-        _scrollToBottom();
-      }
-    } catch (e) {
-      debugPrint('이미지 분석 오류: $e');
-      if (mounted) {
-        setState(() {
-          _messages.add(
-            ChatMessage(
-              isUser: false,
-              text: '죄송합니다. 이미지 분석 중 오류가 발생했습니다. 다시 시도해주세요.',
-            ),
-          );
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  /// 스크롤을 맨 아래로
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
   }
 
   Future<void> _handleImagePicker() async {
@@ -360,8 +164,7 @@ class _ChatScreenState extends State<ChatScreen> {
           // 이미지 업로드 (백그라운드)
           _uploadImage(imageFile);
 
-          // AI에게 이미지 분석 요청
-          _sendImageToAI(imageFile);
+          _simulateAIResponse();
         }
       } catch (e) {
         if (mounted) {
@@ -403,21 +206,12 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _canEatController.text.trim();
     if (text.isEmpty) return;
 
-    if (!_isInitialized) {
-      await _initializeChat();
-    }
-
     setState(() {
       _isCheckingCanEat = true;
       _lastCanEatResult = null;
     });
 
-    final result = await fetchCanEatResult(
-      text,
-      nickname: _userNickname,
-      week: _currentPregWeek,
-      conditions: _conditions,
-    );
+    final result = await fetchCanEatResult(text);
     if (!mounted) return;
 
     setState(() {
@@ -440,8 +234,18 @@ class _ChatScreenState extends State<ChatScreen> {
       _textController.clear();
     });
 
-    // AI에게 메시지 전송 (사용자 이름은 AI 응답에 포함되도록 컨텍스트로 전달)
-    _sendMessageToAI(text);
+    _simulateAIResponse();
+
+    // 스크롤을 맨 아래로
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   @override
@@ -717,19 +521,6 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            // 사용자 이름 표시 (있는 경우)
-            if (_userNickname != null && (message.text.isNotEmpty || message.imagePath != null))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4, right: 8),
-                child: Text(
-                  _userNickname!,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: ColorPalette.text200,
-                  ),
-                ),
-              ),
             if (message.imagePath != null) ...[
               Container(
                 margin: const EdgeInsets.only(bottom: 8),

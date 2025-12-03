@@ -20,40 +20,16 @@ class CanEatResponse {
   });
 }
 
-/// 임산부 음식 섭취 가능 여부 확인
-///
-/// [query] 사용자가 입력한 질문 (예: "연어롤 먹어도 돼?")
-/// [nickname] 사용자 닉네임 (선택사항)
-/// [week] 임신 주차 (선택사항)
-/// [conditions] 진단/질환 정보 (선택사항)
-Future<CanEatResponse> fetchCanEatResult(
-  String query, {
-  String? nickname,
-  int? week,
-  String? conditions,
-}) async {
+Future<CanEatResponse> fetchCanEatResult(String query) async {
   final uri = Uri.parse('$kAiBaseUrl/api/can-eat');
 
   try {
-    final bodyMap = <String, dynamic>{
-      'user_text_or_image_desc': query,
-    };
-
-    // 사용자 정보가 있으면 추가
-    if (nickname != null) {
-      bodyMap['nickname'] = nickname;
-    }
-    if (week != null) {
-      bodyMap['week'] = week;
-    }
-    if (conditions != null) {
-      bodyMap['conditions'] = conditions;
-    }
-
     final resp = await http.post(
       uri,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(bodyMap),
+      body: jsonEncode({
+        'query': query, // 사용자가 입력한 문장 전체
+      }),
     );
 
     if (resp.statusCode != 200) {

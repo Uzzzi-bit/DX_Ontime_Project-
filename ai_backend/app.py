@@ -46,7 +46,6 @@ def read_json(filename: str):
 
 CAN_EAT_TEMPLATE = read_text("can_eat_prompt.txt")
 RECIPES_TEMPLATE = read_text("recommend_recipes_prompt.txt")
-CHAT_TEMPLATE = read_text("chat_prompt.txt")
 RULES_JSON = read_json("pregnancy_ai_rules.json")
 FOOD_KB_MD = read_text("pregnancy_nutrition_and_food_safety_kb.md")
 
@@ -102,20 +101,6 @@ class CanEatResponse(BaseModel):
     reason: str
     target_type: str
     item_name: str
-
-
-class ChatRequest(BaseModel):
-    nickname: str = "사용자"
-    week: int = 12
-    conditions: Optional[str] = "없음"
-    allergies: Optional[str] = ""
-    has_gestational_diabetes: bool = False
-    user_message: str
-    chat_history: Optional[list] = None  # 이전 대화 기록 (선택사항)
-
-
-class ChatResponse(BaseModel):
-    message: str
 
 
 # =========================
@@ -200,47 +185,6 @@ async def recommend_recipes(req: RecipesRequest):
         raise ValueError(f"모델 JSON 파싱 실패: {raw}")
 
     return data
-
-
-@app.post("/api/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest):
-    """일반 대화형 채팅 엔드포인트"""
-    # 대화 히스토리 포맷팅
-    chat_history_text = ""
-    if req.chat_history:
-        for i, msg in enumerate(req.chat_history):
-            role = msg.get("role", "user")  # "user" or "assistant"
-            content = msg.get("content", "")
-            if role == "user":
-                chat_history_text += f"사용자: {content}\n"
-            else:
-                chat_history_text += f"AI: {content}\n"
-    else:
-        chat_history_text = "(이전 대화 없음)"
-    
-    # 알레르기 포맷팅
-    allergies_text = req.allergies if req.allergies else "없음"
-    
-    prompt = render_template(
-        CHAT_TEMPLATE,
-        RULES_JSON=RULES_JSON,
-        FOOD_KB_MD=FOOD_KB_MD,
-        nickname=req.nickname,
-        week=req.week,
-        conditions=req.conditions or "없음",
-        allergies=allergies_text,
-        has_gestational_diabetes="있음" if req.has_gestational_diabetes else "없음",
-        chat_history=chat_history_text,
-        user_message=req.user_message,
-    )
-
-    gemini_resp = client.models.generate_content(
-        model=MODEL_ID,
-        contents=prompt,
-    )
-    raw = gemini_resp.text.strip()
-
-    return ChatResponse(message=raw)
 
 
 if __name__ == "__main__":
