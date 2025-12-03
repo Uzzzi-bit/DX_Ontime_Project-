@@ -211,6 +211,128 @@ class Image(models.Model):
         return f"Image {self.id} - {self.member_id} - {self.image_type}"
 
 
+class AiChatSession(models.Model):
+    """
+    AI 채팅 세션 테이블 (AI_CHAT_SESSION)
+    - 대화 세션 정보 저장
+    - id를 session_id로 사용 (Django는 하나의 PK만 허용)
+    """
+    id = models.AutoField(primary_key=True, db_column='id')
+    # session_id는 id와 동일하게 사용 (property로 제공)
+    member_id = models.CharField(
+        max_length=128,
+        db_column='member_id',
+        help_text="대화 주인의 Firebase UID (MEMBER.id 참조)",
+    )
+    started_at = models.DateTimeField(
+        db_column='started_at',
+        help_text="대화 시작 시간",
+        auto_now_add=True,
+    )
+    ended_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_column='ended_at',
+        help_text="대화 종료 시간",
+    )
+
+    class Meta:
+        db_table = 'AI_CHAT_SESSION'
+        managed = True
+        indexes = [
+            models.Index(fields=['member_id']),
+            models.Index(fields=['started_at']),
+        ]
+        ordering = ['-started_at']
+
+    @property
+    def session_id(self):
+        """session_id는 id와 동일"""
+        return self.id
+
+    def __str__(self):
+        return f"Session {self.id} - {self.member_id}"
+
+
+class AiChat(models.Model):
+    """
+    AI 채팅 대화 내용 테이블 (AI_CHAT)
+    - 실제 대화 메시지 저장
+    - id를 chat_id로 사용 (Django는 하나의 PK만 허용)
+    """
+    id = models.AutoField(primary_key=True, db_column='id')
+    # chat_id는 id와 동일하게 사용 (property로 제공)
+    member_id = models.CharField(
+        max_length=128,
+        db_column='member_id',
+        help_text="사용자 Firebase UID (MEMBER.id 참조)",
+    )
+    session = models.ForeignKey(
+        AiChatSession,
+        on_delete=models.CASCADE,
+        related_name='chats',
+        db_column='session_id',
+        to_field='id',
+        help_text="대화방 세션 ID",
+    )
+    type = models.CharField(
+        max_length=10,
+        db_column='type',
+        help_text="메시지 타입: 'user' 또는 'ai'",
+        choices=[
+            ('user', '사용자'),
+            ('ai', 'AI'),
+        ],
+    )
+    content = models.TextField(
+        db_column='content',
+        help_text="실제 대화 내용",
+    )
+    image = models.ForeignKey(
+        Image,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ai_chats',
+        db_column='image_pk',
+        to_field='id',
+        help_text="이미지 포함 여부 (IMAGES.image_id 참조)",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_column='created_at',
+    )
+
+    class Meta:
+        db_table = 'AI_CHAT'
+        managed = True
+        indexes = [
+            models.Index(fields=['member_id']),
+            models.Index(fields=['session_id']),
+            models.Index(fields=['type']),
+            models.Index(fields=['created_at']),
+        ]
+        ordering = ['created_at']
+
+    @property
+    def chat_id(self):
+        """chat_id는 id와 동일"""
+        return self.id
+
+    @property
+    def session_id(self):
+        """session_id는 session의 id를 반환"""
+        return self.session.id if self.session else None
+
+    @property
+    def image_pk(self):
+        """image_pk는 image의 id를 반환"""
+        return self.image.id if self.image else None
+
+    def __str__(self):
+        return f"Chat {self.id} - {self.type} - {self.member_id}"
+
+
 class MemberNutritionTarget(models.Model):
     """
     임신 주차별 영양소 하루 권장량 테이블 (member_nutrition_target)

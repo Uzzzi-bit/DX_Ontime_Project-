@@ -2,11 +2,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/color_palette.dart';
 import '../service/storage_service.dart';
 import '../repository/image_repository.dart';
 import '../model/image_model.dart';
-import '../api/can_eat_api.dart';
+import '../api/chat_api.dart';
+import '../api/ai_chat_api_service.dart';
+import '../api/member_api_service.dart';
 import '../utils/responsive_helper.dart';
 
 class ChatMessage {
@@ -44,39 +47,254 @@ class _ChatScreenState extends State<ChatScreen> {
   final ImagePicker _imagePicker = ImagePicker();
   bool _isLoading = false;
 
+  // DB 저장을 위한 변수들
+  String? _currentMemberId;
+  int? _currentSessionId;
+  String? _lastUploadedImageDocId; // 마지막으로 업로드된 이미지의 Firestore doc ID
+
+  // 사용자 정보 (채팅 API 호출용)
+  String _userNickname = '사용자';
+  int _pregnancyWeek = 12;
+  String _conditions = '없음';
+
   @override
   void initState() {
     super.initState();
-    // 홈 화면에서 전달받은 초기 메시지 추가
-    if (widget.initialText != null || widget.initialImagePath != null) {
-      _messages.add(
-        ChatMessage(
+    _initializeChat();
+  }
+
+  Future<void> _initializeChat() async {
+    try {
+      // Firebase 사용자 정보 가져오기
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        debugPrint('⚠️ [ChatScreen] 로그인된 사용자가 없습니다.');
+        return;
+      }
+
+      _currentMemberId = user.uid;
+      debugPrint('✅ [ChatScreen] 사용자 ID 로드: $_currentMemberId');
+
+      // 사용자 건강 정보 로드 (채팅 API 호출용)
+      await _loadUserHealthInfo();
+
+      // 이전 세션 로드 (활성 세션이 있으면 사용, 없으면 가장 최근 종료된 세션 사용)
+      await _loadPreviousChat();
+
+      // 세션이 없으면 새로 생성
+      if (_currentSessionId == null) {
+        await _createSession();
+      }
+
+      // 홈 화면에서 전달받은 초기 메시지 추가
+      if (widget.initialText != null || widget.initialImagePath != null) {
+        final initialMessage = ChatMessage(
           isUser: true,
           text: widget.initialText ?? '',
           imagePath: widget.initialImagePath,
-        ),
-      );
-
-      // 초기 이미지가 있으면 업로드
-      if (widget.initialImagePath != null) {
-        final imgFile = File(widget.initialImagePath!);
-        _uploadImage(imgFile);
-
-        // [수정] 초기 이미지가 있다면 이미지 분석 요청을 보내야 함
-        // (XFile로 변환하여 요청)
-        _sendRequestToAI(
-          query: '이 음식 먹어도 되나요?',
-          imageFile: XFile(widget.initialImagePath!),
         );
-      } else if (widget.initialText != null && widget.initialText!.isNotEmpty) {
-        // 텍스트만 있는 경우
-        _sendRequestToAI(query: widget.initialText!);
+        _messages.add(initialMessage);
+
+        // 초기 메시지를 DB에 저장
+        if (_currentSessionId != null && _currentMemberId != null) {
+          await _saveMessageToDb(
+            type: 'user',
+            content: widget.initialText ?? '',
+            imagePath: widget.initialImagePath,
+          );
+        }
+
+        // 초기 이미지가 있으면 업로드
+        if (widget.initialImagePath != null) {
+          final imgFile = File(widget.initialImagePath!);
+          await _uploadImage(imgFile);
+
+          // 이미지 분석 요청
+          _sendRequestToAI(
+            query: '이 음식 먹어도 되나요?',
+            imageFile: XFile(widget.initialImagePath!),
+          );
+        } else if (widget.initialText != null && widget.initialText!.isNotEmpty) {
+          // 텍스트만 있는 경우
+          _sendRequestToAI(query: widget.initialText!);
+        }
       }
+    } catch (e) {
+      debugPrint('❌ [ChatScreen] 초기화 실패: $e');
+    }
+  }
+
+  Future<void> _createSession() async {
+    if (_currentMemberId == null) return;
+
+    try {
+      debugPrint('🔄 [ChatScreen] 새 세션 생성 중...');
+      final result = await AiChatApiService.instance.createSession(_currentMemberId!);
+      _currentSessionId = result['session_id'] as int;
+      debugPrint('✅ [ChatScreen] 세션 생성 완료: session_id=$_currentSessionId');
+    } catch (e) {
+      debugPrint('❌ [ChatScreen] 세션 생성 실패: $e');
+    }
+  }
+
+  Future<void> _loadPreviousChat() async {
+    if (_currentMemberId == null) return;
+
+    try {
+      debugPrint('🔄 [ChatScreen] 이전 채팅 로드 중...');
+      final sessions = await AiChatApiService.instance.listSessions(_currentMemberId!);
+
+      if (sessions.isEmpty) {
+        debugPrint('ℹ️ [ChatScreen] 이전 세션이 없습니다.');
+        return;
+      }
+
+      // 가장 최근 세션 찾기 (활성 세션이 있으면 우선, 없으면 가장 최근 종료된 세션)
+      Map<String, dynamic>? activeSession;
+      Map<String, dynamic>? latestEndedSession;
+
+      for (final session in sessions) {
+        if (session['ended_at'] == null) {
+          // 활성 세션이 있으면 우선 사용
+          activeSession = session;
+          break;
+        } else {
+          // 종료된 세션 중 가장 최근 것 저장
+          if (latestEndedSession == null) {
+            latestEndedSession = session;
+          }
+        }
+      }
+
+      // 활성 세션이 있으면 사용, 없으면 가장 최근 종료된 세션 사용
+      final targetSession = activeSession ?? latestEndedSession;
+
+      if (targetSession != null) {
+        _currentSessionId = targetSession['session_id'] as int;
+        final isEnded = targetSession['ended_at'] != null;
+
+        debugPrint('✅ [ChatScreen] 세션 발견: session_id=$_currentSessionId, ended=${isEnded ? "예" : "아니오"}');
+
+        // 종료된 세션이면 재활성화
+        if (isEnded) {
+          debugPrint('🔄 [ChatScreen] 세션 재활성화 중...');
+          await AiChatApiService.instance.reactivateSession(_currentSessionId!);
+          debugPrint('✅ [ChatScreen] 세션 재활성화 완료');
+        }
+
+        // 세션의 메시지들 로드
+        await _loadMessages(_currentSessionId!);
+      } else {
+        debugPrint('ℹ️ [ChatScreen] 로드할 세션이 없습니다.');
+      }
+    } catch (e) {
+      debugPrint('❌ [ChatScreen] 이전 채팅 로드 실패: $e');
+    }
+  }
+
+  Future<void> _loadMessages(int sessionId) async {
+    try {
+      final messages = await AiChatApiService.instance.getMessages(sessionId);
+      debugPrint('🔄 [ChatScreen] 전체 메시지 ${messages.length}개 로드됨');
+
+      // 오늘 날짜의 메시지만 필터링
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day);
+      final todayEnd = todayStart.add(const Duration(days: 1));
+
+      final todayMessages = messages.where((msg) {
+        final createdAt = DateTime.parse(msg['created_at'] as String);
+        return createdAt.isAfter(todayStart) && createdAt.isBefore(todayEnd);
+      }).toList();
+
+      debugPrint('🔄 [ChatScreen] 오늘 날짜 메시지 ${todayMessages.length}개 필터링됨');
+
+      if (mounted) {
+        setState(() {
+          _messages.clear();
+          for (final msg in todayMessages) {
+            _messages.add(
+              ChatMessage(
+                isUser: msg['type'] == 'user',
+                text: msg['content'] as String,
+                timestamp: DateTime.parse(msg['created_at'] as String),
+              ),
+            );
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ [ChatScreen] 메시지 로드 실패: $e');
+    }
+  }
+
+  Future<void> _saveMessageToDb({
+    required String type,
+    required String content,
+    String? imagePath,
+  }) async {
+    if (_currentSessionId == null || _currentMemberId == null) {
+      debugPrint('⚠️ [ChatScreen] 세션이나 사용자 ID가 없어 메시지를 저장할 수 없습니다.');
+      return;
+    }
+
+    try {
+      int? imagePk;
+      if (imagePath != null && _lastUploadedImageDocId != null) {
+        // Firestore doc ID를 Django image_pk로 변환하는 로직이 필요할 수 있음
+        // 일단 null로 두고, 필요시 추가 구현
+        imagePk = null;
+      }
+
+      debugPrint(
+        '🔄 [ChatScreen] 메시지 DB 저장 중: type=$type, content=${content.substring(0, content.length > 50 ? 50 : content.length)}...',
+      );
+      await AiChatApiService.instance.saveMessage(
+        sessionId: _currentSessionId!,
+        memberId: _currentMemberId!,
+        type: type,
+        content: content,
+        imagePk: imagePk,
+      );
+      debugPrint('✅ [ChatScreen] 메시지 DB 저장 완료');
+    } catch (e) {
+      debugPrint('❌ [ChatScreen] 메시지 DB 저장 실패: $e');
+    }
+  }
+
+  Future<void> _loadUserHealthInfo() async {
+    if (_currentMemberId == null) return;
+
+    try {
+      debugPrint('🔄 [ChatScreen] 사용자 건강 정보 로드 중...');
+      final healthInfo = await MemberApiService.instance.getHealthInfo(_currentMemberId!);
+
+      _userNickname = healthInfo['nickname'] as String? ?? '사용자';
+      _pregnancyWeek = healthInfo['pregnancy_week'] as int? ?? 12;
+      _conditions = healthInfo['conditions'] as String? ?? '없음';
+
+      debugPrint('✅ [ChatScreen] 사용자 정보: nickname=$_userNickname, week=$_pregnancyWeek, conditions=$_conditions');
+    } catch (e) {
+      debugPrint('⚠️ [ChatScreen] 건강 정보 로드 실패 (기본값 사용): $e');
+      // 기본값은 이미 설정되어 있음
+    }
+  }
+
+  Future<void> _endSession() async {
+    if (_currentSessionId == null) return;
+
+    try {
+      debugPrint('🔄 [ChatScreen] 세션 종료 중... session_id=$_currentSessionId');
+      await AiChatApiService.instance.endSession(_currentSessionId!);
+      debugPrint('✅ [ChatScreen] 세션 종료 완료: ended_at 설정됨');
+    } catch (e) {
+      debugPrint('❌ [ChatScreen] 세션 종료 실패: $e');
     }
   }
 
   @override
   void dispose() {
+    _endSession();
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -108,7 +326,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  /// [핵심 수정] 텍스트와 이미지를 모두 처리하는 통합 함수로 변경했습니다.
+  /// [핵심 수정] Gemini API를 사용한 채팅 함수
   Future<void> _sendRequestToAI({required String query, XFile? imageFile}) async {
     if (!mounted) return;
 
@@ -120,39 +338,36 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     try {
-      // API 호출 (이미지가 있으면 imageFile도 같이 전달됨)
+      // Gemini API를 사용한 채팅 API 호출
       final result =
-          await fetchCanEat(
-            query: query,
-            imageFile: imageFile,
+          await fetchChatResponse(
+            userMessage: query,
+            nickname: _userNickname,
+            week: _pregnancyWeek,
+            conditions: _conditions,
           ).timeout(
-            const Duration(seconds: 15), // 타임아웃 15초로 넉넉하게
+            const Duration(seconds: 30),
             onTimeout: () {
-              return CanEatResponse(
-                status: 'error',
-                headline: '분석에 실패했어요.',
-                reason: '네트워크 상태를 확인하거나, 잠시 후 다시 시도해주세요.',
-                targetType: '',
-                itemName: '',
-              );
+              throw Exception('요청 시간이 초과되었습니다.');
             },
           );
 
       if (!mounted) return;
 
-      if (result.status == 'error') {
-        final defaultResponse = _getDefaultResponse(query);
-        setState(() {
-          _messages.add(ChatMessage(isUser: false, text: defaultResponse));
-        });
-      } else {
-        final responseText = '${result.headline}\n\n${result.reason}';
-        setState(() {
-          _messages.add(ChatMessage(isUser: false, text: responseText));
-        });
-      }
+      setState(() {
+        _messages.add(ChatMessage(isUser: false, text: result.message));
+      });
+
+      // AI 응답을 DB에 저장
+      await _saveMessageToDb(
+        type: 'ai',
+        content: result.message,
+      );
     } catch (e) {
+      debugPrint('❌ [ChatScreen] AI 응답 실패: $e');
       if (!mounted) return;
+
+      // 에러 발생 시 기본 응답 표시
       final defaultResponse = _getDefaultResponse(query);
       setState(() {
         _messages.add(ChatMessage(isUser: false, text: defaultResponse));
@@ -215,9 +430,16 @@ class _ChatScreenState extends State<ChatScreen> {
           });
 
           // 2. Firebase 업로드 (백그라운드)
-          _uploadImage(File(image.path));
+          await _uploadImage(File(image.path));
 
-          // 3. [핵심] AI에게 이미지 파일 실어서 전송
+          // 3. 이미지 메시지를 DB에 저장
+          await _saveMessageToDb(
+            type: 'user',
+            content: '이미지',
+            imagePath: image.path,
+          );
+
+          // 4. [핵심] AI에게 이미지 파일 실어서 전송
           _sendRequestToAI(
             query: '이 음식 먹어도 되나요?', // AI에게 던지는 힌트 질문
             imageFile: image, // 실제 이미지 파일 전달
@@ -241,17 +463,19 @@ class _ChatScreenState extends State<ChatScreen> {
         imageFile: imageFile,
         folder: 'chat_images',
       );
-      await imageRepository.saveImageWithUrl(
+      final docId = await imageRepository.saveImageWithUrl(
         imageUrl: imageUrl,
         imageType: ImageType.chat,
         source: ImageSourceType.aiChat,
       );
+      _lastUploadedImageDocId = docId;
+      debugPrint('✅ [ChatScreen] 이미지 업로드 완료: docId=$docId');
     } catch (e) {
-      debugPrint('이미지 업로드 실패: $e');
+      debugPrint('❌ [ChatScreen] 이미지 업로드 실패: $e');
     }
   }
 
-  void _handleSendMessage() {
+  Future<void> _handleSendMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
     if (_isLoading) return;
@@ -260,6 +484,12 @@ class _ChatScreenState extends State<ChatScreen> {
       _messages.add(ChatMessage(isUser: true, text: text));
       _textController.clear();
     });
+
+    // 사용자 메시지를 DB에 저장
+    await _saveMessageToDb(
+      type: 'user',
+      content: text,
+    );
 
     // 텍스트만 전송
     _sendRequestToAI(query: text);

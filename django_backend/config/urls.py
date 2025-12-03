@@ -13,6 +13,15 @@ from members.views import (
     get_nutrition_target,
 )
 from members.image_views import save_image, update_image, get_images
+from members.ai_chat_views import (
+    create_session,
+    get_session,
+    list_sessions,
+    end_session,
+    reactivate_session,
+    save_message,
+    get_messages,
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -34,4 +43,13 @@ urlpatterns = [
 
     # 영양소 권장량 API
     path('api/nutrition-target/<int:trimester>/', get_nutrition_target, name='nutrition-target'),
+
+    # AI 채팅 세션 및 메시지 API
+    path('api/ai-chat/sessions/', create_session, name='ai-chat-create-session'),
+    path('api/ai-chat/sessions/<int:session_id>/', get_session, name='ai-chat-get-session'),
+    path('api/ai-chat/sessions/<str:member_id>/list/', list_sessions, name='ai-chat-list-sessions'),
+    path('api/ai-chat/sessions/<int:session_id>/end/', end_session, name='ai-chat-end-session'),
+    path('api/ai-chat/sessions/<int:session_id>/reactivate/', reactivate_session, name='ai-chat-reactivate-session'),
+    path('api/ai-chat/messages/', save_message, name='ai-chat-save-message'),
+    path('api/ai-chat/sessions/<int:session_id>/messages/', get_messages, name='ai-chat-get-messages'),
 ]

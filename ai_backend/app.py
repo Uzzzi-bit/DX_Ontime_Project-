@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from google import genai
+import google.generativeai as genai
 
 
 # =========================
@@ -20,7 +20,7 @@ if not API_KEY:
         '  export GEMINI_API_KEY="여기에_API_키"\n'
     )
 
-client = genai.Client(api_key=API_KEY)
+genai.configure(api_key=API_KEY)
 MODEL_ID = "gemini-2.0-flash"
 
 
@@ -46,6 +46,7 @@ def read_json(filename: str):
 
 CAN_EAT_TEMPLATE = read_text("can_eat_prompt.txt")
 RECIPES_TEMPLATE = read_text("recommend_recipes_prompt.txt")
+CHAT_TEMPLATE = read_text("can_eat_prompt.txt")  # 채팅도 can_eat_prompt.txt 사용
 RULES_JSON = read_json("pregnancy_ai_rules.json")
 FOOD_KB_MD = read_text("pregnancy_nutrition_and_food_safety_kb.md")
 
@@ -103,6 +104,17 @@ class CanEatResponse(BaseModel):
     item_name: str
 
 
+class ChatRequest(BaseModel):
+    nickname: str = "사용자"
+    week: int = 12
+    conditions: Optional[str] = "없음"
+    user_message: str
+
+
+class ChatResponse(BaseModel):
+    message: str
+
+
 # =========================
 # 4. FastAPI 앱 생성 + CORS
 # =========================
@@ -135,10 +147,8 @@ async def can_eat(req: CanEatRequest):
         user_text_or_image_desc=req.user_text_or_image_desc,
     )
 
-    gemini_resp = client.models.generate_content(
-        model=MODEL_ID,
-        contents=prompt,
-    )
+    model = genai.GenerativeModel(MODEL_ID)
+    gemini_resp = model.generate_content(prompt)
     raw = gemini_resp.text.strip()
 
     try:
@@ -173,10 +183,8 @@ async def recommend_recipes(req: RecipesRequest):
         today_iron_ratio=req.today_iron_ratio,
     )
 
-    gemini_resp = client.models.generate_content(
-        model=MODEL_ID,
-        contents=prompt,
-    )
+    model = genai.GenerativeModel(MODEL_ID)
+    gemini_resp = model.generate_content(prompt)
     raw = gemini_resp.text.strip()
 
     try:
@@ -187,6 +195,45 @@ async def recommend_recipes(req: RecipesRequest):
     return data
 
 
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat(req: ChatRequest):
+    """일반 대화형 채팅 엔드포인트 - can_eat_prompt.txt 사용"""
+    prompt = render_template(
+        CHAT_TEMPLATE,
+        RULES_JSON=RULES_JSON,
+        FOOD_KB_MD=FOOD_KB_MD,
+        nickname=req.nickname,
+        week=req.week,
+        conditions=req.conditions or "없음",
+        user_text_or_image_desc=req.user_message,
+    )
+
+    model = genai.GenerativeModel(MODEL_ID)
+    gemini_resp = model.generate_content(prompt)
+    raw = gemini_resp.text.strip()
+
+    # 마크다운 코드 블록 제거 (```json ... ``` 형식)
+    if raw.startswith("```json"):
+        raw = raw[7:]  # "```json" 제거
+    elif raw.startswith("```"):
+        raw = raw[3:]  # "```" 제거
+    
+    if raw.endswith("```"):
+        raw = raw[:-3]  # 끝의 "```" 제거
+    
+    raw = raw.strip()
+
+    try:
+        # JSON 형식으로 파싱 시도
+        data = json.loads(raw)
+        # JSON이면 headline과 reason을 합쳐서 반환
+        response_text = f"{data.get('headline', '')}\n\n{data.get('reason', '')}"
+        return ChatResponse(message=response_text)
+    except json.JSONDecodeError:
+        # JSON이 아니면 그대로 텍스트로 반환
+        return ChatResponse(message=raw)
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app:app", host="0.0.0.0", port=8001, reload=True)
