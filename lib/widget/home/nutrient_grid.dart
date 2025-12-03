@@ -52,11 +52,13 @@ class NutrientGrid extends StatelessWidget {
                 Expanded(
                   // 340px 안에서의 절반 차지
                   child: Column(
+                    mainAxisSize: MainAxisSize.min, // 최소 크기만 차지
                     crossAxisAlignment: CrossAxisAlignment.end, // 오른쪽(중앙)으로 붙이기
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween, // 위아래 간격 균등 분배
                     children: leftItems
                         .map(
                           (item) => Padding(
-                            padding: EdgeInsets.only(bottom: ResponsiveHelper.height(context, 0.01)),
+                            padding: EdgeInsets.only(bottom: ResponsiveHelper.height(context, 0.005)), // 간격 줄이기
                             child: _buildNutrientItem(
                               context,
                               item,
@@ -76,11 +78,13 @@ class NutrientGrid extends StatelessWidget {
                 Expanded(
                   // 340px 안에서의 절반 차지
                   child: Column(
+                    mainAxisSize: MainAxisSize.min, // 최소 크기만 차지
                     crossAxisAlignment: CrossAxisAlignment.start, // 왼쪽(중앙)으로 붙이기
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween, // 위아래 간격 균등 분배
                     children: rightItems
                         .map(
                           (item) => Padding(
-                            padding: EdgeInsets.only(bottom: ResponsiveHelper.height(context, 0.01)),
+                            padding: EdgeInsets.only(bottom: ResponsiveHelper.height(context, 0.005)), // 간격 줄이기
                             child: _buildNutrientItem(
                               context,
                               item,

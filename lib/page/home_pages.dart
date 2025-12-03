@@ -1085,11 +1085,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               // NutrientGrid 영역 - flex 비율을 늘려서 더 많은 공간 확보
                               Expanded(
                                 flex: 8,
-                                child: SizedBox(
-                                  // NutrientGrid의 최소 높이 보장
-                                  height: ResponsiveHelper.height(context, 0.14),
-                                  child: NutrientGrid(nutrients: _nutrientData),
-                                ),
+                                child: NutrientGrid(nutrients: _nutrientData), // 고정 높이 제거하여 overflow 방지
                               ),
                             ],
                           ),
