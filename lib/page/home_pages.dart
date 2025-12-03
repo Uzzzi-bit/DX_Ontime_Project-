@@ -415,7 +415,23 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _selectedImagePath = file.path;
     });
-    // TODO: [API] 이미지 업로드 및 분석 요청
+
+    // 이미지 선택 시 바로 채팅 화면으로 이동
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          initialText: _qaController.text.trim().isEmpty ? null : _qaController.text.trim(),
+          initialImagePath: file.path,
+        ),
+      ),
+    );
+
+    // 전송 후 상태 초기화
+    setState(() {
+      _qaController.clear();
+      _selectedImagePath = null;
+    });
   }
 
   void _removeSelectedImage() {
