@@ -537,14 +537,21 @@ class _ChatScreenState extends State<ChatScreen> {
                   color: Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text(
-                  text,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w300,
-                    color: isLoading ? ColorPalette.text300 : ColorPalette.text100,
-                    letterSpacing: 0.5,
-                    height: 1.3,
+                child: Container(
+                  padding: EdgeInsets.all(20),
+                  constraints: BoxConstraints(
+                    maxWidth: 450,
+                  ),
+                  color: Colors.white,
+                  child: Text(
+                    text,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w300,
+                      color: isLoading ? ColorPalette.text300 : ColorPalette.text100,
+                      letterSpacing: 0.5,
+                      height: 1.3,
+                    ),
                   ),
                 ),
               ),
