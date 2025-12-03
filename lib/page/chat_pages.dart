@@ -10,6 +10,7 @@ import '../model/image_model.dart';
 import '../api/chat_api.dart';
 import '../api/ai_chat_api_service.dart';
 import '../api/member_api_service.dart';
+import '../api/image_api_service.dart';
 import '../utils/responsive_helper.dart';
 
 class ChatMessage {
@@ -51,6 +52,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _currentMemberId;
   int? _currentSessionId;
   String? _lastUploadedImageDocId; // 마지막으로 업로드된 이미지의 Firestore doc ID
+  int? _lastUploadedImagePk; // 마지막으로 업로드된 이미지의 Django DB image_pk (IMAGES 테이블의 id)
 
   // 사용자 정보 (채팅 API 호출용)
   String _userNickname = '사용자';
@@ -240,14 +242,18 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       int? imagePk;
-      if (imagePath != null && _lastUploadedImageDocId != null) {
-        // Firestore doc ID를 Django image_pk로 변환하는 로직이 필요할 수 있음
-        // 일단 null로 두고, 필요시 추가 구현
-        imagePk = null;
+      if (imagePath != null) {
+        // Django DB에 저장된 이미지 PK 사용
+        imagePk = _lastUploadedImagePk;
+        if (imagePk == null) {
+          debugPrint('⚠️ [ChatScreen] 이미지 PK가 없습니다. 이미지 없이 메시지만 저장합니다.');
+        } else {
+          debugPrint('✅ [ChatScreen] 이미지 PK 사용: image_pk=$imagePk');
+        }
       }
 
       debugPrint(
-        '🔄 [ChatScreen] 메시지 DB 저장 중: type=$type, content=${content.substring(0, content.length > 50 ? 50 : content.length)}...',
+        '🔄 [ChatScreen] 메시지 DB 저장 중: type=$type, content=${content.substring(0, content.length > 50 ? 50 : content.length)}..., imagePk=$imagePk',
       );
       await AiChatApiService.instance.saveMessage(
         sessionId: _currentSessionId!,
@@ -257,6 +263,9 @@ class _ChatScreenState extends State<ChatScreen> {
         imagePk: imagePk,
       );
       debugPrint('✅ [ChatScreen] 메시지 DB 저장 완료');
+
+      // 메시지 저장 후 이미지 PK 초기화 (다음 메시지와 혼동 방지)
+      _lastUploadedImagePk = null;
     } catch (e) {
       debugPrint('❌ [ChatScreen] 메시지 DB 저장 실패: $e');
     }
@@ -269,14 +278,15 @@ class _ChatScreenState extends State<ChatScreen> {
       debugPrint('🔄 [ChatScreen] 사용자 건강 정보 로드 중...');
       final healthInfo = await MemberApiService.instance.getHealthInfo(_currentMemberId!);
 
+      // 닉네임은 건강 정보 API에서 가져옴 (Django에서 Member.nickname 반환)
       _userNickname = healthInfo['nickname'] as String? ?? '사용자';
-      _pregnancyWeek = healthInfo['pregnancy_week'] as int? ?? 12;
+      _pregnancyWeek = healthInfo['pregnancy_week'] as int? ?? healthInfo['pregWeek'] as int? ?? 12;
       _conditions = healthInfo['conditions'] as String? ?? '없음';
 
       debugPrint('✅ [ChatScreen] 사용자 정보: nickname=$_userNickname, week=$_pregnancyWeek, conditions=$_conditions');
     } catch (e) {
       debugPrint('⚠️ [ChatScreen] 건강 정보 로드 실패 (기본값 사용): $e');
-      // 기본값은 이미 설정되어 있음
+      // 기본값은 이미 설정되어 있음 (_userNickname = '사용자', _pregnancyWeek = 12, _conditions = '없음')
     }
   }
 
@@ -338,13 +348,14 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     try {
-      // Gemini API를 사용한 채팅 API 호출
+      // Gemini API를 사용한 채팅 API 호출 (이미지 포함)
       final result =
           await fetchChatResponse(
             userMessage: query,
             nickname: _userNickname,
             week: _pregnancyWeek,
             conditions: _conditions,
+            imageFile: imageFile, // 이미지 파일 전달
           ).timeout(
             const Duration(seconds: 30),
             onTimeout: () {
@@ -469,9 +480,36 @@ class _ChatScreenState extends State<ChatScreen> {
         source: ImageSourceType.aiChat,
       );
       _lastUploadedImageDocId = docId;
-      debugPrint('✅ [ChatScreen] 이미지 업로드 완료: docId=$docId');
+
+      // Django DB에 저장된 이미지 ID 가져오기
+      // ImageRepository.saveImageWithUrl에서 이미 Django DB에 저장하지만,
+      // 여기서는 직접 저장하여 image_pk를 확실히 가져옴
+      try {
+        if (_currentMemberId != null) {
+          final imageApiService = ImageApiService.instance;
+          final djangoImageResult = await imageApiService.saveImage(
+            memberId: _currentMemberId!,
+            imageUrl: imageUrl,
+            imageType: 'chat', // ImageType.chat의 문자열 값
+            source: 'ai_chat', // ImageSourceType.aiChat의 문자열 값
+          );
+
+          // Django 응답에서 image_id 또는 id 추출
+          _lastUploadedImagePk = djangoImageResult['image_id'] as int? ?? djangoImageResult['id'] as int?;
+          debugPrint('✅ [ChatScreen] Django 이미지 저장 완료: image_pk=$_lastUploadedImagePk');
+        } else {
+          debugPrint('⚠️ [ChatScreen] 사용자 ID가 없어 Django 이미지 저장을 건너뜁니다.');
+          _lastUploadedImagePk = null;
+        }
+      } catch (e) {
+        debugPrint('⚠️ [ChatScreen] Django 이미지 저장 실패 (Firestore는 성공): $e');
+        _lastUploadedImagePk = null;
+      }
+
+      debugPrint('✅ [ChatScreen] 이미지 업로드 완료: docId=$docId, imagePk=$_lastUploadedImagePk');
     } catch (e) {
       debugPrint('❌ [ChatScreen] 이미지 업로드 실패: $e');
+      _lastUploadedImagePk = null;
     }
   }
 

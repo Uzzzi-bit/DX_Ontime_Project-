@@ -172,13 +172,16 @@ def get_health_info(request, uid):
 
     data = {
         'memberId': member.firebase_uid,
+        'nickname': member.nickname,  # 닉네임 추가
         'birthYear': preg.birth_year,
         'heightCm': preg.height_cm,
         'weightKg': preg.weight_kg,
         'dueDate': preg.due_date.isoformat(),
         'pregWeek': preg.preg_week,
+        'pregnancy_week': preg.preg_week,  # 호환성을 위해 둘 다 포함
         'hasGestationalDiabetes': preg.gestational_diabetes,
         'allergies': allergies_list,
+        'conditions': '없음',  # TODO: 나중에 conditions 필드 추가 시 수정
     }
 
     return JsonResponse(data)
