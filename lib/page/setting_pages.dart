@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bounceable/flutter_bounceable.dart';
 import '../theme/color_palette.dart';
 import '../widget/bottom_bar_widget.dart';
 
@@ -140,9 +141,17 @@ class SettingsScreen extends StatelessWidget {
               background: _surfaceVariant,
             ),
             const SizedBox(width: 16),
-            _HeaderIcon(
-              icon: Icons.settings_outlined,
-              background: _surfaceVariant,
+            Bounceable(
+              onTap: () {},
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.pushNamed(context, "/login");
+                },
+                child: _HeaderIcon(
+                  icon: Icons.settings_outlined,
+                  background: _surfaceVariant,
+                ),
+              ),
             ),
           ],
         ),

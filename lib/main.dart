@@ -52,6 +52,7 @@ class HealthApp extends StatelessWidget {
         '/momcaresetting': (_) => const MomCareSettingScreen(),
         '/healthinfo': (_) => const HealthInfoScreen(),
         '/addfamily': (_) => const AddFamilyScreen(),
+        '/login': (_) => const LoginScreen(),
       },
     );
   }
