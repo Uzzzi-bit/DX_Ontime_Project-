@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:intl/intl.dart';
@@ -46,7 +47,12 @@ class NutrientSlot {
 }
 
 class ReportScreen extends StatefulWidget {
-  const ReportScreen({super.key});
+  final String? initialMealType; // 홈 화면에서 식사 타입 선택 시 전달
+
+  const ReportScreen({
+    super.key,
+    this.initialMealType,
+  });
 
   @override
   State<ReportScreen> createState() => _ReportScreenState();
@@ -86,6 +92,13 @@ class _ReportScreenState extends State<ReportScreen> {
 
     // 화면 초기 로드 시 AI 추천 레시피 호출
     _reloadDailyNutrientsForSelectedDate();
+
+    // 홈 화면에서 식사 타입 선택 시 해당 식사 타입으로 분석 화면 이동
+    if (widget.initialMealType != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _navigateToMealRecord(widget.initialMealType!);
+      });
+    }
   }
 
   @override
@@ -359,41 +372,33 @@ class _ReportScreenState extends State<ReportScreen> {
   //    - 네트워크 오류 처리
   //    - 사용자에게 적절한 에러 메시지 표시
   void _navigateToMealRecord(String mealType) {
-    // TODO: [AI] [DB] AnalysisScreen에 mealType과 selectedDate 전달 필요
-    // Navigator.push(
-    //   context,
-    //   MaterialPageRoute(
-    //     builder: (context) => AnalysisScreen(
-    //       mealType: mealType,
-    //       selectedDate: _selectedWeekDate,
-    //       onAnalysisComplete: (Map<String, dynamic> result) async {
-    //         // AnalysisScreen에서 분석 완료 후 콜백
-    //         // result: { imageUrl, analysisResult, menuText, ... }
-    //
-    //         // 1. 사진을 서버에 업로드
-    //         // final imageUrl = await api.uploadMealImage(result['imagePath']);
-    //
-    //         // 2. 데이터베이스에 저장
-    //         // await api.saveMealRecord(
-    //         //   mealType: mealType,
-    //         //   date: _selectedWeekDate,
-    //         //   imageUrl: imageUrl,
-    //         //   analysisResult: result['analysisResult'],
-    //         //   menuText: result['menuText'],
-    //         // );
-    //
-    //         // 3. 로컬 상태 업데이트
-    //         // setState(() {
-    //         //   _mealRecords = await api.getMealRecords(_selectedWeekDate);
-    //         // });
-    //       },
-    //     ),
-    //   ),
-    // );
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const AnalysisScreen(),
+        builder: (context) => AnalysisScreen(
+          mealType: mealType,
+          selectedDate: _selectedWeekDate,
+          onAnalysisComplete: (Map<String, dynamic> result) {
+            // AnalysisScreen에서 분석 완료 후 콜백
+            // result: { imageUrl, menuText, mealType, selectedDate }
+            final imageUrl = result['imageUrl'] as String?;
+            final menuText = result['menuText'] as String?;
+            final resultMealType = result['mealType'] as String? ?? mealType;
+
+            // 해당 식사 타입의 MealRecord 업데이트
+            setState(() {
+              final index = _mealRecords.indexWhere((m) => m.mealType == resultMealType);
+              if (index != -1) {
+                _mealRecords[index] = MealRecord(
+                  mealType: resultMealType,
+                  imagePath: imageUrl, // Firebase Storage URL 또는 로컬 경로
+                  menuText: menuText,
+                  hasRecord: true,
+                );
+              }
+            });
+          },
+        ),
       ),
     );
   }
@@ -866,16 +871,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.asset(
-                      meal.imagePath!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: const Color(0xFFECE6F0),
-                          child: const Icon(Icons.image, color: Color(0xFFCAC4D0)),
-                        );
-                      },
-                    ),
+                    child: _buildMealImage(meal.imagePath!),
                   ),
                 ),
               Expanded(
@@ -953,5 +949,55 @@ class _ReportScreenState extends State<ReportScreen> {
         ],
       ),
     );
+  }
+
+  /// 이미지 경로가 URL인지 로컬 경로인지 판단하여 적절한 위젯 반환
+  Widget _buildMealImage(String imagePath) {
+    // URL인지 확인 (http:// 또는 https://로 시작)
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return Image.network(
+        imagePath,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: const Color(0xFFECE6F0),
+            child: const Icon(Icons.image, color: Color(0xFFCAC4D0)),
+          );
+        },
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            color: const Color(0xFFECE6F0),
+            child: const Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        },
+      );
+    } else if (imagePath.startsWith('assets/')) {
+      // assets 경로인 경우
+      return Image.asset(
+        imagePath,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: const Color(0xFFECE6F0),
+            child: const Icon(Icons.image, color: Color(0xFFCAC4D0)),
+          );
+        },
+      );
+    } else {
+      // 로컬 파일 경로인 경우
+      return Image.file(
+        File(imagePath),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: const Color(0xFFECE6F0),
+            child: const Icon(Icons.image, color: Color(0xFFCAC4D0)),
+          );
+        },
+      );
+    }
   }
 }

@@ -12,7 +12,16 @@ import '../model/image_model.dart';
 enum _AnalysisStep { capture, analyzingImage, reviewFoods, nutrientAnalysis }
 
 class AnalysisScreen extends StatefulWidget {
-  const AnalysisScreen({super.key});
+  final String? mealType; // 식사 타입: '아침', '점심', '간식', '저녁'
+  final DateTime? selectedDate; // 선택된 날짜
+  final Function(Map<String, dynamic>)? onAnalysisComplete; // 분석 완료 콜백
+
+  const AnalysisScreen({
+    super.key,
+    this.mealType,
+    this.selectedDate,
+    this.onAnalysisComplete,
+  });
 
   @override
   State<AnalysisScreen> createState() => _AnalysisScreenState();
@@ -27,6 +36,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   File? _selectedImage;
   bool _seededReviewData = false;
   String? _uploadedImageDocId; // 업로드된 이미지의 Firestore 문서 ID
+  String? _uploadedImageUrl; // 업로드된 이미지의 Firebase Storage URL
 
   @override
   void dispose() {
@@ -39,7 +49,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     try {
       final picked = await _picker.pickImage(source: source);
       if (picked == null) return;
-      
+
       final imageFile = File(picked.path);
       setState(() {
         _selectedImage = imageFile;
@@ -66,6 +76,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
         setState(() {
           _uploadedImageDocId = docId;
+          _uploadedImageUrl = imageUrl; // 이미지 URL 저장
         });
 
         // TODO: [AI] 실제 AI 서버에 이미지 분석 요청
@@ -186,10 +197,20 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     // 분석 완료 후 ingredient_info 업데이트 (나중에 AI 분석 결과를 여기에 저장)
     Future.delayed(const Duration(seconds: 3), () async {
       if (!mounted) return;
-      
+
       // TODO: [AI] AI 분석 결과가 나오면 _uploadedImageDocId를 사용하여
       // ImageRepository.updateIngredientInfo()로 ingredient_info 업데이트
       // 예: await ImageRepository().updateIngredientInfo(_uploadedImageDocId!, jsonResult);
+
+      // 분석 완료 콜백 호출 (이미지 URL과 메뉴 텍스트 전달)
+      if (widget.onAnalysisComplete != null && _uploadedImageUrl != null) {
+        widget.onAnalysisComplete!({
+          'imageUrl': _uploadedImageUrl,
+          'menuText': _foodItems.join(', '),
+          'mealType': widget.mealType ?? '',
+          'selectedDate': widget.selectedDate ?? DateTime.now(),
+        });
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('분석이 완료되었습니다. 리포트로 돌아갑니다.')),

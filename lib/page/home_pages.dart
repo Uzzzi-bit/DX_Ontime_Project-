@@ -1,14 +1,10 @@
 import 'dart:math' as math;
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../service/storage_service.dart';
-import '../repository/image_repository.dart';
-import '../model/image_model.dart';
 import '../widget/bottom_bar_widget.dart';
 import '../widget/home/header_section.dart';
 import '../widget/home/nutrient_grid.dart';
@@ -80,7 +76,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  final ImagePicker _picker = ImagePicker();
 
   // TODO: [SERVER] 추천 식단 업데이트 메서드
   //
@@ -342,7 +337,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  /// 플로팅 버튼 클릭 시 이미지 선택 옵션 표시
+  /// 플로팅 버튼 클릭 시 식사 타입 선택 다이얼로그 표시
   void _showMealImagePicker() {
     showDialog(
       context: context,
@@ -361,7 +356,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   child: Text(
-                    '식단 사진 추가',
+                    '식사 타입 선택',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
@@ -369,19 +364,35 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const Divider(height: 24),
                 ListTile(
-                  leading: const Icon(Icons.camera_alt, color: Color(0xFF5BB5C8)),
-                  title: const Text('사진 직접 촬영'),
-                  onTap: () async {
+                  leading: const Icon(Icons.wb_sunny, color: Color(0xFF5BB5C8)),
+                  title: const Text('아침'),
+                  onTap: () {
                     Navigator.pop(dialogContext);
-                    await _handleMealImageCapture(ImageSource.camera);
+                    _navigateToMealAnalysis('아침');
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.photo_library, color: Color(0xFF5BB5C8)),
-                  title: const Text('앨범에서 추가'),
-                  onTap: () async {
+                  leading: const Icon(Icons.lunch_dining, color: Color(0xFF5BB5C8)),
+                  title: const Text('점심'),
+                  onTap: () {
                     Navigator.pop(dialogContext);
-                    await _handleMealImageCapture(ImageSource.gallery);
+                    _navigateToMealAnalysis('점심');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.cookie, color: Color(0xFF5BB5C8)),
+                  title: const Text('간식'),
+                  onTap: () {
+                    Navigator.pop(dialogContext);
+                    _navigateToMealAnalysis('간식');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.dinner_dining, color: Color(0xFF5BB5C8)),
+                  title: const Text('저녁'),
+                  onTap: () {
+                    Navigator.pop(dialogContext);
+                    _navigateToMealAnalysis('저녁');
                   },
                 ),
                 const SizedBox(height: 8),
@@ -397,72 +408,18 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 식단 사진 캡처/선택 처리
-  Future<void> _handleMealImageCapture(ImageSource source) async {
-    try {
-      final XFile? image = await _picker.pickImage(source: source);
-      if (image != null && mounted) {
-        final imageFile = File(image.path);
-        
-        // 이미지 업로드 및 저장
-        try {
-          final storageService = StorageService();
-          final imageRepository = ImageRepository();
-
-          // 1. Firebase Storage에 이미지 업로드
-          final imageUrl = await storageService.uploadImage(
-            imageFile: imageFile,
-            folder: 'meal_images',
-          );
-
-          // 2. Firestore에 이미지 정보 저장
-          await imageRepository.saveImageWithUrl(
-            imageUrl: imageUrl,
-            imageType: ImageType.meal,
-            source: ImageSourceType.mealForm,
-          );
-
-          // TODO: [API] 식단 분석 화면으로 이동하거나 분석 요청
-          
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  source == ImageSource.camera 
-                      ? '사진이 업로드되었습니다.' 
-                      : '앨범에서 사진이 업로드되었습니다.',
-                ),
-                duration: const Duration(seconds: 2),
-                backgroundColor: const Color(0xFF5BB5C8),
-              ),
-            );
-          }
-        } catch (uploadError) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('이미지 업로드 중 오류가 발생했습니다: $uploadError'),
-                duration: const Duration(seconds: 2),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              source == ImageSource.camera ? '카메라 오류: ${e.toString()}' : '앨범 오류: ${e.toString()}',
-            ),
-            duration: const Duration(seconds: 2),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+  /// 선택한 식사 타입으로 리포트 화면으로 이동하여 식단 분석 시작
+  void _navigateToMealAnalysis(String mealType) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReportScreen(
+          initialMealType: mealType,
+        ),
+      ),
+    );
   }
+
 
   /// 영양제 효과를 반영하여 영양소 진행도를 재계산합니다.
   ///
