@@ -63,7 +63,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       // 초기 텍스트에 대한 AI 응답
       if (widget.initialText != null && widget.initialText!.isNotEmpty) {
-        _fetchCanEatResponse(widget.initialText!);
+        _fetchCanEatFromText(widget.initialText!);
       }
     }
   }
@@ -96,7 +96,20 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _fetchCanEatResponse(String query) async {
+  /// 스크롤을 맨 아래로 이동시키는 헬퍼 함수
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  Future<void> _fetchCanEatFromText(String query) async {
     if (!mounted) return;
 
     setState(() {
@@ -104,9 +117,9 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
-      // 3초 타임아웃 설정 - 연결이 안 되면 빠르게 고정 답변으로 전환
-      final result = await fetchCanEatResult(query).timeout(
-        const Duration(seconds: 3),
+      // 10초 타임아웃 설정 - 연결이 안 되면 빠르게 고정 답변으로 전환
+      final result = await fetchCanEatFromText(query).timeout(
+        const Duration(seconds: 10),
         onTimeout: () {
           // 타임아웃 시 에러 응답 반환
           return CanEatResponse(
@@ -162,15 +175,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     // 스크롤을 맨 아래로
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
+    _scrollToBottom();
   }
 
   Future<void> _handleImagePicker() async {
@@ -227,8 +232,11 @@ class _ChatScreenState extends State<ChatScreen> {
           // 이미지 업로드 (백그라운드)
           _uploadImage(imageFile);
 
-          // 이미지에 대한 AI 응답은 기존 시뮬레이션 유지 (이미지 분석은 별도 API 필요)
-          _fetchCanEatResponse('이미지 분석');
+          // 이미지 전송 후 스크롤
+          _scrollToBottom();
+
+          // 이미지에 대한 AI 분석 요청
+          _fetchCanEatFromText('방금 올린 사진의 음식 먹어도 되나요?');
         }
       } catch (e) {
         if (mounted) {
@@ -282,19 +290,11 @@ class _ChatScreenState extends State<ChatScreen> {
       _textController.clear();
     });
 
-    // can-eat API 호출
-    _fetchCanEatResponse(text);
+    // 메시지 추가 후 즉시 스크롤
+    _scrollToBottom();
 
-    // 스크롤을 맨 아래로
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
+    // can-eat API 호출
+    _fetchCanEatFromText(text);
   }
 
   @override
@@ -362,22 +362,18 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: Row(
                     children: [
                       Bounceable(
-                        onTap: () {},
-                        child: InkWell(
-                          onTap: _handleImagePicker,
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: ColorPalette.bg200,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Icon(
-                              Icons.add,
-                              color: ColorPalette.text100,
-                              size: 24,
-                            ),
+                        onTap: _handleImagePicker,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: ColorPalette.bg200,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Icon(
+                            Icons.add,
+                            color: ColorPalette.text100,
+                            size: 24,
                           ),
                         ),
                       ),
@@ -414,32 +410,30 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       const SizedBox(width: 12),
                       Bounceable(
-                        onTap: () {},
-                        child: InkWell(
-                          onTap: _isLoading ? null : _handleSendMessage,
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            width: 45,
-                            height: 45,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _isLoading ? ColorPalette.primary100.withOpacity(0.5) : ColorPalette.primary100,
-                            ),
-                            child: _isLoading
-                                ? const SizedBox(
+                        onTap: _isLoading ? null : _handleSendMessage,
+                        child: Container(
+                          width: 45,
+                          height: 45,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _isLoading ? ColorPalette.primary100.withOpacity(0.5) : ColorPalette.primary100,
+                          ),
+                          child: _isLoading
+                              ? const Center(
+                                  child: SizedBox(
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
                                       valueColor: AlwaysStoppedAnimation<Color>(ColorPalette.text100),
                                     ),
-                                  )
-                                : const Icon(
-                                    Icons.send,
-                                    color: ColorPalette.text100,
-                                    size: 20,
                                   ),
-                          ),
+                                )
+                              : const Icon(
+                                  Icons.send,
+                                  color: ColorPalette.text100,
+                                  size: 20,
+                                ),
                         ),
                       ),
                     ],
