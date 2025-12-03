@@ -56,7 +56,7 @@ class TodayMealSection extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final meal = meals[index];
                   return Bounceable(
-                    onTap: () {},
+                    onTap: () => onMealTap(meal['id'] as String),
                     child: _MealCard(
                       meal: meal,
                       onTap: () => onMealTap(meal['id'] as String),

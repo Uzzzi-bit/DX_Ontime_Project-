@@ -415,7 +415,23 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _selectedImagePath = file.path;
     });
-    // TODO: [API] 이미지 업로드 및 분석 요청
+
+    // 이미지 선택 시 바로 채팅 화면으로 이동
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          initialText: _qaController.text.trim().isEmpty ? null : _qaController.text.trim(),
+          initialImagePath: file.path,
+        ),
+      ),
+    );
+
+    // 전송 후 상태 초기화
+    setState(() {
+      _qaController.clear();
+      _selectedImagePath = null;
+    });
   }
 
   void _removeSelectedImage() {
@@ -545,31 +561,35 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _navigateToRecipe(String mealId) {
-    // TODO: [API] 실제 레시피 상세 페이지로 이동
-    // 홈 화면의 추천 식단과 recipe_pages의 메뉴 매핑
-    // 연어스테이크 → 간장 닭봉 구이 (index 0)
-    // 냉모밀 → 냉메밀 (index 1)
-    // 미역국 → 미역국 (index 2)
-    int recipeIndex = 0;
-    switch (mealId) {
-      case 'salmon-steak':
-        recipeIndex = 0; // 간장 닭봉 구이
-        break;
-      case 'cold-noodles':
-        recipeIndex = 1; // 냉메밀
-        break;
-      case 'seaweed-soup':
-        recipeIndex = 2; // 미역국
-        break;
-      default:
-        recipeIndex = 0;
+    // 음식 선택 시 채팅 화면으로 이동
+    // 음식 이름 찾기
+    String mealName = '';
+    try {
+      final meal = _mealData.firstWhere((m) => m['id'] == mealId);
+      mealName = meal['name'] as String;
+    } catch (e) {
+      // mealId로 찾지 못하면 기본값 사용
+      switch (mealId) {
+        case 'salmon-steak':
+          mealName = '간장 닭봉 구이';
+          break;
+        case 'cold-noodles':
+          mealName = '냉메밀';
+          break;
+        case 'seaweed-soup':
+          mealName = '미역국';
+          break;
+        default:
+          mealName = '이 음식';
+      }
     }
 
+    // 채팅 화면으로 이동 (음식 이름을 질문으로 전달)
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => RecipeScreen(
-          initialMenuIndex: recipeIndex,
+        builder: (context) => ChatScreen(
+          initialText: '$mealName 먹어도 되나요?',
         ),
       ),
     );
