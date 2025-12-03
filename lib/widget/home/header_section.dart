@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:intl/intl.dart';
+import '../../utils/responsive_helper.dart';
 
 class HeaderSection extends StatelessWidget {
   final String userName;
@@ -26,8 +27,13 @@ class HeaderSection extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      height: 300,
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 24), // 하단 패딩 최소
+      height: ResponsiveHelper.height(context, 0.37),
+      padding: EdgeInsets.fromLTRB(
+        ResponsiveHelper.width(context, 0.053),
+        ResponsiveHelper.height(context, 0.035),
+        ResponsiveHelper.width(context, 0.053),
+        ResponsiveHelper.height(context, 0.03),
+      ), // 하단 패딩 최소
       decoration: const BoxDecoration(
         color: Color(0xFFBCE7F0),
         borderRadius: BorderRadius.only(

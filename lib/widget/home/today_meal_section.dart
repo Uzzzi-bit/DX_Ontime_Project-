@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
+import '../../utils/responsive_helper.dart';
 
 class TodayMealSection extends StatelessWidget {
   const TodayMealSection({
@@ -16,25 +17,25 @@ class TodayMealSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const Text(
+        Text(
           '오늘의 추천 식단',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: ResponsiveHelper.fontSize(context, 16),
             fontWeight: FontWeight.w600,
             letterSpacing: 0.5,
-            color: Color(0xFF000000),
+            color: const Color(0xFF000000),
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: ResponsiveHelper.height(context, 0.015)),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: ResponsiveHelper.padding(context, all: 16),
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border.all(
               color: const Color(0xFFF0ECE4),
               width: 1,
             ),
-            borderRadius: BorderRadius.circular(11),
+            borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.029)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
@@ -44,13 +45,13 @@ class TodayMealSection extends StatelessWidget {
             ],
           ),
           child: SizedBox(
-            height: 155,
+            height: ResponsiveHelper.height(context, 0.19),
             child: Center(
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 shrinkWrap: true,
                 itemCount: meals.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 16),
+                separatorBuilder: (_, __) => SizedBox(width: ResponsiveHelper.width(context, 0.043)),
                 itemBuilder: (context, index) {
                   final meal = meals[index];
                   return Bounceable(
@@ -86,27 +87,27 @@ class _MealCard extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.053)),
       child: Container(
-        width: 101,
-        height: 155,
+        width: ResponsiveHelper.width(context, 0.269),
+        height: ResponsiveHelper.height(context, 0.19),
         decoration: BoxDecoration(
           color: backgroundColor.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.053)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              padding: ResponsiveHelper.padding(context, horizontal: 8, vertical: 8),
               child: Text(
                 meal['name'] as String,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 10,
+                style: TextStyle(
+                  fontSize: ResponsiveHelper.fontSize(context, 10),
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.5,
-                  color: Color(0xFF49454F),
+                  color: const Color(0xFF49454F),
                 ),
               ),
             ),
@@ -116,21 +117,21 @@ class _MealCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(500),
                   child: Image.asset(
                     meal['imagePath'] as String,
-                    width: 70,
-                    height: 70,
+                    width: ResponsiveHelper.width(context, 0.187),
+                    height: ResponsiveHelper.width(context, 0.187),
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
-                        width: 70,
-                        height: 70,
+                        width: ResponsiveHelper.width(context, 0.187),
+                        height: ResponsiveHelper.width(context, 0.187),
                         decoration: BoxDecoration(
                           color: backgroundColor.withOpacity(0.3),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.restaurant_menu,
-                          size: 35,
-                          color: Color(0xFF49454F),
+                          size: ResponsiveHelper.fontSize(context, 35),
+                          color: const Color(0xFF49454F),
                         ),
                       );
                     },
@@ -139,52 +140,52 @@ class _MealCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: EdgeInsets.symmetric(horizontal: ResponsiveHelper.width(context, 0.021)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: ResponsiveHelper.width(context, 0.021),
+                      vertical: ResponsiveHelper.height(context, 0.005),
                     ),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.8),
-                      borderRadius: BorderRadius.circular(30),
+                      borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.08)),
                     ),
                     child: Text(
                       '${meal['calories']} kcal',
-                      style: const TextStyle(
-                        fontSize: 8,
+                      style: TextStyle(
+                        fontSize: ResponsiveHelper.fontSize(context, 8),
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.2,
-                        color: Color(0xFF49454F),
+                        color: const Color(0xFF49454F),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: ResponsiveHelper.height(context, 0.005)),
                   Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
+                    spacing: ResponsiveHelper.width(context, 0.011),
+                    runSpacing: ResponsiveHelper.height(context, 0.005),
                     children: tags.map((tag) {
                       return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: ResponsiveHelper.width(context, 0.016),
+                          vertical: ResponsiveHelper.height(context, 0.002),
                         ),
                         decoration: BoxDecoration(
                           border: Border.all(
                             color: const Color(0xFF49454F).withOpacity(0.5),
                           ),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.027)),
                         ),
                         child: Text(
                           tag,
-                          style: const TextStyle(
-                            fontSize: 7,
+                          style: TextStyle(
+                            fontSize: ResponsiveHelper.fontSize(context, 7),
                             fontWeight: FontWeight.w600,
                             letterSpacing: 0.2,
-                            color: Color(0xFF49454F),
+                            color: const Color(0xFF49454F),
                           ),
                         ),
                       );
@@ -193,7 +194,7 @@ class _MealCard extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: ResponsiveHelper.height(context, 0.01)),
           ],
         ),
       ),

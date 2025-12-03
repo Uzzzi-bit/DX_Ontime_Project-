@@ -19,6 +19,7 @@ import '../model/user_model.dart';
 import '../repository/user_repository.dart';
 import '../model/supplement_effects.dart';
 import '../model/nutrient_type.dart';
+import '../utils/responsive_helper.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -75,7 +76,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
   }
-
 
   // TODO: [SERVER] 추천 식단 업데이트 메서드
   //
@@ -420,7 +420,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-
   /// 영양제 효과를 반영하여 영양소 진행도를 재계산합니다.
   ///
   /// 기본값(_baseNutrientProgress)에 선택된 영양제들의 효과를 누적하여
@@ -577,9 +576,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Row(
                   children: [
                     Container(
-                      margin: const EdgeInsets.all(10),
-                      width: 60,
-                      height: 60,
+                      margin: EdgeInsets.all(ResponsiveHelper.width(context, 0.027)),
+                      width: ResponsiveHelper.width(context, 0.16),
+                      height: ResponsiveHelper.width(context, 0.16),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(8),
                         image: const DecorationImage(
@@ -587,7 +586,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-                    SizedBox(width: 8),
+                    SizedBox(width: ResponsiveHelper.width(context, 0.021)),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -677,26 +676,26 @@ class _HomeScreenState extends State<HomeScreen> {
                       mainAxisSize: MainAxisSize.max,
                       children: [
                         Container(
-                          height: 48,
+                          height: ResponsiveHelper.height(context, 0.059),
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.037)),
                           ),
                           child: Center(
                             child: iconPath != null && iconPath.isNotEmpty
                                 ? Image.asset(
                                     iconPath,
-                                    width: 60,
-                                    height: 60,
+                                    width: ResponsiveHelper.width(context, 0.16),
+                                    height: ResponsiveHelper.width(context, 0.16),
                                     fit: BoxFit.contain,
                                     errorBuilder: (context, error, stackTrace) {
                                       return const SizedBox.shrink();
                                     },
                                   )
-                                : const SizedBox(height: 60),
+                                : SizedBox(height: ResponsiveHelper.width(context, 0.16)),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: ResponsiveHelper.height(context, 0.01)),
                         Text(
                           product['name'] ?? '',
                           style:
@@ -824,6 +823,9 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).padding.bottom + 80, // 하단 네비게이션 바 + SafeArea 공간
+          ),
           child: Column(
             children: [
               /// 1) 파란색 헤더
@@ -837,10 +839,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
               /// 2) RoundedContainer를 자연스럽게 위로 끌어올림
               Transform.translate(
-                offset: const Offset(0, -170), // 흰색 박스 배경 침투 조절
+                offset: Offset(0, -ResponsiveHelper.height(context, 0.21)), // 흰색 박스 배경 침투 조절
                 child: RoundedContainer(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                    padding: ResponsiveHelper.padding(context, all: 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -853,16 +855,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                 style:
                                     textTheme.titleMedium?.copyWith(
                                       fontWeight: FontWeight.w600,
-                                      fontSize: 14,
+                                      fontSize: ResponsiveHelper.fontSize(context, 13),
                                       letterSpacing: 0.5,
                                     ) ??
-                                    const TextStyle(
-                                      fontSize: 14,
+                                    TextStyle(
+                                      fontSize: ResponsiveHelper.fontSize(context, 13),
                                       fontWeight: FontWeight.w600,
                                       letterSpacing: 0.5,
                                     ),
                               ),
-                              const SizedBox(width: 12),
+                              SizedBox(width: ResponsiveHelper.width(context, 0.032)),
                               Bounceable(
                                 onTap: () {},
                                 child: TextButton(
@@ -875,22 +877,22 @@ class _HomeScreenState extends State<HomeScreen> {
                                     );
                                   },
                                   style: TextButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 4,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: ResponsiveHelper.width(context, 0.027),
+                                      vertical: ResponsiveHelper.height(context, 0.005),
                                     ),
                                     backgroundColor: const Color(0xFFBCE7F0),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.021)),
                                     ),
                                     foregroundColor: const Color(0xFF49454F),
                                     minimumSize: Size.zero,
                                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                   ),
-                                  child: const Text(
+                                  child: Text(
                                     '종합리포트 가기',
                                     style: TextStyle(
-                                      fontSize: 10,
+                                      fontSize: ResponsiveHelper.fontSize(context, 9),
                                       fontWeight: FontWeight.w600,
                                       letterSpacing: 0.5,
                                     ),
@@ -900,7 +902,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: ResponsiveHelper.height(context, 0.02)),
                         IntrinsicHeight(
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -911,8 +913,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     SizedBox(
-                                      width: 120,
-                                      height: 130,
+                                      width: ResponsiveHelper.width(context, 0.32),
+                                      height: ResponsiveHelper.height(context, 0.14),
                                       child: CalorieArcGauge(
                                         current: _currentCalorie,
                                         target: _targetCalorie,
@@ -923,23 +925,23 @@ class _HomeScreenState extends State<HomeScreen> {
                                           Color(0xFFBCE7F0),
                                         ],
                                         child: SizedBox(
-                                          height: 110,
-                                          width: 110,
+                                          height: ResponsiveHelper.height(context, 0.12),
+                                          width: ResponsiveHelper.width(context, 0.293),
                                           child: Image.asset(
                                             'assets/image/baby.png',
                                             fit: BoxFit.contain,
                                             errorBuilder: (context, error, stackTrace) {
                                               return Container(
-                                                width: 90,
-                                                height: 90,
+                                                width: ResponsiveHelper.width(context, 0.24),
+                                                height: ResponsiveHelper.width(context, 0.24),
                                                 decoration: BoxDecoration(
                                                   color: const Color(0xFFBCE7F0).withOpacity(0.3),
                                                   shape: BoxShape.circle,
                                                 ),
-                                                child: const Icon(
+                                                child: Icon(
                                                   Icons.child_care,
-                                                  size: 50,
-                                                  color: Color(0xFF5BB5C8),
+                                                  size: ResponsiveHelper.fontSize(context, 50),
+                                                  color: const Color(0xFF5BB5C8),
                                                 ),
                                               );
                                             },
@@ -948,18 +950,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                     ),
                                     Transform.translate(
-                                      offset: const Offset(0, -10),
+                                      offset: Offset(0, -ResponsiveHelper.height(context, 0.012)),
                                       child: Text(
                                         '${_currentCalorie.toStringAsFixed(0)}Kcal',
                                         style:
                                             textTheme.displaySmall?.copyWith(
                                               fontWeight: FontWeight.w700,
-                                              fontSize: 24,
+                                              fontSize: ResponsiveHelper.fontSize(context, 22),
                                               height: 1.0,
                                               letterSpacing: 0.5,
                                             ) ??
-                                            const TextStyle(
-                                              fontSize: 24,
+                                            TextStyle(
+                                              fontSize: ResponsiveHelper.fontSize(context, 22),
                                               fontWeight: FontWeight.w700,
                                               height: 1.0,
                                               letterSpacing: 0.5,
@@ -969,7 +971,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ],
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              SizedBox(width: ResponsiveHelper.width(context, 0.032)),
                               Expanded(
                                 flex: 6,
                                 child: NutrientGrid(nutrients: _nutrientData),
@@ -977,7 +979,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: ResponsiveHelper.height(context, 0.02)),
                         SupplementChecklist(
                           supplements: _supplementIds
                               .map((id) => _supplements.firstWhere((s) => s.id == id).label)
@@ -993,21 +995,21 @@ class _HomeScreenState extends State<HomeScreen> {
                             // TODO: [API] 영양제 추가하기 기능
                           },
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: ResponsiveHelper.height(context, 0.01)),
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          padding: EdgeInsets.symmetric(horizontal: ResponsiveHelper.width(context, 0.011)),
                           child: Text(
                             '※ 영양제 효과는 1일 권장량 대비 평균적인 퍼센트로 가정한 값입니다. 실제 제품과는 차이가 있을 수 있어요.',
                             style:
                                 textTheme.bodySmall?.copyWith(
-                                  fontSize: 9,
+                                  fontSize: ResponsiveHelper.fontSize(context, 9),
                                   fontWeight: FontWeight.w300,
                                   color: Colors.grey[600],
                                   letterSpacing: 0.09,
                                   height: 1.3,
                                 ) ??
                                 TextStyle(
-                                  fontSize: 9,
+                                  fontSize: ResponsiveHelper.fontSize(context, 9),
                                   fontWeight: FontWeight.w300,
                                   color: Colors.grey[600],
                                   letterSpacing: 0.09,
@@ -1015,7 +1017,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                           ),
                         ),
-                        const SizedBox(height: 32),
+                        SizedBox(height: ResponsiveHelper.height(context, 0.04)),
                         EatCheckSection(
                           controller: _qaController,
                           onSubmit: _handleAskSubmit,
@@ -1023,29 +1025,29 @@ class _HomeScreenState extends State<HomeScreen> {
                           selectedImagePath: _selectedImagePath,
                           onRemoveImage: _removeSelectedImage,
                         ),
-                        const SizedBox(height: 32),
+                        SizedBox(height: ResponsiveHelper.height(context, 0.04)),
                         TodayMealSection(
                           meals: _mealData,
                           onMealTap: _navigateToRecipe,
                         ),
-                        const SizedBox(height: 20),
+                        SizedBox(height: ResponsiveHelper.height(context, 0.025)),
                         Text(
                           '즐겨 찾는 제품',
                           style:
                               textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w500,
-                                fontSize: 12,
+                                fontSize: ResponsiveHelper.fontSize(context, 12),
                                 letterSpacing: 0.5,
                               ) ??
-                              const TextStyle(
-                                fontSize: 12,
+                              TextStyle(
+                                fontSize: ResponsiveHelper.fontSize(context, 12),
                                 fontWeight: FontWeight.w500,
                                 letterSpacing: 0.5,
                               ),
                         ),
-                        const SizedBox(height: 10),
+                        SizedBox(height: ResponsiveHelper.height(context, 0.012)),
                         SizedBox(
-                          height: 30,
+                          height: ResponsiveHelper.height(context, 0.037),
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: _appliances.length,
@@ -1188,44 +1190,47 @@ class _ApplianceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 95,
-      height: 30,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      width: ResponsiveHelper.width(context, 0.253),
+      height: ResponsiveHelper.height(context, 0.037),
+      padding: EdgeInsets.symmetric(
+        horizontal: ResponsiveHelper.width(context, 0.021),
+        vertical: ResponsiveHelper.height(context, 0.005),
+      ),
       decoration: BoxDecoration(
         color: const Color(0x45CDCDCD),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.021)),
       ),
       child: Row(
         children: [
           SizedBox(
-            width: 24,
-            height: 19,
+            width: ResponsiveHelper.width(context, 0.064),
+            height: ResponsiveHelper.height(context, 0.023),
             child: Image.asset(
               info.assetPath,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) {
                 return Container(
-                  width: 24,
-                  height: 19,
+                  width: ResponsiveHelper.width(context, 0.064),
+                  height: ResponsiveHelper.height(context, 0.023),
                   decoration: BoxDecoration(
                     color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.011)),
                   ),
                   child: Icon(
                     info.name.contains('오븐') ? Icons.microwave : Icons.kitchen,
-                    size: 14,
+                    size: ResponsiveHelper.fontSize(context, 14),
                     color: Colors.grey[600],
                   ),
                 );
               },
             ),
           ),
-          const SizedBox(width: 6),
+          SizedBox(width: ResponsiveHelper.width(context, 0.016)),
           Expanded(
             child: Text(
               info.name,
-              style: const TextStyle(
-                fontSize: 10,
+              style: TextStyle(
+                fontSize: ResponsiveHelper.fontSize(context, 10),
                 fontWeight: FontWeight.w500,
                 letterSpacing: 0.5,
               ),

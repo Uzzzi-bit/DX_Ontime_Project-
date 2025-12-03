@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../theme/color_palette.dart';
+import '../../utils/responsive_helper.dart';
 
 class EatCheckSection extends StatelessWidget {
   const EatCheckSection({
@@ -20,32 +21,32 @@ class EatCheckSection extends StatelessWidget {
   final String? selectedImagePath;
   final VoidCallback? onRemoveImage;
 
-  Widget _buildImagePreview(String imagePath) {
+  Widget _buildImagePreview(BuildContext context, String imagePath) {
     try {
       final file = File(imagePath);
       if (!file.existsSync()) {
-        return _buildErrorWidget();
+        return _buildErrorWidget(context);
       }
       return Image.file(
         file,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
-          return _buildErrorWidget();
+          return _buildErrorWidget(context);
         },
       );
     } catch (e) {
-      return _buildErrorWidget();
+      return _buildErrorWidget(context);
     }
   }
 
-  Widget _buildErrorWidget() {
+  Widget _buildErrorWidget(BuildContext context) {
     return Container(
       width: double.infinity,
-      height: 200,
+      height: ResponsiveHelper.height(context, 0.247),
       color: Colors.grey[300],
-      child: const Icon(
+      child: Icon(
         Icons.broken_image,
-        size: 50,
+        size: ResponsiveHelper.fontSize(context, 50),
         color: Colors.grey,
       ),
     );
@@ -137,30 +138,30 @@ class EatCheckSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Center(
+        Center(
           child: Text(
             '먹어도 되나요?',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: ResponsiveHelper.fontSize(context, 16),
               fontWeight: FontWeight.w600,
               letterSpacing: 0.5,
-              color: Color(0xFF0F0F0F),
+              color: const Color(0xFF0F0F0F),
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: ResponsiveHelper.height(context, 0.015)),
         // 선택된 이미지 미리보기
         if (selectedImagePath != null) ...[
           Container(
-            margin: const EdgeInsets.only(bottom: 12),
+            margin: EdgeInsets.only(bottom: ResponsiveHelper.height(context, 0.015)),
             child: Stack(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.032)),
                   child: SizedBox(
                     width: double.infinity,
-                    height: 200,
-                    child: _buildImagePreview(selectedImagePath!),
+                    height: ResponsiveHelper.height(context, 0.247),
+                    child: _buildImagePreview(context, selectedImagePath!),
                   ),
                 ),
                 // 삭제 버튼
@@ -171,16 +172,16 @@ class EatCheckSection extends StatelessWidget {
                     onTap: onRemoveImage,
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
-                      width: 32,
-                      height: 32,
+                      width: ResponsiveHelper.width(context, 0.085),
+                      height: ResponsiveHelper.width(context, 0.085),
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.5),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.close,
                         color: Colors.white,
-                        size: 20,
+                        size: ResponsiveHelper.fontSize(context, 20),
                       ),
                     ),
                   ),
@@ -190,10 +191,10 @@ class EatCheckSection extends StatelessWidget {
           ),
         ],
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: EdgeInsets.symmetric(horizontal: ResponsiveHelper.width(context, 0.053)),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(55),
+            borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.147)),
             border: Border.all(color: const Color(0xFFF0ECE4)),
           ),
           child: Row(
@@ -202,56 +203,59 @@ class EatCheckSection extends StatelessWidget {
                 onTap: () {},
                 child: InkWell(
                   onTap: () => _showImagePicker(context),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.021)),
                   child: Container(
-                    width: 28,
-                    height: 28,
+                    width: ResponsiveHelper.width(context, 0.075),
+                    height: ResponsiveHelper.width(context, 0.075),
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
                       color: Color(0xFFBCE7F0),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.add,
-                      size: 18,
-                      color: Color(0xFF0F0F0F),
+                      size: ResponsiveHelper.fontSize(context, 18),
+                      color: const Color(0xFF0F0F0F),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: ResponsiveHelper.width(context, 0.032)),
               Expanded(
                 child: TextField(
                   controller: controller,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: '궁금한 음식/약을 물어보세요',
                     hintStyle: TextStyle(
-                      color: Color(0xFFDADADA),
-                      fontSize: 14,
+                      color: const Color(0xFFDADADA),
+                      fontSize: ResponsiveHelper.fontSize(context, 14),
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.5,
                     ),
                     border: InputBorder.none,
                   ),
+                  style: TextStyle(
+                    fontSize: ResponsiveHelper.fontSize(context, 14),
+                  ),
                   onSubmitted: (_) => onSubmit(),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: ResponsiveHelper.width(context, 0.032)),
               Bounceable(
                 onTap: () {},
                 child: InkWell(
                   onTap: onSubmit,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.021)),
                   child: Container(
-                    width: 28,
-                    height: 28,
+                    width: ResponsiveHelper.width(context, 0.075),
+                    height: ResponsiveHelper.width(context, 0.075),
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
                       color: Color(0xFFBCE7F0),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.send,
-                      size: 16,
-                      color: Color(0xFF0F0F0F),
+                      size: ResponsiveHelper.fontSize(context, 16),
+                      color: const Color(0xFF0F0F0F),
                     ),
                   ),
                 ),

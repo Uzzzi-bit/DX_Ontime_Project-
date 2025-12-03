@@ -7,6 +7,7 @@ import '../service/storage_service.dart';
 import '../repository/image_repository.dart';
 import '../model/image_model.dart';
 import '../api/can_eat_api.dart';
+import '../utils/responsive_helper.dart';
 
 class ChatMessage {
   final bool isUser;
@@ -332,20 +333,20 @@ class _ChatScreenState extends State<ChatScreen> {
                       Bounceable(
                         onTap: _handleImagePicker,
                         child: Container(
-                          width: 40,
-                          height: 40,
+                          width: ResponsiveHelper.width(context, 0.107),
+                          height: ResponsiveHelper.width(context, 0.107),
                           decoration: BoxDecoration(
                             color: ColorPalette.bg200,
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.053)),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.add,
                             color: ColorPalette.text100,
-                            size: 24,
+                            size: ResponsiveHelper.fontSize(context, 24),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: ResponsiveHelper.width(context, 0.032)),
                       Expanded(
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -380,27 +381,27 @@ class _ChatScreenState extends State<ChatScreen> {
                       Bounceable(
                         onTap: _isLoading ? null : _handleSendMessage,
                         child: Container(
-                          width: 45,
-                          height: 45,
+                          width: ResponsiveHelper.width(context, 0.12),
+                          height: ResponsiveHelper.width(context, 0.12),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: _isLoading ? ColorPalette.primary100.withOpacity(0.5) : ColorPalette.primary100,
                           ),
                           child: _isLoading
-                              ? const Center(
+                              ? Center(
                                   child: SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
+                                    width: ResponsiveHelper.width(context, 0.053),
+                                    height: ResponsiveHelper.width(context, 0.053),
+                                    child: const CircularProgressIndicator(
                                       strokeWidth: 2,
                                       valueColor: AlwaysStoppedAnimation<Color>(ColorPalette.text100),
                                     ),
                                   ),
                                 )
-                              : const Icon(
+                              : Icon(
                                   Icons.send,
                                   color: ColorPalette.text100,
-                                  size: 20,
+                                  size: ResponsiveHelper.fontSize(context, 20),
                                 ),
                         ),
                       ),
