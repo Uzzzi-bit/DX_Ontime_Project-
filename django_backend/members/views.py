@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.dateparse import parse_datetime, parse_date
 
-from .models import Member, MemberPregnancy, FamilyRelation, Image
+from .models import Member, MemberPregnancy, FamilyRelation, MemberNutritionTarget
 from django.utils import timezone
 
 
@@ -33,7 +33,7 @@ def register_member(request):
 
     uid = body.get('uid')
     email = body.get('email')
-    nickname = body.get('nickname')  # 사용자가 입력한 닉네임
+    nickname = body.get('nickname')
 
     if not uid:
         return JsonResponse({'error': 'uid is required'}, status=400)
@@ -45,25 +45,20 @@ def register_member(request):
         try:
             member = Member.objects.get(firebase_uid=uid)
             created = False
-            # 이메일이 비어 있거나, 바뀌었으면 업데이트
             if email and member.email != email:
                 member.email = email
                 member.save(update_fields=['email'])
-            # 닉네임이 제공되었고, 기존 닉네임과 다르면 업데이트
             if nickname and member.nickname != nickname:
                 member.nickname = nickname
                 member.save(update_fields=['nickname'])
         except Member.DoesNotExist:
-            # 2) 새 멤버라면 email 이 필수
             if not email:
                 return JsonResponse(
                     {'error': 'email is required for new member'},
                     status=400,
                 )
-            # nickname이 제공되지 않으면 이메일의 @ 앞부분을 기본값으로 사용 (기존 로직 유지)
             final_nickname = nickname if nickname else (email.split('@')[0] if email else 'User')
             
-            # email 은 UNIQUE 이므로 email 기준으로 get_or_create
             member, created = Member.objects.get_or_create(
                 email=email,
                 defaults={
@@ -72,7 +67,6 @@ def register_member(request):
                     'nickname': final_nickname,
                 },
             )
-            # get_or_create로 기존 멤버를 가져온 경우 nickname 업데이트
             if not created and nickname and member.nickname != nickname:
                 member.nickname = nickname
                 member.save(update_fields=['nickname'])
@@ -99,18 +93,6 @@ def save_health_info(request):
     """
     건강 정보 저장
     POST /api/health/
-
-    body 예시 :
-    {
-      "memberId": "firebase-uid-123",   <- Firebase UID (문자열)
-      "birthYear": 1993,
-      "heightCm": 162,
-      "weightKg": 60,
-      "dueDate": "2025-10-01",
-      "pregWeek": 20,
-      "hasGestationalDiabetes": true,
-      "allergies": ["우유", "땅콩"]
-    }
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST only'}, status=405)
@@ -120,7 +102,6 @@ def save_health_info(request):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
-    # 클라이언트의 memberId = Firebase UID
     member_uid = body.get('memberId')
     birth_year = body.get('birthYear')
     height_cm = body.get('heightCm')
@@ -137,14 +118,12 @@ def save_health_info(request):
     if due_dt is None:
         return JsonResponse({'error': 'dueDate 형식 오류'}, status=400)
 
-    # datetime이면 date만 추출
     if hasattr(due_dt, 'date'):
         due_dt = due_dt.date()
 
     allergy_str = ','.join(allergies_list) if allergies_list else ''
 
     try:
-        # ✅ firebase_uid로 Member 찾기
         member = Member.objects.get(firebase_uid=member_uid)
 
         preg, created = MemberPregnancy.objects.update_or_create(
@@ -176,11 +155,8 @@ def get_health_info(request, uid):
     """
     건강 정보 조회
     GET /api/health/<uid>/
-
-    여기서 uid = Firebase UID (문자열)
     """
     try:
-        # ✅ firebase_uid 기준으로 조회
         member = Member.objects.get(firebase_uid=uid)
     except Member.DoesNotExist:
         return JsonResponse({'error': 'member not found'}, status=404)
@@ -214,14 +190,6 @@ def update_pregnant_mode(request):
     임신 모드 업데이트
     POST /api/member/pregnant-mode/
     body: { "uid": "firebase-uid", "is_pregnant_mode": true }
-    
-    역할 전환 로직:
-    - is_pregnant_mode = False -> True: 보호자에서 임산부로 전환
-      * 기존에 이 사용자가 guardian_member_id로 있던 관계들은 삭제
-      * 이제 이 사용자는 member_id로 사용 가능
-    - is_pregnant_mode = True -> False: 임산부에서 보호자로 전환
-      * 기존에 이 사용자가 member_id로 있던 관계들은 삭제
-      * 이제 이 사용자는 guardian_member_id로 사용 가능
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST only'}, status=405)
@@ -245,18 +213,13 @@ def update_pregnant_mode(request):
         old_mode = member.is_pregnant_mode
         new_mode = bool(is_pregnant_mode)
         
-        # 모드가 실제로 변경되는 경우에만 관계 데이터 정리
         if old_mode != new_mode:
             if new_mode:
-                # 보호자 -> 임산부 전환
-                # 이 사용자가 guardian_member_id로 있던 모든 관계 삭제
                 deleted_as_guardian = FamilyRelation.objects.filter(
                     guardian_member_id=uid
                 ).delete()[0]
                 print(f'>>> {uid}: 보호자 -> 임산부 전환, {deleted_as_guardian}개 보호자 관계 삭제')
             else:
-                # 임산부 -> 보호자 전환
-                # 이 사용자가 member_id로 있던 모든 관계 삭제
                 deleted_as_member = FamilyRelation.objects.filter(
                     member_id=uid
                 ).delete()[0]
@@ -287,17 +250,6 @@ def update_family_members(request):
     """
     가족 구성원 업데이트 (전체 동기화)
     POST /api/family/update/
-
-    body 예시:
-    {
-      "member_id": "firebase-uid-123",  // 임산부의 Firebase UID
-      "relation_types": ["배우자", "부모님"]  // 선택된 relation_type 목록
-    }
-    
-    동작:
-    1. DB에서 해당 member_id의 모든 관계 조회
-    2. 선택된 relation_type만 유지하고, 나머지는 삭제
-    3. 선택된 relation_type 중 DB에 없는 것은 추가 (guardian_member_id는 임시로 relation_type 사용)
     """
     print(f'>>> update_family_members 호출됨: method={request.method}, path={request.path}')
     
@@ -309,8 +261,8 @@ def update_family_members(request):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
-    member_id = body.get('member_id')  # 임산부의 Firebase UID
-    relation_types = body.get('relation_types', [])  # 선택된 relation_type 목록
+    member_id = body.get('member_id')
+    relation_types = body.get('relation_types', [])
 
     if not member_id:
         return JsonResponse({'error': 'member_id is required'}, status=400)
@@ -319,18 +271,15 @@ def update_family_members(request):
         return JsonResponse({'error': 'relation_types must be a list'}, status=400)
 
     try:
-        # 임산부가 Member에 등록되어 있는지 확인
         try:
             member = Member.objects.get(firebase_uid=member_id)
         except Member.DoesNotExist:
             return JsonResponse({'error': 'member not found'}, status=404)
 
-        # 1. 기존 관계 조회
         existing_relations = FamilyRelation.objects.filter(member_id=member_id)
         existing_relation_types = set(existing_relations.values_list('relation_type', flat=True))
         selected_relation_types = set(relation_types)
 
-        # 2. 삭제할 관계 (기존에 있지만 선택되지 않은 것)
         to_delete = existing_relation_types - selected_relation_types
         deleted_count = 0
         if to_delete:
@@ -339,15 +288,12 @@ def update_family_members(request):
                 relation_type__in=to_delete
             ).delete()[0]
 
-        # 3. 추가할 관계 (선택되었지만 기존에 없는 것)
         to_add = selected_relation_types - existing_relation_types
         created_count = 0
         for relation_type in to_add:
-            # guardian_member_id는 임시로 relation_type을 사용
-            # 실제로는 보호자의 Firebase UID를 받아야 하지만, 현재는 임시 처리
             FamilyRelation.objects.create(
                 member_id=member_id,
-                guardian_member_id=relation_type,  # 임시: 실제로는 보호자 UID
+                guardian_member_id=relation_type,
                 relation_type=relation_type,
             )
             created_count += 1
@@ -371,8 +317,6 @@ def get_family_members(request, member_id):
     """
     가족 구성원 조회
     GET /api/family/<member_id>/
-
-    member_id: 임산부의 Firebase UID
     """
     try:
         relations = FamilyRelation.objects.filter(member_id=member_id).order_by('-created_at')
@@ -398,3 +342,85 @@ def get_family_members(request, member_id):
             {'error': 'Server error in get_family_members', 'detail': str(e)},
             status=500,
         )
+
+
+def get_nutrition_target(request, trimester):
+    """
+    임신 분기별 영양소 권장량 조회
+    GET /api/nutrition-target/<trimester>/
+    
+    trimester: 1, 2, 3 (1분기, 2분기, 3분기)
+    
+    Response:
+    {
+        "trimester": 1,
+        "calories": 2200,
+        "carb": 260.0,
+        "protein": 70.0,
+        "fat": 70.0,
+        "sodium": 2000.0,
+        "iron": 27.0,
+        "folate": 600.0,
+        "calcium": 1000.0,
+        "vitamin_d": 15.0,
+        "omega3": 300.0,
+        "choline": 450.0,
+        "sugar": 50.0,
+        "magnesium": 350.0,
+        "vitamin_a": 770.0,
+        "vitamin_b12": 2.6,
+        "vitamin_c": 85.0,
+        "dietary_fiber": 28.0,
+        "potassium": 2900.0
+    }
+    """
+    try:
+        trimester_int = int(trimester)
+        if trimester_int not in [1, 2, 3]:
+            return JsonResponse({'error': 'trimester must be 1, 2, or 3'}, status=400)
+        
+        target = MemberNutritionTarget.objects.get(trimester=trimester_int)
+        
+        result = {
+            'trimester': target.trimester,
+            'calories': target.calories,
+            'carb': float(target.carb),
+            'protein': float(target.protein),
+            'fat': float(target.fat),
+            'sodium': float(target.sodium),
+            'iron': float(target.iron),
+            'folate': float(target.folate),
+            'calcium': float(target.calcium),
+            'vitamin_d': float(target.vitamin_d),
+            'omega3': float(target.omega3),
+            'choline': float(target.choline),
+        }
+        
+        # 추가 영양소 필드 (null일 수 있음)
+        if target.sugar is not None:
+            result['sugar'] = float(target.sugar)
+        if target.magnesium is not None:
+            result['magnesium'] = float(target.magnesium)
+        if target.vitamin_a is not None:
+            result['vitamin_a'] = float(target.vitamin_a)
+        if target.vitamin_b12 is not None:
+            result['vitamin_b12'] = float(target.vitamin_b12)
+        if target.vitamin_c is not None:
+            result['vitamin_c'] = float(target.vitamin_c)
+        if target.dietary_fiber is not None:
+            result['dietary_fiber'] = float(target.dietary_fiber)
+        if target.potassium is not None:
+            result['potassium'] = float(target.potassium)
+        
+        return JsonResponse(result)
+    except MemberNutritionTarget.DoesNotExist:
+        return JsonResponse({'error': 'nutrition target not found for trimester'}, status=404)
+    except ValueError:
+        return JsonResponse({'error': 'invalid trimester format'}, status=400)
+    except Exception as e:
+        traceback.print_exc()
+        return JsonResponse(
+            {'error': 'Server error in get_nutrition_target', 'detail': str(e)},
+            status=500,
+        )
+

@@ -10,6 +10,7 @@ from members.views import (
     update_pregnant_mode,
     update_family_members,
     get_family_members,
+    get_nutrition_target,
 )
 from members.image_views import save_image, update_image, get_images
 
@@ -30,4 +31,7 @@ urlpatterns = [
     # 이미지 API: POST는 저장, GET은 조회 (같은 경로에서 메서드로 구분)
     path('api/images/', save_image, name='image-save-list'),  # POST: 저장, GET: 조회
     path('api/images/<int:image_id>/', update_image, name='image-update'),
+
+    # 영양소 권장량 API
+    path('api/nutrition-target/<int:trimester>/', get_nutrition_target, name='nutrition-target'),
 ]
