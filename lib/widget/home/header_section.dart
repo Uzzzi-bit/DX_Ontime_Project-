@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:intl/intl.dart';
 
 class HeaderSection extends StatelessWidget {
@@ -71,24 +72,27 @@ class HeaderSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              TextButton(
-                onPressed: onHealthInfoUpdate,
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  backgroundColor: const Color(0xFF5BB5C8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+              Bounceable(
+                onTap: () {},
+                child: TextButton(
+                  onPressed: onHealthInfoUpdate,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    backgroundColor: const Color(0xFF5BB5C8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    foregroundColor: Colors.white,
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  foregroundColor: Colors.white,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  '건강정보 업데이트',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.5,
+                  child: const Text(
+                    '건강정보 업데이트',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
               ),
