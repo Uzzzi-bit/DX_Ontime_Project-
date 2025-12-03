@@ -1,11 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-
+import '../config/gemini_config.dart'; // ✅ 설정 파일 import
 import '../page/recipe_pages.dart'; // RecipeData가 정의된 곳
-
-// 로컬 개발용 (Android 에뮬레이터 기준 IP)
-// iOS 시뮬레이터/실기기는 나중에 서버 주소로 변경
-const String kAiBaseUrl = 'http://10.0.2.2:8000';
 
 class AiRecipeResponse {
   final String bannerMessage;
@@ -23,6 +19,7 @@ Future<AiRecipeResponse> fetchAiRecommendedRecipes({
   required double bmi,
   required String conditions,
 }) async {
+  // ✅ gemini_config.dart의 kAiBaseUrl 사용
   final uri = Uri.parse('$kAiBaseUrl/api/recommend-recipes');
 
   final body = jsonEncode({
@@ -48,7 +45,11 @@ Future<AiRecipeResponse> fetchAiRecommendedRecipes({
   try {
     final resp = await http.post(
       uri,
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        // ✅ [추가됨] 헤더에 API 키 추가
+        'Authorization': 'Bearer ${GeminiConfig.apiKey}',
+      },
       body: body,
     );
 
@@ -59,6 +60,8 @@ Future<AiRecipeResponse> fetchAiRecommendedRecipes({
     final decoded = jsonDecode(resp.body) as Map<String, dynamic>;
     final banner = decoded['bannerMessage'] as String? ?? '';
     final recipesJson = decoded['recipes'] as List<dynamic>? ?? [];
+
+    // JSON 리스트를 RecipeData 객체 리스트로 변환
     final recipes = recipesJson.map((e) => RecipeData.fromJson(e as Map<String, dynamic>)).toList();
 
     return AiRecipeResponse(
