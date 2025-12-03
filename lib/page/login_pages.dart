@@ -26,28 +26,41 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final viewInsets = MediaQuery.of(context).viewInsets.bottom;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF1F2F3),
       body: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Spacer(),
-              Image.asset('assets/image/lg_logo.png', width: 500, height: 300),
-              Container(height: 70),
-              _buildEmailField(),
-              Container(height: 16),
-              _buildPasswordField(),
-              Container(height: 16),
-              Bounceable(onTap: () {}, child: _buildLoginButton(context)),
-              Container(height: 56),
-              const Spacer(),
-              Bounceable(onTap: () {}, child: _buildSignUpButton(context)),
-              Container(height: 40),
-            ],
-          ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                24,
+                20,
+                viewInsets == 0 ? 40 : viewInsets + 16,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.asset('assets/image/lg_logo.png', width: 500, height: 300),
+                    const SizedBox(height: 48),
+                    _buildEmailField(),
+                    const SizedBox(height: 16),
+                    _buildPasswordField(),
+                    const SizedBox(height: 16),
+                    Bounceable(onTap: () {}, child: _buildLoginButton(context)),
+                    const SizedBox(height: 48),
+                    Bounceable(onTap: () {}, child: _buildSignUpButton(context)),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

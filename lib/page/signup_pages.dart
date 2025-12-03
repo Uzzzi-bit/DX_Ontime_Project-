@@ -128,36 +128,49 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final viewInsets = MediaQuery.of(context).viewInsets.bottom;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF1F2F3),
       body: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Spacer(),
-              // LG 로고 (로그인과 동일하게)
-              Image.asset(
-                'assets/image/lg_logo.png',
-                width: 500,
-                height: 300,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                24,
+                20,
+                viewInsets == 0 ? 40 : viewInsets + 16,
               ),
-              const SizedBox(height: 40),
-              _buildNicknameField(),
-              const SizedBox(height: 16),
-              _buildEmailField(),
-              const SizedBox(height: 16),
-              _buildPasswordField(),
-              const SizedBox(height: 16),
-              _buildPasswordCheckField(),
-              const SizedBox(height: 24),
-              Bounceable(onTap: () {}, child: _buildSignUpButton()),
-              const Spacer(),
-              Bounceable(onTap: () {}, child: _buildBackToLoginButton(context)),
-              const SizedBox(height: 40),
-            ],
-          ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.asset(
+                      'assets/image/lg_logo.png',
+                      width: 500,
+                      height: 300,
+                    ),
+                    const SizedBox(height: 40),
+                    _buildNicknameField(),
+                    const SizedBox(height: 16),
+                    _buildEmailField(),
+                    const SizedBox(height: 16),
+                    _buildPasswordField(),
+                    const SizedBox(height: 16),
+                    _buildPasswordCheckField(),
+                    const SizedBox(height: 24),
+                    Bounceable(onTap: () {}, child: _buildSignUpButton()),
+                    const SizedBox(height: 40),
+                    Bounceable(onTap: () {}, child: _buildBackToLoginButton(context)),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
