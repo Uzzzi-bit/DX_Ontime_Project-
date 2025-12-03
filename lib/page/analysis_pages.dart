@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/color_palette.dart';
+import '../service/storage_service.dart';
+import '../repository/image_repository.dart';
+import '../model/image_model.dart';
 
 enum _AnalysisStep { capture, analyzingImage, reviewFoods, nutrientAnalysis }
 
@@ -22,6 +25,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   final List<String> _foodItems = [];
   File? _selectedImage;
   bool _seededReviewData = false;
+  String? _uploadedImageDocId; // 업로드된 이미지의 Firestore 문서 ID
 
   @override
   void dispose() {
@@ -34,12 +38,46 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     try {
       final picked = await _picker.pickImage(source: source);
       if (picked == null) return;
+      
+      final imageFile = File(picked.path);
       setState(() {
-        _selectedImage = File(picked.path);
+        _selectedImage = imageFile;
         _currentStep = _AnalysisStep.analyzingImage;
       });
-      // TODO: [AI] 실제 AI 서버에 이미지 분석 요청
-      // await _analyzeImageWithAI(File(picked.path));
+
+      // Firebase Storage에 이미지 업로드 및 Firestore에 메타데이터 저장
+      try {
+        final storageService = StorageService();
+        final imageRepository = ImageRepository();
+
+        // 1. Firebase Storage에 이미지 업로드
+        final imageUrl = await storageService.uploadImage(
+          imageFile: imageFile,
+          folder: 'meal_images',
+        );
+
+        // 2. Firestore에 이미지 정보 저장
+        final docId = await imageRepository.saveImageWithUrl(
+          imageUrl: imageUrl,
+          imageType: ImageType.meal,
+          source: ImageSourceType.mealForm,
+        );
+
+        setState(() {
+          _uploadedImageDocId = docId;
+        });
+
+        // TODO: [AI] 실제 AI 서버에 이미지 분석 요청
+        // await _analyzeImageWithAI(imageFile, docId);
+      } catch (uploadError) {
+        // 업로드 실패해도 이미지 분석은 진행
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('이미지 업로드 중 오류가 발생했습니다: $uploadError')),
+          );
+        }
+      }
+
       _simulateImageAnalysis();
     } catch (e) {
       if (!mounted) return;
@@ -144,8 +182,14 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     // TODO: [AI] 실제 AI 서버에 영양소 분석 요청
     // _analyzeNutrientsAndSave();
 
-    Future.delayed(const Duration(seconds: 3), () {
+    // 분석 완료 후 ingredient_info 업데이트 (나중에 AI 분석 결과를 여기에 저장)
+    Future.delayed(const Duration(seconds: 3), () async {
       if (!mounted) return;
+      
+      // TODO: [AI] AI 분석 결과가 나오면 _uploadedImageDocId를 사용하여
+      // ImageRepository.updateIngredientInfo()로 ingredient_info 업데이트
+      // 예: await ImageRepository().updateIngredientInfo(_uploadedImageDocId!, jsonResult);
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('분석이 완료되었습니다. 리포트로 돌아갑니다.')),
       );

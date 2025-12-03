@@ -6,7 +6,8 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.dateparse import parse_datetime, parse_date
 
-from .models import Member, MemberPregnancy, FamilyRelation
+from .models import Member, MemberPregnancy, FamilyRelation, Image
+from django.utils import timezone
 
 
 # ✅ 헬스 체크용 루트 뷰 (127.0.0.1:8000)
