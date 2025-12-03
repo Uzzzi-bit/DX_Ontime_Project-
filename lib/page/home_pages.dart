@@ -1,10 +1,14 @@
 import 'dart:math' as math;
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../service/storage_service.dart';
+import '../repository/image_repository.dart';
+import '../model/image_model.dart';
 import '../widget/bottom_bar_widget.dart';
 import '../widget/home/header_section.dart';
 import '../widget/home/nutrient_grid.dart';
@@ -393,22 +397,57 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 식단 사진 캡처/선택 처리 (임시 기능)
+  /// 식단 사진 캡처/선택 처리
   Future<void> _handleMealImageCapture(ImageSource source) async {
     try {
       final XFile? image = await _picker.pickImage(source: source);
       if (image != null && mounted) {
-        // TODO: [API] 식단 사진 업로드 및 분석 기능 구현
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              source == ImageSource.camera ? '사진이 촬영되었습니다. (임시 기능)' : '앨범에서 사진이 선택되었습니다. (임시 기능)',
-            ),
-            duration: const Duration(seconds: 2),
-            backgroundColor: const Color(0xFF5BB5C8),
-          ),
-        );
-        // 여기에 실제 식단 분석 및 저장 로직 추가 예정
+        final imageFile = File(image.path);
+        
+        // 이미지 업로드 및 저장
+        try {
+          final storageService = StorageService();
+          final imageRepository = ImageRepository();
+
+          // 1. Firebase Storage에 이미지 업로드
+          final imageUrl = await storageService.uploadImage(
+            imageFile: imageFile,
+            folder: 'meal_images',
+          );
+
+          // 2. Firestore에 이미지 정보 저장
+          await imageRepository.saveImageWithUrl(
+            imageUrl: imageUrl,
+            imageType: ImageType.meal,
+            source: ImageSourceType.mealForm,
+          );
+
+          // TODO: [API] 식단 분석 화면으로 이동하거나 분석 요청
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  source == ImageSource.camera 
+                      ? '사진이 업로드되었습니다.' 
+                      : '앨범에서 사진이 업로드되었습니다.',
+                ),
+                duration: const Duration(seconds: 2),
+                backgroundColor: const Color(0xFF5BB5C8),
+              ),
+            );
+          }
+        } catch (uploadError) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('이미지 업로드 중 오류가 발생했습니다: $uploadError'),
+                duration: const Duration(seconds: 2),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
       }
     } catch (e) {
       if (mounted) {

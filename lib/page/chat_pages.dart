@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/color_palette.dart';
+import '../service/storage_service.dart';
+import '../repository/image_repository.dart';
+import '../model/image_model.dart';
 
 class ChatMessage {
   final bool isUser;
@@ -51,6 +54,12 @@ class _ChatScreenState extends State<ChatScreen> {
           imagePath: widget.initialImagePath,
         ),
       );
+      
+      // 초기 이미지가 있으면 업로드
+      if (widget.initialImagePath != null) {
+        _uploadImage(File(widget.initialImagePath!));
+      }
+      
       // AI 응답 시뮬레이션
       _simulateAIResponse();
     }
@@ -134,6 +143,7 @@ class _ChatScreenState extends State<ChatScreen> {
       try {
         final XFile? image = await _imagePicker.pickImage(source: result);
         if (image != null && mounted) {
+          final imageFile = File(image.path);
           setState(() {
             _messages.add(
               ChatMessage(
@@ -143,6 +153,10 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             );
           });
+          
+          // 이미지 업로드 (백그라운드)
+          _uploadImage(imageFile);
+          
           _simulateAIResponse();
         }
       } catch (e) {
@@ -152,6 +166,32 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         }
       }
+    }
+  }
+
+  /// 이미지를 Firebase Storage에 업로드하고 Firestore에 저장합니다.
+  Future<void> _uploadImage(File imageFile) async {
+    try {
+      final storageService = StorageService();
+      final imageRepository = ImageRepository();
+
+      // 1. Firebase Storage에 이미지 업로드
+      final imageUrl = await storageService.uploadImage(
+        imageFile: imageFile,
+        folder: 'chat_images',
+      );
+
+      // 2. Firestore에 이미지 정보 저장
+      await imageRepository.saveImageWithUrl(
+        imageUrl: imageUrl,
+        imageType: ImageType.chat,
+        source: ImageSourceType.aiChat,
+      );
+
+      // TODO: [AI] AI 분석 결과가 나오면 updateIngredientInfo()로 ingredient_info 업데이트
+    } catch (e) {
+      // 업로드 실패는 조용히 처리 (사용자 경험을 위해)
+      debugPrint('이미지 업로드 실패: $e');
     }
   }
 

@@ -153,3 +153,59 @@ class FamilyRelation(models.Model):
 
     def __str__(self):
         return f"{self.member_id} - {self.relation_type} - {self.guardian_member_id}"
+
+
+class Image(models.Model):
+    """
+    이미지 정보 테이블 (IMAGES)
+    - Firebase Storage URL 저장
+    - SAM3/분류모델 결과(JSON) 저장
+    """
+    id = models.AutoField(primary_key=True, db_column='id')
+    member_id = models.CharField(
+        max_length=128,
+        db_column='member_id',
+        help_text="업로드한 사용자의 Firebase UID (MEMBER.id 참조)",
+    )
+    image_url = models.TextField(
+        db_column='image_url',
+        help_text="Firebase Storage URL",
+    )
+    ingredient_info = models.TextField(
+        null=True,
+        blank=True,
+        db_column='ingredient_info',
+        help_text="SAM3/분류모델 결과(JSON)",
+    )
+    image_type = models.CharField(
+        max_length=50,
+        db_column='image_type',
+        help_text="이미지 타입: 'meal', 'chat', 'recipe' 등",
+    )
+    source = models.CharField(
+        max_length=50,
+        db_column='source',
+        help_text="이미지 소스: 'ai_chat', 'meal_form', 'system' 등",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_column='created_at',
+    )
+
+    class Meta:
+        db_table = 'images'
+        managed = True
+        indexes = [
+            models.Index(fields=['member_id']),
+            models.Index(fields=['image_type']),
+            models.Index(fields=['created_at']),
+        ]
+        ordering = ['-created_at']
+
+    @property
+    def image_id(self):
+        """image_id는 id와 동일하게 사용"""
+        return self.id
+
+    def __str__(self):
+        return f"Image {self.id} - {self.member_id} - {self.image_type}"
