@@ -38,15 +38,10 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
-  final TextEditingController _canEatController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
   final ImagePicker _imagePicker = ImagePicker();
   bool _isLoading = false;
-
-  // 임산부 음식 섭취 가능 여부 확인 관련 상태
-  CanEatResponse? _lastCanEatResult;
-  bool _isCheckingCanEat = false;
 
   @override
   void initState() {
@@ -66,48 +61,116 @@ class _ChatScreenState extends State<ChatScreen> {
         _uploadImage(File(widget.initialImagePath!));
       }
 
-      // AI 응답 시뮬레이션
-      _simulateAIResponse();
+      // 초기 텍스트에 대한 AI 응답
+      if (widget.initialText != null && widget.initialText!.isNotEmpty) {
+        _fetchCanEatResponse(widget.initialText!);
+      }
     }
   }
 
   @override
   void dispose() {
     _textController.dispose();
-    _canEatController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _simulateAIResponse() async {
+  /// AI 연결 전 고정 답변을 반환합니다.
+  String _getDefaultResponse(String query) {
+    // 사용자 입력을 기반으로 간단한 키워드 매칭
+    final lowerQuery = query.toLowerCase();
+
+    if (lowerQuery.contains('연어') || lowerQuery.contains('생선') || lowerQuery.contains('회')) {
+      return '연어와 생선류에 대한 안내\n\n임신 중에는 생선을 섭취할 때 주의가 필요해요. 연어는 오메가-3가 풍부해 좋지만, 생선회나 날생선은 식중독 위험이 있어 피하는 것이 좋습니다. 완전히 익힌 생선은 안전하게 드실 수 있어요. 다만, 상어, 황새치, 참치 등 수은 함량이 높은 생선은 주의가 필요합니다.';
+    } else if (lowerQuery.contains('커피') || lowerQuery.contains('카페인')) {
+      return '커피와 카페인에 대한 안내\n\n임신 중 카페인은 하루 200mg 이하로 제한하는 것이 좋아요. 이는 일반적인 커피 1~2잔 정도에 해당합니다. 과도한 카페인 섭취는 저체중 출산이나 조산 위험을 높일 수 있으니 적당히 드시는 것이 좋습니다.';
+    } else if (lowerQuery.contains('술') || lowerQuery.contains('알코올') || lowerQuery.contains('와인')) {
+      return '알코올 섭취에 대한 안내\n\n임신 중에는 어떤 양의 알코올도 안전하지 않습니다. 알코올은 태아의 발달에 영향을 줄 수 있어 완전히 피하는 것이 가장 좋아요. 술, 와인, 맥주 등 모든 알코올 음료는 임신 기간 동안 금지됩니다.';
+    } else if (lowerQuery.contains('치즈') || lowerQuery.contains('우유') || lowerQuery.contains('유제품')) {
+      return '유제품 섭취에 대한 안내\n\n우유와 일반 치즈는 안전하게 드실 수 있어요. 다만, 생우유나 비살균 유제품, 부드러운 치즈(브리, 카망베르 등)는 리스테리아 감염 위험이 있어 피하는 것이 좋습니다. 완전히 익힌 치즈나 살균 처리된 유제품은 안전하게 드실 수 있어요.';
+    } else if (lowerQuery.contains('날') || lowerQuery.contains('회') || lowerQuery.contains('생')) {
+      return '날음식 섭취에 대한 안내\n\n임신 중에는 날음식이나 덜 익힌 음식을 피하는 것이 좋아요. 생선회, 육회, 날계란 등은 식중독이나 기생충 감염 위험이 있습니다. 모든 음식은 완전히 익혀서 드시는 것이 가장 안전합니다.';
+    } else {
+      // 일반적인 안내 메시지
+      return '임산부 음식 섭취 안내\n\n임신 중에는 균형 잡힌 식단이 중요해요. 신선한 채소와 과일, 완전히 익힌 단백질(닭고기, 생선, 계란), 통곡물을 중심으로 드시는 것이 좋습니다. 생음식, 날음식, 비살균 유제품, 과도한 카페인, 알코올은 피하는 것이 좋아요. 구체적인 음식에 대한 질문이 있으시면 언제든 물어보세요!';
+    }
+  }
+
+  Future<void> _fetchCanEatResponse(String query) async {
+    if (!mounted) return;
+
     setState(() {
       _isLoading = true;
     });
 
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      // 3초 타임아웃 설정 - 연결이 안 되면 빠르게 고정 답변으로 전환
+      final result = await fetchCanEatResult(query).timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          // 타임아웃 시 에러 응답 반환
+          return CanEatResponse(
+            status: 'error',
+            headline: '분석에 실패했어요.',
+            reason: '네트워크 상태를 확인하거나, 잠시 후 다시 시도해주세요.',
+            targetType: '',
+            itemName: '',
+          );
+        },
+      );
 
-    if (mounted) {
+      if (!mounted) return;
+
+      // API가 연결되지 않았거나 에러가 발생한 경우 고정 답변 사용
+      if (result.status == 'error') {
+        final defaultResponse = _getDefaultResponse(query);
+        setState(() {
+          _messages.add(
+            ChatMessage(
+              isUser: false,
+              text: defaultResponse,
+            ),
+          );
+          _isLoading = false;
+        });
+      } else {
+        // 정상 응답인 경우 headline과 reason을 합쳐서 AI 응답 메시지로 추가
+        final responseText = '${result.headline}\n\n${result.reason}';
+        setState(() {
+          _messages.add(
+            ChatMessage(
+              isUser: false,
+              text: responseText,
+            ),
+          );
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      // 예외 발생 시에도 고정 답변 사용
+      final defaultResponse = _getDefaultResponse(query);
       setState(() {
         _messages.add(
           ChatMessage(
             isUser: false,
-            text: '네. 현재 임신 N주차인 김레제님에게 해당 음식은 먹어도 됩니다!',
+            text: defaultResponse,
           ),
         );
         _isLoading = false;
       });
-
-      // 스크롤을 맨 아래로
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
     }
+
+    // 스크롤을 맨 아래로
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   Future<void> _handleImagePicker() async {
@@ -164,7 +227,8 @@ class _ChatScreenState extends State<ChatScreen> {
           // 이미지 업로드 (백그라운드)
           _uploadImage(imageFile);
 
-          _simulateAIResponse();
+          // 이미지에 대한 AI 응답은 기존 시뮬레이션 유지 (이미지 분석은 별도 API 필요)
+          _fetchCanEatResponse('이미지 분석');
         }
       } catch (e) {
         if (mounted) {
@@ -202,28 +266,12 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _onCheckCanEat() async {
-    final text = _canEatController.text.trim();
-    if (text.isEmpty) return;
-
-    setState(() {
-      _isCheckingCanEat = true;
-      _lastCanEatResult = null;
-    });
-
-    final result = await fetchCanEatResult(text);
-    if (!mounted) return;
-
-    setState(() {
-      _isCheckingCanEat = false;
-      _lastCanEatResult = result;
-    });
-  }
-
   void _handleSendMessage() {
     final text = _textController.text.trim();
-    if (text.isEmpty && _messages.isEmpty) return;
+    if (text.isEmpty) return;
+    if (_isLoading) return; // 로딩 중에는 중복 요청 방지
 
+    // 사용자 메시지 추가
     setState(() {
       _messages.add(
         ChatMessage(
@@ -234,7 +282,8 @@ class _ChatScreenState extends State<ChatScreen> {
       _textController.clear();
     });
 
-    _simulateAIResponse();
+    // can-eat API 호출
+    _fetchCanEatResponse(text);
 
     // 스크롤을 맨 아래로
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -291,120 +340,10 @@ class _ChatScreenState extends State<ChatScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              // 임산부 음식 섭취 가능 여부 확인 UI
-              Container(
-                padding: const EdgeInsets.fromLTRB(24, 80, 24, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '이 음식, 먹어도 될까요?',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: ColorPalette.text100,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: ColorPalette.bg100,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: ColorPalette.bg300),
-                            ),
-                            child: TextField(
-                              controller: _canEatController,
-                              decoration: const InputDecoration(
-                                hintText: '예: 연어롤 먹어도 돼?',
-                                hintStyle: TextStyle(
-                                  color: ColorPalette.text300,
-                                  fontSize: 14,
-                                ),
-                                border: InputBorder.none,
-                                isDense: true,
-                                contentPadding: EdgeInsets.symmetric(vertical: 12),
-                              ),
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: ColorPalette.text100,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: _isCheckingCanEat ? null : _onCheckCanEat,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: ColorPalette.primary100,
-                            foregroundColor: ColorPalette.text100,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: _isCheckingCanEat
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(ColorPalette.text100),
-                                  ),
-                                )
-                              : const Text(
-                                  '확인',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    if (_lastCanEatResult != null)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _lastCanEatResult!.headline,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: ColorPalette.text100,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _lastCanEatResult!.reason,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                height: 1.4,
-                                color: ColorPalette.text100,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
               Expanded(
                 child: ListView.builder(
                   controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  padding: const EdgeInsets.fromLTRB(24, 80, 24, 16),
                   itemCount: _messages.length + (_isLoading ? 1 : 0),
                   itemBuilder: (context, index) {
                     if (index == _messages.length && _isLoading) {
@@ -477,20 +416,29 @@ class _ChatScreenState extends State<ChatScreen> {
                       Bounceable(
                         onTap: () {},
                         child: InkWell(
-                          onTap: _handleSendMessage,
+                          onTap: _isLoading ? null : _handleSendMessage,
                           borderRadius: BorderRadius.circular(20),
                           child: Container(
                             width: 45,
                             height: 45,
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: ColorPalette.primary100,
+                              color: _isLoading ? ColorPalette.primary100.withOpacity(0.5) : ColorPalette.primary100,
                             ),
-                            child: const Icon(
-                              Icons.send,
-                              color: ColorPalette.text100,
-                              size: 20,
-                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(ColorPalette.text100),
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.send,
+                                    color: ColorPalette.text100,
+                                    size: 20,
+                                  ),
                           ),
                         ),
                       ),
