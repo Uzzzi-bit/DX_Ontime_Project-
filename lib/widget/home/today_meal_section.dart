@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bounceable/flutter_bounceable.dart';
 
 class TodayMealSection extends StatelessWidget {
   const TodayMealSection({
@@ -52,9 +53,12 @@ class TodayMealSection extends StatelessWidget {
                 separatorBuilder: (_, __) => const SizedBox(width: 16),
                 itemBuilder: (context, index) {
                   final meal = meals[index];
-                  return _MealCard(
-                    meal: meal,
-                    onTap: () => onMealTap(meal['id'] as String),
+                  return Bounceable(
+                    onTap: () {},
+                    child: _MealCard(
+                      meal: meal,
+                      onTap: () => onMealTap(meal['id'] as String),
+                    ),
                   );
                 },
               ),
