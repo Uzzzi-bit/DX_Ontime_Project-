@@ -209,3 +209,147 @@ class Image(models.Model):
 
     def __str__(self):
         return f"Image {self.id} - {self.member_id} - {self.image_type}"
+
+
+class MemberNutritionTarget(models.Model):
+    """
+    임신 주차별 영양소 하루 권장량 테이블 (member_nutrition_target)
+    - 1분기: 1-13주차
+    - 2분기: 14-27주차
+    - 3분기: 28-40주차
+    """
+    trimester = models.IntegerField(
+        db_column='trimester',
+        help_text="임신 분기 (1, 2, 3)",
+    )
+    calories = models.IntegerField(
+        db_column='calories',
+        help_text="칼로리 (kcal)",
+    )
+    carb = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='carb',
+        help_text="탄수화물 (g)",
+    )
+    protein = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='protein',
+        help_text="단백질 (g)",
+    )
+    fat = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='fat',
+        help_text="지방 (g)",
+    )
+    sodium = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='sodium',
+        help_text="나트륨 (mg)",
+    )
+    iron = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='iron',
+        help_text="철분 (mg)",
+    )
+    folate = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='folate',
+        help_text="엽산 (ug)",
+    )
+    calcium = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='calcium',
+        help_text="칼슘 (mg)",
+    )
+    vitamin_d = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='vitamin_d',
+        help_text="비타민 D (ug)",
+    )
+    omega3 = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='omega3',
+        help_text="오메가3 (mg)",
+    )
+    choline = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='choline',
+        help_text="콜린 (mg)",
+    )
+    sugar = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='sugar',
+        help_text="당 (g)",
+        null=True,
+        blank=True,
+    )
+    magnesium = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='magnesium',
+        help_text="마그네슘 (mg)",
+        null=True,
+        blank=True,
+    )
+    vitamin_a = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='vitamin_a',
+        help_text="비타민 A (μg)",
+        null=True,
+        blank=True,
+    )
+    vitamin_b12 = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='vitamin_b12',
+        help_text="비타민 B12 (μg)",
+        null=True,
+        blank=True,
+    )
+    vitamin_c = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='vitamin_c',
+        help_text="비타민 C (mg)",
+        null=True,
+        blank=True,
+    )
+    dietary_fiber = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='dietary_fiber',
+        help_text="식이섬유 (g)",
+        null=True,
+        blank=True,
+    )
+    potassium = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        db_column='potassium',
+        help_text="칼륨 (mg)",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        db_table = 'member_nutrition_target'
+        managed = True
+        unique_together = [['trimester']]
+        indexes = [
+            models.Index(fields=['trimester']),
+        ]
+
+    def __str__(self):
+        return f"Trimester {self.trimester} - {self.calories} kcal"
