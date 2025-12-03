@@ -65,9 +65,11 @@ class _HomeScreenState extends State<HomeScreen> {
           _userData = userData;
           _isLoading = false;
         });
+        debugPrint('홈 화면 데이터 로드 완료: _isMomCareMode=$isMomCareMode, _userData=${userData.nickname}');
       }
     } catch (e) {
       // 에러 발생 시 기본값 사용
+      debugPrint('홈 화면 데이터 로드 에러: $e');
       if (mounted) {
         setState(() {
           _isMomCareMode = false;
@@ -76,22 +78,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
   }
-
-  // TODO: [SERVER] 추천 식단 업데이트 메서드
-  //
-  // [서버 연동 시 구현 사항]
-  // report_pages.dart에서 AI 추천 식단이 변경되었을 때 호출되는 메서드
-  // void _updateRecommendedMeals() async {
-  //   try {
-  //     // 서버에서 최신 추천 식단 정보 GET
-  //     // final updatedRecipes = await api.getRecommendedRecipes();
-  //     // setState(() {
-  //     //   // _recommendedMeals를 업데이트된 데이터로 갱신
-  //     // });
-  //   } catch (e) {
-  //     // 에러 처리
-  //   }
-  // }
 
   // 사용자 정보 (UserRepository에서 로드)
   String get _userName => _userData?.nickname ?? '김레제';
@@ -163,42 +149,57 @@ class _HomeScreenState extends State<HomeScreen> {
   //    - 방법 2: 홈 화면 진입 시 서버에서 최신 추천 식단 정보 GET
   //    - 방법 3: report_pages.dart에서 변경 후 Navigator.pop() 시 콜백으로 홈 화면 업데이트
   List<_RecommendedMeal> get _recommendedMeals {
-    final recipes = RecipeScreen.getRecommendedRecipes();
-    // 레시피를 RecommendedMeal 형식으로 변환
-    final List<Color> backgroundColors = [
-      const Color(0xFFD2ECBF), // 연어스테이크 색상
-      const Color(0xFFFEF493), // 냉모밀 색상
-      const Color(0xFFBCE7F0), // 미역국 색상
-    ];
+    try {
+      // recipe_pages.dart에서 레시피 가져오기 (더미 데이터)
+      final recipes = RecipeScreen.getRecommendedRecipes();
 
-    return recipes.asMap().entries.map((entry) {
-      final index = entry.key;
-      final recipe = entry.value;
-      // 레시피 ID 매핑 (기존 매핑 유지)
-      String mealId;
-      switch (index) {
-        case 0:
-          mealId = 'salmon-steak'; // 간장 닭봉 구이
-          break;
-        case 1:
-          mealId = 'cold-noodles'; // 냉메밀
-          break;
-        case 2:
-          mealId = 'seaweed-soup'; // 미역국
-          break;
-        default:
-          mealId = 'salmon-steak';
+      // 레시피가 비어있으면 빈 리스트 반환
+      if (recipes.isEmpty) {
+        debugPrint('경고: 레시피 리스트가 비어있습니다.');
+        return [];
       }
 
-      return _RecommendedMeal(
-        id: mealId,
-        name: recipe.title,
-        imagePath: recipe.imagePath,
-        calories: recipe.calories,
-        tags: recipe.tags,
-        backgroundColor: backgroundColors[index % backgroundColors.length],
-      );
-    }).toList();
+      // 레시피를 RecommendedMeal 형식으로 변환
+      final List<Color> backgroundColors = [
+        const Color(0xFFD2ECBF), // 연어스테이크 색상
+        const Color(0xFFFEF493), // 냉모밀 색상
+        const Color(0xFFBCE7F0), // 미역국 색상
+      ];
+
+      return recipes.asMap().entries.map((entry) {
+        final index = entry.key;
+        final recipe = entry.value;
+        // 레시피 ID 매핑 (기존 매핑 유지)
+        String mealId;
+        switch (index) {
+          case 0:
+            mealId = 'salmon-steak'; // 간장 닭봉 구이
+            break;
+          case 1:
+            mealId = 'cold-noodles'; // 냉메밀
+            break;
+          case 2:
+            mealId = 'seaweed-soup'; // 미역국
+            break;
+          default:
+            mealId = 'salmon-steak';
+        }
+
+        return _RecommendedMeal(
+          id: mealId,
+          name: recipe.title,
+          imagePath: recipe.imagePath,
+          calories: recipe.calories,
+          tags: recipe.tags,
+          backgroundColor: backgroundColors[index % backgroundColors.length],
+        );
+      }).toList();
+    } catch (e, stackTrace) {
+      debugPrint('에러: _recommendedMeals getter에서 에러 발생: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      // 에러 발생 시 빈 리스트 반환 (빈 화면 대신 기본 데이터 표시)
+      return [];
+    }
   }
 
   final List<_ApplianceInfo> _appliances = const [
@@ -219,8 +220,31 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> get _supplementIds => _supplements.map((s) => s.id).toList();
 
   List<Map<String, dynamic>> get _nutrientData {
-    // 데이터가 없을 경우 임시 데이터 반환
-    if (_nutrientProgress.isEmpty) {
+    try {
+      // 데이터가 없을 경우 임시 데이터 반환
+      if (_nutrientProgress.isEmpty) {
+        debugPrint('홈 화면: _nutrientProgress가 비어있습니다. 기본값 사용');
+        return [
+          {'label': '철분', 'progress': 0.0},
+          {'label': '비타민D', 'progress': 0.0},
+          {'label': '엽산', 'progress': 0.0},
+          {'label': '오메가-3', 'progress': 0.0},
+          {'label': '칼슘', 'progress': 0.0},
+          {'label': '콜린', 'progress': 0.0},
+        ];
+      }
+      return [
+        {'label': '철분', 'progress': _nutrientProgress[NutrientType.iron] ?? 0.0},
+        {'label': '비타민D', 'progress': _nutrientProgress[NutrientType.vitaminD] ?? 0.0},
+        {'label': '엽산', 'progress': _nutrientProgress[NutrientType.folate] ?? 0.0},
+        {'label': '오메가-3', 'progress': _nutrientProgress[NutrientType.omega3] ?? 0.0},
+        {'label': '칼슘', 'progress': _nutrientProgress[NutrientType.calcium] ?? 0.0},
+        {'label': '콜린', 'progress': _nutrientProgress[NutrientType.choline] ?? 0.0},
+      ];
+    } catch (e, stackTrace) {
+      debugPrint('에러: _nutrientData getter에서 에러 발생: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      // 에러 발생 시 기본값 반환
       return [
         {'label': '철분', 'progress': 0.0},
         {'label': '비타민D', 'progress': 0.0},
@@ -230,20 +254,55 @@ class _HomeScreenState extends State<HomeScreen> {
         {'label': '콜린', 'progress': 0.0},
       ];
     }
-    return [
-      {'label': '철분', 'progress': _nutrientProgress[NutrientType.iron] ?? 0.0},
-      {'label': '비타민D', 'progress': _nutrientProgress[NutrientType.vitaminD] ?? 0.0},
-      {'label': '엽산', 'progress': _nutrientProgress[NutrientType.folate] ?? 0.0},
-      {'label': '오메가-3', 'progress': _nutrientProgress[NutrientType.omega3] ?? 0.0},
-      {'label': '칼슘', 'progress': _nutrientProgress[NutrientType.calcium] ?? 0.0},
-      {'label': '콜린', 'progress': _nutrientProgress[NutrientType.choline] ?? 0.0},
-    ];
   }
 
   List<Map<String, dynamic>> get _mealData {
-    final meals = _recommendedMeals;
-    // 데이터가 없을 경우 임시 데이터 반환
-    if (meals.isEmpty) {
+    try {
+      final meals = _recommendedMeals;
+      // 데이터가 없을 경우 임시 데이터 반환
+      if (meals.isEmpty) {
+        debugPrint('홈 화면: _recommendedMeals가 비어있습니다. 기본값 사용');
+        return [
+          {
+            'id': 'temp-1',
+            'name': '연어스테이크',
+            'imagePath': 'assets/image/sample_food.png',
+            'calories': 350,
+            'tags': ['오메가-3', '비타민 D'],
+            'backgroundColor': const Color(0xFFD2ECBF).value.toInt(),
+          },
+          {
+            'id': 'temp-2',
+            'name': '냉모밀',
+            'imagePath': 'assets/image/sample_food.png',
+            'calories': 400,
+            'tags': ['단백질', '미네랄'],
+            'backgroundColor': const Color(0xFFFEF493).value.toInt(),
+          },
+          {
+            'id': 'temp-3',
+            'name': '미역국',
+            'imagePath': 'assets/image/sample_food.png',
+            'calories': 150,
+            'tags': ['철분', '칼슘'],
+            'backgroundColor': const Color(0xFFBCE7F0).value.toInt(),
+          },
+        ];
+      }
+      return meals.map((meal) {
+        return {
+          'id': meal.id,
+          'name': meal.name,
+          'imagePath': meal.imagePath,
+          'calories': meal.calories,
+          'tags': meal.tags,
+          'backgroundColor': meal.backgroundColor.value.toInt(),
+        };
+      }).toList();
+    } catch (e, stackTrace) {
+      debugPrint('에러: _mealData getter에서 에러 발생: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      // 에러 발생 시 기본값 반환
       return [
         {
           'id': 'temp-1',
@@ -271,16 +330,6 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ];
     }
-    return meals.map((meal) {
-      return {
-        'id': meal.id,
-        'name': meal.name,
-        'imagePath': meal.imagePath,
-        'calories': meal.calories,
-        'tags': meal.tags,
-        'backgroundColor': meal.backgroundColor.value.toInt(),
-      };
-    }).toList();
   }
 
   // 임신 주차 계산
@@ -791,6 +840,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     // 로딩 중일 때
     if (_isLoading) {
+      debugPrint('홈 화면: 로딩 중...');
       return Scaffold(
         backgroundColor: Colors.white,
         body: const Center(
@@ -800,8 +850,11 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    debugPrint('홈 화면 빌드: _isMomCareMode=$_isMomCareMode, _userData=${_userData?.nickname}');
+
     // Mom Care Mode가 OFF일 때
     if (!_isMomCareMode) {
+      debugPrint('홈 화면: 맘케어 모드 OFF - Mode Off 화면 표시');
       return Scaffold(
         backgroundColor: Colors.white,
         body: _buildModeOffView(),
@@ -810,105 +863,121 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     // Mom Care Mode가 ON일 때 - 기존 대시보드
-    final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
-    final now = DateTime.now();
-    final dateFormat = DateFormat('M월 d일 (E)', 'ko');
+    debugPrint('홈 화면: 맘케어 모드 ON - 대시보드 화면 표시 시작');
+    try {
+      debugPrint('홈 화면: try 블록 시작');
+      final theme = Theme.of(context);
+      final textTheme = theme.textTheme;
+      final now = DateTime.now();
+      final dateFormat = DateFormat('M월 d일 (E)', 'ko');
+      debugPrint('홈 화면: 날짜 포맷 준비 완료');
 
-    final pregnancyWeek = _getPregnancyWeek();
-    final pregnancyProgress = _getPregnancyProgress();
+      final pregnancyWeek = _getPregnancyWeek();
+      final pregnancyProgress = _getPregnancyProgress();
+      debugPrint('홈 화면: 임신 주차 계산 완료 - pregnancyWeek=$pregnancyWeek, progress=$pregnancyProgress');
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        bottom: false,
-        child: SingleChildScrollView(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).padding.bottom + 80, // 하단 네비게이션 바 + SafeArea 공간
-          ),
-          child: Column(
-            children: [
-              /// 1) 파란색 헤더
-              HeaderSection(
-                userName: _userName,
-                pregnancyWeek: pregnancyWeek,
-                dueDate: _dueDate,
-                pregnancyProgress: pregnancyProgress,
-                onHealthInfoUpdate: () => Navigator.pushNamed(context, '/healthinfo'),
-              ),
+      // 데이터 getter 테스트
+      debugPrint('홈 화면: _nutrientData 테스트 시작');
+      final nutrientData = _nutrientData;
+      debugPrint('홈 화면: _nutrientData 완료 - ${nutrientData.length}개');
 
-              /// 2) RoundedContainer를 자연스럽게 위로 끌어올림
-              Transform.translate(
-                offset: Offset(0, -ResponsiveHelper.height(context, 0.21)), // 흰색 박스 배경 침투 조절
-                child: RoundedContainer(
-                  child: Padding(
-                    padding: ResponsiveHelper.padding(context, all: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                dateFormat.format(now),
-                                style:
-                                    textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: ResponsiveHelper.fontSize(context, 13),
-                                      letterSpacing: 0.5,
-                                    ) ??
-                                    TextStyle(
-                                      fontSize: ResponsiveHelper.fontSize(context, 13),
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 0.5,
-                                    ),
-                              ),
-                              SizedBox(width: ResponsiveHelper.width(context, 0.032)),
-                              Bounceable(
-                                onTap: () {},
-                                child: TextButton(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => const ReportScreen(),
+      debugPrint('홈 화면: _mealData 테스트 시작');
+      final mealData = _mealData;
+      debugPrint('홈 화면: _mealData 완료 - ${mealData.length}개');
+
+      debugPrint('홈 화면: 모든 데이터 준비 완료, Scaffold 빌드 시작');
+
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          bottom: false,
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).padding.bottom + 80, // 하단 네비게이션 바 + SafeArea 공간
+            ),
+            child: Column(
+              children: [
+                /// 1) 파란색 헤더
+                HeaderSection(
+                  userName: _userName,
+                  pregnancyWeek: pregnancyWeek,
+                  dueDate: _dueDate,
+                  pregnancyProgress: pregnancyProgress,
+                  onHealthInfoUpdate: () => Navigator.pushNamed(context, '/healthinfo'),
+                ),
+
+                /// 2) RoundedContainer를 자연스럽게 위로 끌어올림
+                Transform.translate(
+                  offset: Offset(0, -ResponsiveHelper.height(context, 0.21)), // 흰색 박스 배경 침투 조절
+                  child: RoundedContainer(
+                    child: Padding(
+                      padding: ResponsiveHelper.padding(context, all: 20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Center(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  dateFormat.format(now),
+                                  style:
+                                      textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: ResponsiveHelper.fontSize(context, 13),
+                                        letterSpacing: 0.5,
+                                      ) ??
+                                      TextStyle(
+                                        fontSize: ResponsiveHelper.fontSize(context, 13),
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.5,
                                       ),
-                                    );
-                                  },
-                                  style: TextButton.styleFrom(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: ResponsiveHelper.width(context, 0.027),
-                                      vertical: ResponsiveHelper.height(context, 0.005),
+                                ),
+                                SizedBox(width: ResponsiveHelper.width(context, 0.032)),
+                                Bounceable(
+                                  onTap: () {},
+                                  child: TextButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => const ReportScreen(),
+                                        ),
+                                      );
+                                    },
+                                    style: TextButton.styleFrom(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: ResponsiveHelper.width(context, 0.027),
+                                        vertical: ResponsiveHelper.height(context, 0.005),
+                                      ),
+                                      backgroundColor: const Color(0xFFBCE7F0),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.021)),
+                                      ),
+                                      foregroundColor: const Color(0xFF49454F),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                     ),
-                                    backgroundColor: const Color(0xFFBCE7F0),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.021)),
-                                    ),
-                                    foregroundColor: const Color(0xFF49454F),
-                                    minimumSize: Size.zero,
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                  child: Text(
-                                    '종합리포트 가기',
-                                    style: TextStyle(
-                                      fontSize: ResponsiveHelper.fontSize(context, 9),
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 0.5,
+                                    child: Text(
+                                      '종합리포트 가기',
+                                      style: TextStyle(
+                                        fontSize: ResponsiveHelper.fontSize(context, 9),
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.5,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        SizedBox(height: ResponsiveHelper.height(context, 0.02)),
-                        IntrinsicHeight(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                          SizedBox(height: ResponsiveHelper.height(context, 0.02)),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                flex: 4,
+                              // Expanded 대신 고정 너비 사용
+                              SizedBox(
+                                width: ResponsiveHelper.width(context, 0.32),
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -972,114 +1041,177 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                               SizedBox(width: ResponsiveHelper.width(context, 0.032)),
-                              Expanded(
-                                flex: 6,
-                                child: NutrientGrid(nutrients: _nutrientData),
+                              // Expanded 대신 Flexible 사용 (너비만 유연하게)
+                              Flexible(
+                                child: SizedBox(
+                                  // NutrientGrid의 최소 높이 보장
+                                  height: ResponsiveHelper.height(context, 0.14),
+                                  child: NutrientGrid(nutrients: _nutrientData),
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                        SizedBox(height: ResponsiveHelper.height(context, 0.02)),
-                        SupplementChecklist(
-                          supplements: _supplementIds
-                              .map((id) => _supplements.firstWhere((s) => s.id == id).label)
-                              .toList(),
-                          selectedSupplements: _selectedSupplementIds
-                              .map((id) => _supplements.firstWhere((s) => s.id == id).label)
-                              .toSet(),
-                          onToggle: (label) {
-                            final id = _supplements.firstWhere((s) => s.label == label).id;
-                            _toggleSupplement(id);
-                          },
-                          onAdd: () {
-                            // TODO: [API] 영양제 추가하기 기능
-                          },
-                        ),
-                        SizedBox(height: ResponsiveHelper.height(context, 0.01)),
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: ResponsiveHelper.width(context, 0.011)),
-                          child: Text(
-                            '※ 영양제 효과는 1일 권장량 대비 평균적인 퍼센트로 가정한 값입니다. 실제 제품과는 차이가 있을 수 있어요.',
-                            style:
-                                textTheme.bodySmall?.copyWith(
-                                  fontSize: ResponsiveHelper.fontSize(context, 9),
-                                  fontWeight: FontWeight.w300,
-                                  color: Colors.grey[600],
-                                  letterSpacing: 0.09,
-                                  height: 1.3,
-                                ) ??
-                                TextStyle(
-                                  fontSize: ResponsiveHelper.fontSize(context, 9),
-                                  fontWeight: FontWeight.w300,
-                                  color: Colors.grey[600],
-                                  letterSpacing: 0.09,
-                                  height: 1.3,
-                                ),
-                          ),
-                        ),
-                        SizedBox(height: ResponsiveHelper.height(context, 0.04)),
-                        EatCheckSection(
-                          controller: _qaController,
-                          onSubmit: _handleAskSubmit,
-                          onImageSelected: _handleImageSelected,
-                          selectedImagePath: _selectedImagePath,
-                          onRemoveImage: _removeSelectedImage,
-                        ),
-                        SizedBox(height: ResponsiveHelper.height(context, 0.04)),
-                        TodayMealSection(
-                          meals: _mealData,
-                          onMealTap: _navigateToRecipe,
-                        ),
-                        SizedBox(height: ResponsiveHelper.height(context, 0.025)),
-                        Text(
-                          '즐겨 찾는 제품',
-                          style:
-                              textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w500,
-                                fontSize: ResponsiveHelper.fontSize(context, 12),
-                                letterSpacing: 0.5,
-                              ) ??
-                              TextStyle(
-                                fontSize: ResponsiveHelper.fontSize(context, 12),
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 0.5,
-                              ),
-                        ),
-                        SizedBox(height: ResponsiveHelper.height(context, 0.012)),
-                        SizedBox(
-                          height: ResponsiveHelper.height(context, 0.037),
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _appliances.length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 12),
-                            itemBuilder: (context, index) {
-                              final appliance = _appliances[index];
-                              return _ApplianceCard(info: appliance);
+                          SizedBox(height: ResponsiveHelper.height(context, 0.02)),
+                          SupplementChecklist(
+                            supplements: _supplementIds
+                                .map((id) {
+                                  try {
+                                    return _supplements.firstWhere((s) => s.id == id).label;
+                                  } catch (e) {
+                                    debugPrint('에러: 영양제 id "$id"를 찾을 수 없습니다: $e');
+                                    return '';
+                                  }
+                                })
+                                .where((label) => label.isNotEmpty)
+                                .toList(),
+                            selectedSupplements: _selectedSupplementIds
+                                .map((id) {
+                                  try {
+                                    return _supplements.firstWhere((s) => s.id == id).label;
+                                  } catch (e) {
+                                    debugPrint('에러: 선택된 영양제 id "$id"를 찾을 수 없습니다: $e');
+                                    return '';
+                                  }
+                                })
+                                .where((label) => label.isNotEmpty)
+                                .toSet(),
+                            onToggle: (label) {
+                              try {
+                                final id = _supplements.firstWhere((s) => s.label == label).id;
+                                _toggleSupplement(id);
+                              } catch (e) {
+                                debugPrint('에러: 영양제 label "$label"를 찾을 수 없습니다: $e');
+                              }
+                            },
+                            onAdd: () {
+                              // TODO: [API] 영양제 추가하기 기능
                             },
                           ),
-                        ),
-                      ],
+                          SizedBox(height: ResponsiveHelper.height(context, 0.01)),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: ResponsiveHelper.width(context, 0.011)),
+                            child: Text(
+                              '※ 영양제 효과는 1일 권장량 대비 평균적인 퍼센트로 가정한 값입니다. 실제 제품과는 차이가 있을 수 있어요.',
+                              style:
+                                  textTheme.bodySmall?.copyWith(
+                                    fontSize: ResponsiveHelper.fontSize(context, 9),
+                                    fontWeight: FontWeight.w300,
+                                    color: Colors.grey[600],
+                                    letterSpacing: 0.09,
+                                    height: 1.3,
+                                  ) ??
+                                  TextStyle(
+                                    fontSize: ResponsiveHelper.fontSize(context, 9),
+                                    fontWeight: FontWeight.w300,
+                                    color: Colors.grey[600],
+                                    letterSpacing: 0.09,
+                                    height: 1.3,
+                                  ),
+                            ),
+                          ),
+                          SizedBox(height: ResponsiveHelper.height(context, 0.04)),
+                          EatCheckSection(
+                            controller: _qaController,
+                            onSubmit: _handleAskSubmit,
+                            onImageSelected: _handleImageSelected,
+                            selectedImagePath: _selectedImagePath,
+                            onRemoveImage: _removeSelectedImage,
+                          ),
+                          SizedBox(height: ResponsiveHelper.height(context, 0.04)),
+                          TodayMealSection(
+                            meals: _mealData,
+                            onMealTap: _navigateToRecipe,
+                          ),
+                          SizedBox(height: ResponsiveHelper.height(context, 0.025)),
+                          Text(
+                            '즐겨 찾는 제품',
+                            style:
+                                textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: ResponsiveHelper.fontSize(context, 12),
+                                  letterSpacing: 0.5,
+                                ) ??
+                                TextStyle(
+                                  fontSize: ResponsiveHelper.fontSize(context, 12),
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: 0.5,
+                                ),
+                          ),
+                          SizedBox(height: ResponsiveHelper.height(context, 0.012)),
+                          SizedBox(
+                            height: ResponsiveHelper.height(context, 0.037),
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _appliances.length,
+                              separatorBuilder: (_, __) => const SizedBox(width: 12),
+                              itemBuilder: (context, index) {
+                                final appliance = _appliances[index];
+                                return _ApplianceCard(info: appliance);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
+              ],
+            ),
+          ),
+        ),
+        bottomNavigationBar: const BottomBarWidget(currentRoute: '/'),
+        floatingActionButton: Bounceable(
+          onTap: () {},
+          child: FloatingActionButton(
+            onPressed: _showMealImagePicker,
+            backgroundColor: const Color(0xFF5BB5C8),
+            foregroundColor: Colors.white,
+            shape: const CircleBorder(),
+            child: const Icon(Icons.add, size: 28),
+          ),
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      );
+    } catch (e, stackTrace) {
+      debugPrint('에러: 홈 화면 빌드 중 에러 발생: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      // 에러 발생 시 에러 화면 표시
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text(
+                '화면을 불러오는 중 오류가 발생했습니다',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '에러: $e',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _isLoading = true;
+                  });
+                  _loadInitialData();
+                },
+                child: const Text('다시 시도'),
               ),
             ],
           ),
         ),
-      ),
-      bottomNavigationBar: const BottomBarWidget(currentRoute: '/'),
-      floatingActionButton: Bounceable(
-        onTap: () {},
-        child: FloatingActionButton(
-          onPressed: _showMealImagePicker,
-          backgroundColor: const Color(0xFF5BB5C8),
-          foregroundColor: Colors.white,
-          shape: const CircleBorder(),
-          child: const Icon(Icons.add, size: 28),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-    );
+        bottomNavigationBar: const BottomBarWidget(currentRoute: '/'),
+      );
+    }
   }
 }
 

@@ -7,20 +7,14 @@ class AppTheme {
       fontFamily: 'ProductSans',
       scaffoldBackgroundColor: ColorPalette.bg100, // 흰색 배경
       appBarTheme: AppBarTheme(
-        backgroundColor: ColorPalette.bg100, // 흰색 배경
+        backgroundColor: Colors.transparent, // 투명 배경
         elevation: 0,
         titleTextStyle: const TextStyle(
           color: ColorPalette.text100, // 블랙 #0F0F0F
           fontSize: 18,
           fontWeight: FontWeight.w500,
         ),
-        shape: const Border(
-          bottom: BorderSide(
-            color: ColorPalette.bg300, // 위젯박스 #F0ECE4
-            width: 0.5,
-          ),
-        ),
-        shadowColor: Colors.black.withOpacity(0.05),
+        shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 8,
       ),

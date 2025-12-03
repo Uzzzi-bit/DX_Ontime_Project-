@@ -26,25 +26,31 @@ class NutrientGrid extends StatelessWidget {
 
     return Row(
       // [높이 맞춤] 좌우 컬럼의 높이를 강제로 맞춰서 'spaceBetween'이 정확히 동작하게 함
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // [왼쪽 열]
-        Column(
-          // [핵심 1] 컬럼 내부 아이템들을 '좌측(Start)'으로 정렬
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween, // 위아래 간격 균등 분배
-          children: leftItems.map((item) => _buildNutrientItem(context, item, isLeft: true)).toList(),
+        Expanded(
+          child: Column(
+            // [핵심 1] 컬럼 내부 아이템들을 '좌측(Start)'으로 정렬
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween, // 위아래 간격 균등 분배
+            mainAxisSize: MainAxisSize.min,
+            children: leftItems.map((item) => _buildNutrientItem(context, item, isLeft: true)).toList(),
+          ),
         ),
 
         // [간격] (화면 크기에 비례) - 더 작게 조정
         SizedBox(width: ResponsiveHelper.width(context, 0.016)),
 
         // [오른쪽 열]
-        Column(
-          // [핵심 1] 컬럼 내부 아이템들을 '좌측(Start)'으로 정렬
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: rightItems.map((item) => _buildNutrientItem(context, item, isLeft: false)).toList(),
+        Expanded(
+          child: Column(
+            // [핵심 1] 컬럼 내부 아이템들을 '좌측(Start)'으로 정렬
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisSize: MainAxisSize.min,
+            children: rightItems.map((item) => _buildNutrientItem(context, item, isLeft: false)).toList(),
+          ),
         ),
       ],
     );
@@ -84,65 +90,58 @@ class NutrientGrid extends StatelessWidget {
 
         // 2. 게이지 바 (화면 크기에 비례) - 더 작게 조정
         Flexible(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final barWidth = constraints.maxWidth;
-              final barHeight = ResponsiveHelper.height(context, 0.033);
-              return SizedBox(
-                width: barWidth,
-                height: barHeight,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(barHeight),
-                  child: Stack(
-                    children: [
-                      // 빈 게이지 배경
-                      Container(
-                        width: barWidth,
-                        height: barHeight,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFF0F0F0), // 항상 연한 회색
-                        ),
-                      ),
-                      // 채워지는 게이지
-                      if (clampedProgress > 0)
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: FractionallySizedBox(
-                            widthFactor: clampedProgress / 100.0,
-                            heightFactor: 1.0,
-                            child: Container(
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Color(0xFFFEF493),
-                                    Color(0xFFDDEDC1),
-                                    Color(0xFFBCE7F0),
-                                  ],
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight,
-                                ),
-                              ),
+          child: SizedBox(
+            height: ResponsiveHelper.height(context, 0.033),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(ResponsiveHelper.height(context, 0.033)),
+              child: Stack(
+                children: [
+                  // 빈 게이지 배경
+                  Container(
+                    width: double.infinity,
+                    height: ResponsiveHelper.height(context, 0.033),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF0F0F0), // 항상 연한 회색
+                    ),
+                  ),
+                  // 채워지는 게이지
+                  if (clampedProgress > 0)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: FractionallySizedBox(
+                        widthFactor: clampedProgress / 100.0,
+                        heightFactor: 1.0,
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Color(0xFFFEF493),
+                                Color(0xFFDDEDC1),
+                                Color(0xFFBCE7F0),
+                              ],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
                             ),
                           ),
                         ),
-                      // 퍼센트 텍스트 (항상 중앙 정렬)
-                      Center(
-                        child: Text(
-                          '${clampedProgress.toInt()}%',
-                          style: TextStyle(
-                            fontSize: ResponsiveHelper.fontSize(context, 9),
-                            fontWeight: FontWeight.w600,
-                            color: clampedProgress == 0
-                                ? const Color(0xFF808080) // 0%일 때 회색 텍스트
-                                : ColorPalette.text100, // 게이지가 올라갔을 때 테마 블랙
-                          ),
-                        ),
                       ),
-                    ],
+                    ),
+                  // 퍼센트 텍스트 (항상 중앙 정렬)
+                  Center(
+                    child: Text(
+                      '${clampedProgress.toInt()}%',
+                      style: TextStyle(
+                        fontSize: ResponsiveHelper.fontSize(context, 9),
+                        fontWeight: FontWeight.w600,
+                        color: clampedProgress == 0
+                            ? const Color(0xFF808080) // 0%일 때 회색 텍스트
+                            : ColorPalette.text100, // 게이지가 올라갔을 때 테마 블랙
+                      ),
+                    ),
                   ),
-                ),
-              );
-            },
+                ],
+              ),
+            ),
           ),
         ),
       ],

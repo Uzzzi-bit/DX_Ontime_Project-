@@ -71,6 +71,7 @@ class SettingsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: _background,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
         automaticallyImplyLeading: false,
         leading: IconButton(
           onPressed: () {
@@ -86,7 +87,6 @@ class SettingsScreen extends StatelessWidget {
           '설정',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
-        backgroundColor: _surface,
         iconTheme: const IconThemeData(color: ColorPalette.textPrimary),
       ),
       body: SafeArea(

@@ -21,7 +21,7 @@ if not API_KEY:
     )
 
 client = genai.Client(api_key=API_KEY)
-MODEL_ID = "gemini-2.5-flash"
+MODEL_ID = "gemini-2.0-flash"
 
 
 # =========================

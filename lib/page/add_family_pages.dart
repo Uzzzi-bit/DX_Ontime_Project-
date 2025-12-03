@@ -195,7 +195,7 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
       appBar: AppBar(
         automaticallyImplyLeading: false,
         elevation: 0,
-        backgroundColor: colorScheme.surface,
+        backgroundColor: Colors.transparent,
         leading: IconButton(
           onPressed: () {
             if (Navigator.canPop(context)) {
