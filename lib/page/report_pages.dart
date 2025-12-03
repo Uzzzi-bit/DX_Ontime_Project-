@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../widget/bottom_bar_widget.dart';
 import '../theme/color_palette.dart';
+import '../api/ai_recipe_api.dart';
 import 'recipe_pages.dart';
 import 'analysis_pages.dart';
 import '../model/nutrient_type.dart';
@@ -65,6 +66,10 @@ class _ReportScreenState extends State<ReportScreen> {
   late List<NutrientSlot> _nutrientSlots;
   bool _hasNutrientData = true; // 기존 필드는 그대로 사용하되, 이제 실제 상태에 맞게 바꾸도록 준비
 
+  // AI 추천 레시피 관련 상태 변수
+  String? _bannerMessageFromAi; // AI가 보내준 배너 문장
+  List<RecipeData> _aiRecipes = []; // AI 추천 레시피 3개
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +82,9 @@ class _ReportScreenState extends State<ReportScreen> {
     // TODO: [SERVER][DB] 나중에 API 연동으로 교체
     _todayStatus = createDummyTodayStatus();
     _buildNutrientSlotsFromStatus();
+
+    // 화면 초기 로드 시 AI 추천 레시피 호출
+    _reloadDailyNutrientsForSelectedDate();
   }
 
   @override
@@ -166,26 +174,29 @@ class _ReportScreenState extends State<ReportScreen> {
   /// userRepository.fetchDailyNutrients()를 통해 서버에서 데이터를 가져옵니다.
   Future<void> _reloadDailyNutrientsForSelectedDate() async {
     // TODO: [SERVER][DB] 실제 API 연동 시 userRepository를 통해 데이터 가져오기
-    // 예시:
-    // final result = await userRepository.fetchDailyNutrients(date: _selectedWeekDate);
-    // if (result == null) {
-    //   setState(() {
-    //     _hasNutrientData = false;
-    //   });
-    //   return;
-    // }
-    // _todayStatus = result;
-    // _buildNutrientSlotsFromStatus();
-    // setState(() {
-    //   _hasNutrientData = true;
-    // });
-
     // 지금은 더미 데이터로 대체
     _todayStatus = createDummyTodayStatus();
     _buildNutrientSlotsFromStatus();
 
     setState(() {
       _hasNutrientData = true; // TODO: 실제 데이터 없으면 false 처리
+    });
+
+    // 🔽 AI 추천 식단 호출 (백엔드 없어도 try/catch 때문에 앱이 깨지지 않아야 함)
+    final aiResp = await fetchAiRecommendedRecipes(
+      nickname: _userName,
+      week: 12, // TODO: 실제 주수로 교체
+      bmi: 22.0, // TODO: 실제 BMI로 교체
+      conditions: '없음', // TODO: 실제 진단/질환 정보로 교체
+    );
+    if (!mounted) return;
+    setState(() {
+      if (aiResp.bannerMessage.isNotEmpty) {
+        _bannerMessageFromAi = aiResp.bannerMessage;
+      }
+      if (aiResp.recipes.isNotEmpty) {
+        _aiRecipes = aiResp.recipes;
+      }
     });
   }
 
@@ -276,7 +287,13 @@ class _ReportScreenState extends State<ReportScreen> {
     // });
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const RecipeScreen()),
+      MaterialPageRoute(
+        builder: (context) => RecipeScreen(
+          initialMenuIndex: 0,
+          // AI 레시피가 있으면 그것을 넘기고, 없으면 null → 기존 목 데이터 사용
+          initialRecipes: _aiRecipes.isNotEmpty ? _aiRecipes : null,
+        ),
+      ),
     );
   }
 
@@ -639,7 +656,8 @@ class _ReportScreenState extends State<ReportScreen> {
                     const SizedBox(height: 8),
                     // TODO: [AI] AI가 생성한 추천 메시지는 AI 서버에서 가져오기
                     Text(
-                      '$_userName님, 다음 식사는 $_lackingNutrient 보충을 위해 $_recommendedFood은(는) 어떤가요? 🥗',
+                      _bannerMessageFromAi ??
+                          '$_userName님, 다음 식사는 $_lackingNutrient 보충을 위해 $_recommendedFood은(는) 어떤가요? 🥗',
                       style: const TextStyle(
                         color: ColorPalette.text100,
                         fontSize: 14,
