@@ -1,0 +1,313 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "domain": "pregnancy_nutrition",
+    "language": "ko",
+    "description": "임산부 영양, 칼로리, 체중 증가, 음식 안전, 질환별 조정에 대한 AI용 공통 규칙"
+  },
+  "trimester_rules": [
+    {
+      "trimester": "first",
+      "label_ko": "임신 초기",
+      "weeks_range": [
+        1,
+        12
+      ],
+      "extra_kcal": 0,
+      "summary_ko": "임신 초기에는 보통 추가 열량이 필요하지 않으며, 균형 잡힌 식사가 중요합니다."
+    },
+    {
+      "trimester": "second",
+      "label_ko": "임신 중기",
+      "weeks_range": [
+        13,
+        27
+      ],
+      "extra_kcal": 300,
+      "summary_ko": "임신 중기에는 하루 약 300kcal 정도의 추가 섭취가 권장됩니다."
+    },
+    {
+      "trimester": "third",
+      "label_ko": "임신 후기",
+      "weeks_range": [
+        28,
+        40
+      ],
+      "extra_kcal": 450,
+      "summary_ko": "임신 후기에는 약 450kcal를 추가 섭취하는 것이 권장됩니다."
+    }
+  ],
+  "bmi_category_rules": [
+    {
+      "category": "underweight",
+      "label_ko": "저체중",
+      "bmi_min": 0.0,
+      "bmi_max": 18.4,
+      "weight_gain_recommend_kg": [
+        12.5,
+        18.0
+      ],
+      "tip_ko": "저체중 임산부는 비교적 더 많은 체중 증가가 허용되며, 충분한 에너지와 단백질 섭취가 중요합니다."
+    },
+    {
+      "category": "normal",
+      "label_ko": "정상 체중",
+      "bmi_min": 18.5,
+      "bmi_max": 24.9,
+      "weight_gain_recommend_kg": [
+        11.5,
+        16.0
+      ],
+      "tip_ko": "정상 체중 임산부는 총 11.5~16kg 정도의 체중 증가가 권장되며, 꾸준하고 완만한 증가를 목표로 합니다."
+    },
+    {
+      "category": "overweight",
+      "label_ko": "과체중",
+      "bmi_min": 25.0,
+      "bmi_max": 29.9,
+      "weight_gain_recommend_kg": [
+        7.0,
+        11.5
+      ],
+      "tip_ko": "과체중 임산부는 체중 증가 폭을 다소 줄이는 대신, 영양의 질을 높이는 데 집중하는 것이 좋습니다."
+    },
+    {
+      "category": "obese",
+      "label_ko": "비만",
+      "bmi_min": 30.0,
+      "bmi_max": 100.0,
+      "weight_gain_recommend_kg": [
+        5.0,
+        9.0
+      ],
+      "tip_ko": "비만 임산부는 불필요한 체중 증가는 줄이고, 태아 성장에 필요한 최소한의 영양 공급에 집중해야 합니다."
+    }
+  ],
+  "main_nutrient_targets": [
+    {
+      "nutrient": "energy",
+      "label_ko": "에너지",
+      "unit": "kcal",
+      "base_target_per_day": 2000,
+      "note_ko": "기본 2,000kcal를 기준으로 하되, 임신 분기별로 추가 열량을 더해 계산합니다."
+    },
+    {
+      "nutrient": "protein",
+      "label_ko": "단백질",
+      "unit": "g",
+      "target_per_day": 75,
+      "note_ko": "임신 전보다 하루 약 10~15g 정도 단백질 섭취를 늘리는 것이 권장됩니다."
+    },
+    {
+      "nutrient": "iron",
+      "label_ko": "철분",
+      "unit": "mg",
+      "target_per_day": 27,
+      "note_ko": "임신 시 철 요구량이 증가하므로, 식사와 필요시 보충제를 통해 충분히 섭취해야 합니다."
+    },
+    {
+      "nutrient": "folate",
+      "label_ko": "엽산",
+      "unit": "µg",
+      "target_per_day": 600,
+      "note_ko": "신경관 결손 예방을 위해 임신 전·초기에 특히 중요하며, 임신 중에도 꾸준한 섭취가 필요합니다."
+    },
+    {
+      "nutrient": "calcium",
+      "label_ko": "칼슘",
+      "unit": "mg",
+      "target_per_day": 1000,
+      "note_ko": "태아의 뼈 형성을 위해 충분한 칼슘 섭취가 필요하며, 유제품·칼슘 강화 식품 등으로 보충할 수 있습니다."
+    },
+    {
+      "nutrient": "vitamin_d",
+      "label_ko": "비타민 D",
+      "unit": "IU",
+      "target_per_day": 600,
+      "note_ko": "칼슘 흡수를 돕기 때문에 함께 고려해야 하며, 혈중 농도에 따라 추가 보충이 필요할 수 있습니다."
+    },
+    {
+      "nutrient": "omega_3",
+      "label_ko": "오메가-3(DHA/EPA)",
+      "unit": "mg",
+      "target_per_day": 250,
+      "note_ko": "태아의 뇌·망막 발달에 중요한 역할을 하며, 기름진 생선 또는 보충제를 통해 섭취할 수 있습니다."
+    }
+  ],
+  "condition_adjust_rules": [
+    {
+      "condition": "gestational_diabetes",
+      "label_ko": "임신성 당뇨",
+      "adjustments_ko": [
+        "정제 탄수화물(흰빵, 케이크, 과자, 설탕이 많이 든 음료) 섭취를 줄이고, 전곡류·채소·단백질 위주의 식단을 권장합니다.",
+        "한 번에 많은 양을 먹기보다는, 소량씩 나누어 규칙적으로 섭취하도록 안내합니다.",
+        "당이 많은 주스·탄산음료·달콤한 음료는 가급적 피하도록 안내합니다."
+      ]
+    },
+    {
+      "condition": "hypertension",
+      "label_ko": "임신성 고혈압/고혈압",
+      "adjustments_ko": [
+        "나트륨 섭취를 줄이기 위해 짠 음식, 가공식품, 라면·즉석식품 등의 섭취를 제한하도록 안내합니다.",
+        "국·찌개의 국물은 가능한 한 적게 섭취하거나, 먹기 전에 희석해 먹도록 권장합니다.",
+        "카페인 음료는 하루 총 섭취량을 줄이고, 알코올은 완전히 피하도록 안내합니다."
+      ]
+    },
+    {
+      "condition": "anemia",
+      "label_ko": "빈혈",
+      "adjustments_ko": [
+        "철분이 풍부한 적색육, 간, 콩류, 시금치, 강화 곡류 등을 식단에 포함하도록 권장합니다.",
+        "철분 흡수를 돕기 위해 비타민 C가 풍부한 과일·채소와 함께 섭취하도록 안내합니다.",
+        "카페인 음료는 철분 흡수를 방해할 수 있으므로, 철분제 복용 시간 주변에는 피하도록 권장합니다."
+      ]
+    }
+  ],
+  "food_safety_rules": [
+    {
+      "category": "alcohol",
+      "label_ko": "알코올",
+      "status": "avoid",
+      "rule_ko": "임신 중에는 모든 종류의 알코올 섭취를 피하는 것이 권장됩니다.",
+      "reason_ko": "태아 알코올 증후군 등 태아 발달에 심각한 영향을 줄 수 있습니다.",
+      "ai_message_ko": "알코올 음료는 임신 기간 동안 가급적 완전히 피하도록 안내합니다."
+    },
+    {
+      "category": "caffeine",
+      "label_ko": "카페인",
+      "status": "limit",
+      "max_mg_per_day": 200,
+      "rule_ko": "하루 총 카페인 섭취량을 200mg 이하로 제한하는 것이 일반적으로 권장됩니다.",
+      "reason_ko": "과도한 카페인은 유산·조산 위험과 관련성이 제기되어 있습니다.",
+      "ai_message_ko": "커피, 차, 에너지 음료, 초콜릿 등 카페인 함유 식품의 양을 합산해 하루 총량을 관리하도록 안내합니다."
+    },
+    {
+      "category": "raw_fish",
+      "label_ko": "날생선·회",
+      "status": "avoid_or_caution",
+      "rule_ko": "날생선, 회, 조개류 등은 식중독·기생충 감염 위험 때문에 피하거나 매우 신중하게 섭취해야 합니다.",
+      "reason_ko": "임신 중에는 면역력이 떨어져 식중독에 취약하며, 태아에도 영향을 줄 수 있습니다.",
+      "ai_message_ko": "가능하면 충분히 가열 조리된 생선 요리를 선택하고, 날생선 섭취를 최소화하거나 피하도록 안내합니다."
+    },
+    {
+      "category": "high_mercury_fish",
+      "label_ko": "수은이 많은 생선",
+      "status": "limit",
+      "rule_ko": "상어, 황새치, 참다랑어, 메카렐 등 수은 함량이 높은 생선은 섭취를 제한해야 합니다.",
+      "reason_ko": "고농도 수은 노출은 태아의 신경계 발달에 영향을 줄 수 있습니다.",
+      "ai_message_ko": "수은 함량이 낮은 생선(연어, 정어리, 꽁치 등)을 주 2~3회 정도 섭취하는 방향으로 안내합니다."
+    },
+    {
+      "category": "unpasteurized_dairy",
+      "label_ko": "비살균 유제품",
+      "status": "avoid",
+      "rule_ko": "살균되지 않은 우유, 생치즈 등은 리스테리아 감염 위험 때문에 피해야 합니다.",
+      "reason_ko": "리스테리아균은 태반을 통과해 태아에 영향을 줄 수 있습니다.",
+      "ai_message_ko": "제품 라벨에 '살균' 또는 '멸균' 표시가 있는지 확인하고, 불확실한 경우 섭취하지 않도록 안내합니다."
+    },
+    {
+      "category": "processed_meat",
+      "label_ko": "가공육",
+      "status": "limit",
+      "rule_ko": "소시지, 햄, 베이컨 등 가공육은 나트륨·포화지방 함량이 높아 섭취를 제한하는 것이 좋습니다.",
+      "reason_ko": "과도한 나트륨과 포화지방 섭취는 체중 증가, 부종, 고혈압 위험을 높일 수 있습니다.",
+      "ai_message_ko": "가능하면 살코기·가정식 조리육을 선택하고, 가공육 섭취 빈도와 양을 줄이도록 안내합니다."
+    },
+    {
+      "category": "others_supplements",
+      "label_ko": "기타 건강기능식품",
+      "status": "caution",
+      "rule_ko": "다양한 건강기능식품·허브제는 임신 중 안전성 정보가 부족한 경우가 많으므로, 임의로 복용하지 않는 것이 좋습니다.",
+      "reason_ko": "일부 성분은 태아 발달에 영향을 줄 수 있으며, 약물과 상호작용을 일으킬 수 있습니다.",
+      "ai_message_ko": "새로운 건강기능식품이나 허브제를 시작하기 전에는 반드시 의료진과 상의하도록 안내합니다."
+    }
+  ],
+  "supplement_guidelines": [
+    {
+      "supplement_type": "prenatal_multivitamin",
+      "label_ko": "임산부 종합비타민",
+      "recommended": true,
+      "condition_ko": "일반적으로 임신 중 복용이 권장되지만, 구체적인 제품과 용량은 의료진과 상의하는 것이 좋습니다.",
+      "reason_ko": "식사만으로 모든 영양소를 충분히 섭취하기 어려운 경우를 보완하는 목적입니다.",
+      "ai_message_ko": "이미 복용 중인 영양제와 중복되지 않도록 주의하고, 의사나 약사와 상담 후 선택하도록 안내합니다."
+    },
+    {
+      "supplement_type": "extra_iron",
+      "label_ko": "추가 철분제",
+      "recommended": "conditional",
+      "condition_ko": "빈혈 소견이 있거나 혈액검사 결과에 따라 의사가 추가 철분을 권장한 경우에 복용합니다.",
+      "reason_ko": "철분이 부족한 경우 태아와 임산부 모두에게 영향을 줄 수 있어, 필요한 경우 보충이 중요합니다.",
+      "ai_message_ko": "변비나 위 불편감이 생길 수 있으므로, 증상이 심하면 의료진과 상담하도록 안내합니다."
+    },
+    {
+      "supplement_type": "extra_omega_3",
+      "label_ko": "오메가-3 보충제",
+      "recommended": "conditional",
+      "condition_ko": "식사로 오메가-3 섭취가 충분하지 않거나, 의사가 권장하는 경우에 복용을 고려합니다.",
+      "reason_ko": "태아의 뇌·시각 발달을 돕는 역할을 할 수 있습니다.",
+      "ai_message_ko": "혈액응고에 영향을 줄 수 있어, 항응고제 복용 중이거나 수술 전후에는 반드시 의료진과 상의하도록 안내합니다."
+    },
+    {
+      "supplement_type": "others",
+      "label_ko": "기타 보충제",
+      "recommended": "caution",
+      "condition_ko": "필요성이 명확하지 않거나, 안전성이 충분히 검증되지 않은 보충제는 신중하게 접근해야 합니다.",
+      "reason_ko": "과도한 비타민·무기질 섭취는 오히려 부작용을 초래할 수 있습니다.",
+      "ai_message_ko": "여러 보충제를 동시에 복용하기 전에 반드시 의료진과 상의하도록 안내합니다."
+    }
+  ],
+  "ai_style": {
+    "tone_ko": "친절하고 부드러운 말투를 사용하며, 불안감을 주지 않도록 균형 잡힌 표현을 사용합니다.",
+    "disclaimer_ko": "이 서비스는 의료진의 진단이나 치료를 대신할 수 없으며, 이상 증상이나 걱정되는 점이 있다면 반드시 병·의원을 방문해야 합니다.",
+    "must_do_ko": [
+      "사용자의 선택을 존중하고, 강요하는 표현을 피합니다.",
+      "숫자와 기준을 제시할 때는 ‘일반적인 권장 기준’임을 분명히 합니다.",
+      "위험 신호가 의심되는 경우에는 의료진 상담을 권장하는 문장을 항상 포함합니다."
+    ]
+  },
+  "cooking_device_rules": {
+    "light_oven": {
+      "label_ko": "광파오븐",
+      "description_ko": "광파오븐과 유사한 복합 조리기기의 주요 기능과 임산부 친화적인 사용 기준입니다.",
+      "functions": [
+        {
+          "code": "oven",
+          "label_ko": "오븐",
+          "usage_ko": "굽기·베이킹에 사용합니다. 튀김보다는 굽기 방식으로 기름 사용을 줄이는 데 적합합니다."
+        },
+        {
+          "code": "microwave",
+          "label_ko": "전자레인지",
+          "usage_ko": "데우기와 간단 조리에 사용합니다. 장시간 과도하게 가열하지 않도록 합니다."
+        },
+        {
+          "code": "airfry",
+          "label_ko": "에어프라이",
+          "usage_ko": "튀김류를 기름을 거의 쓰지 않고 조리할 때 사용합니다. 나트륨·양념 사용량은 줄이는 것이 좋습니다."
+        },
+        {
+          "code": "defrost",
+          "label_ko": "해동",
+          "usage_ko": "냉동 식재료를 빠르게 해동할 때 사용합니다. 해동 후에는 반드시 충분히 가열 조리해야 합니다."
+        },
+        {
+          "code": "steam_microwave",
+          "label_ko": "스팀 전자레인지",
+          "usage_ko": "찜·데우기 등 부드러운 조리에 사용합니다. 야채·흰살 생선 등을 건강하게 조리할 때 적합합니다."
+        },
+        {
+          "code": "air_sous_vide",
+          "label_ko": "에어 수비드",
+          "usage_ko": "저온에서 천천히 익히는 방식으로, 고기를 부드럽게 익힐 때 사용합니다. 충분한 내부 온도에 도달하도록 합니다."
+        }
+      ],
+      "ai_guidelines_ko": [
+        "가능하면 튀김보다는 굽기·찜·에어프라이 등 기름 사용이 적은 조리법을 우선 제안합니다.",
+        "해동 기능을 사용할 때는 해동 후 반드시 충분한 가열 조리 단계를 레시피에 포함시킵니다.",
+        "레시피에 특정 온도와 시간을 제시할 때는 임산부가 따라 하기 쉽게 직관적인 문장으로 안내합니다.",
+        "나트륨과 포화지방을 줄이는 방향으로 양념과 재료를 설계합니다."
+      ]
+    }
+  }
+}
+

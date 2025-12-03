@@ -46,14 +46,44 @@ class RecipeData {
     required this.calories,
     required this.tags,
   });
+
+  /// AI 백엔드에서 내려준 JSON을 RecipeData 객체로 변환하는 생성자
+  factory RecipeData.fromJson(Map<String, dynamic> json) {
+    // List<String>으로 안전하게 변환하는 헬퍼
+    List<String> toStringList(dynamic value) {
+      if (value is List) {
+        return value.map((e) => e.toString()).toList();
+      }
+      return const [];
+    }
+
+    return RecipeData(
+      title: json['title'] as String? ?? '',
+      fullTitle: json['fullTitle'] as String? ?? '',
+      imagePath: json['imagePath'] as String? ?? '',
+      ingredients: toStringList(json['ingredients']),
+      cookingSteps: toStringList(json['cookingSteps']),
+      tip: json['tip'] as String? ?? '',
+      isOvenAvailable: json['isOvenAvailable'] as bool? ?? false,
+      ovenMode: json['ovenMode'] as String?,
+      ovenTimeMinutes: (json['ovenTimeMinutes'] as num?)?.toInt(),
+      // 일단 AI 응답에 대해서는 ovenSettings는 null로 두고,
+      // 필요하다면 나중에 cookingSteps에서 별도 파싱해서 채울 수 있도록 남겨둔다.
+      ovenSettings: null,
+      calories: (json['calories'] as num?)?.toInt() ?? 0,
+      tags: toStringList(json['tags']),
+    );
+  }
 }
 
 class RecipeScreen extends StatefulWidget {
   final int? initialMenuIndex; // 초기 선택할 메뉴 인덱스
+  final List<RecipeData>? initialRecipes; // AI에서 받아온 레시피가 있으면 사용
 
   const RecipeScreen({
     super.key,
     this.initialMenuIndex,
+    this.initialRecipes,
   });
 
   @override
@@ -67,12 +97,15 @@ class RecipeScreen extends StatefulWidget {
 
 class _RecipeScreenState extends State<RecipeScreen> {
   late int _selectedMenuIndex;
+  late List<RecipeData> _recipes;
 
   @override
   void initState() {
     super.initState();
     // 초기 메뉴 인덱스가 전달되면 사용, 없으면 0 (첫 번째 메뉴)
     _selectedMenuIndex = widget.initialMenuIndex ?? 0;
+    // AI에서 레시피가 넘어오면 그걸 사용, 아니면 기존 목 데이터를 사용
+    _recipes = widget.initialRecipes ?? RecipeScreen.getRecommendedRecipes();
   }
 
   // [API] 사용자 이름과 추천 시간대는 추후 로그인 정보 및 서버 시간으로 대체
@@ -244,10 +277,6 @@ class _RecipeScreenState extends State<RecipeScreen> {
       ),
     ];
   }
-
-  // [API] Mock Data - 실제 서버 응답과 유사한 형태
-  // 조리법에서 오븐 설정을 자동 파싱하여 포함
-  late final List<RecipeData> _recipes = RecipeScreen.getRecommendedRecipes();
 
   String _getRecommendationMessage() {
     final hour = DateTime.now().hour;
