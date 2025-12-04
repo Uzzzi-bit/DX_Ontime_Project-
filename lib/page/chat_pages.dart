@@ -95,7 +95,7 @@ class _ChatScreenState extends State<ChatScreen> {
           text: widget.initialText ?? '',
           imagePath: widget.initialImagePath,
         );
-        
+
         if (mounted) {
           setState(() {
             _messages.add(initialMessage);
@@ -353,6 +353,20 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     try {
+      // 이미지 파일 확인 및 로그
+      if (imageFile != null) {
+        debugPrint('🖼️ [ChatScreen] 이미지 파일 전달: path=${imageFile.path}, name=${imageFile.name}');
+        final fileExists = await File(imageFile.path).exists();
+        debugPrint('🖼️ [ChatScreen] 이미지 파일 존재 여부: $fileExists');
+        if (!fileExists) {
+          throw Exception('이미지 파일을 찾을 수 없습니다: ${imageFile.path}');
+        }
+      } else {
+        debugPrint('📝 [ChatScreen] 텍스트만 전송 (이미지 없음)');
+      }
+
+      debugPrint('🔄 [ChatScreen] AI 요청 시작: query=$query, nickname=$_userNickname, week=$_pregnancyWeek');
+
       // Gemini API를 사용한 채팅 API 호출 (이미지 포함)
       final result =
           await fetchChatResponse(
@@ -367,6 +381,10 @@ class _ChatScreenState extends State<ChatScreen> {
               throw Exception('요청 시간이 초과되었습니다.');
             },
           );
+
+      debugPrint(
+        '✅ [ChatScreen] AI 응답 받음: ${result.message.substring(0, result.message.length > 50 ? 50 : result.message.length)}...',
+      );
 
       if (!mounted) return;
 
@@ -455,8 +473,8 @@ class _ChatScreenState extends State<ChatScreen> {
             imagePath: image.path,
           );
 
-          // 4. [핵심] AI에게 이미지 파일 실어서 전송
-          _sendRequestToAI(
+          // 4. [핵심] AI에게 이미지 파일 실어서 전송 (await로 기다림)
+          await _sendRequestToAI(
             query: '이 음식 먹어도 되나요?', // AI에게 던지는 힌트 질문
             imageFile: image, // 실제 이미지 파일 전달
           );
