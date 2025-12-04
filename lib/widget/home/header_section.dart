@@ -55,7 +55,7 @@ class HeaderSection extends StatelessWidget {
                     final nameLength = userName.length;
                     double nameFontSize = 28;
                     double suffixFontSize = 20;
-                    
+
                     // 닉네임이 길면 폰트 크기 조정
                     if (nameLength > 8) {
                       nameFontSize = 24;
@@ -69,7 +69,7 @@ class HeaderSection extends StatelessWidget {
                       nameFontSize = 18;
                       suffixFontSize = 14;
                     }
-                    
+
                     return RichText(
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,

@@ -124,34 +124,33 @@ class _RecipeScreenState extends State<RecipeScreen> {
 
       String? nickname;
 
+      // 1) 먼저 register_member API에서 닉네임 가져오기 (건강정보가 없어도 회원 정보는 있음)
       try {
-        final healthInfo = await MemberApiService.instance.getHealthInfo(user.uid);
-        debugPrint('🔍 [RecipeScreen] API 응답 전체: $healthInfo');
-
-        // nickname 필드 확인 (다양한 가능한 필드명 체크)
-        nickname =
-            healthInfo['nickname'] as String? ?? healthInfo['user_nickname'] as String? ?? healthInfo['name'] as String?;
-
-        debugPrint('🔍 [RecipeScreen] 추출된 닉네임: $nickname');
+        final memberInfo = await MemberApiService.instance.registerMember(
+          user.uid,
+          email: user.email,
+        );
+        debugPrint('🔍 [RecipeScreen] register_member 응답: $memberInfo');
+        
+        nickname = memberInfo['nickname'] as String?;
+        debugPrint('✅ [RecipeScreen] register_member에서 닉네임: $nickname');
       } catch (e) {
-        debugPrint('⚠️ [RecipeScreen] 건강 정보 로드 실패 (Firebase Auth 정보 사용): $e');
-        // 건강 정보가 없어도 Firebase Auth 정보로 닉네임 가져오기 시도
+        debugPrint('⚠️ [RecipeScreen] register_member 호출 실패: $e');
       }
 
-      // 닉네임 fallback 로직: Django API → Firebase displayName → email 앞부분 → '사용자'
+      // 2) 회원 정보에서 닉네임을 못 가져왔으면 건강정보에서 시도
       if (nickname == null || nickname.isEmpty) {
-        // Firebase Auth의 displayName 사용
-        if (user.displayName != null && user.displayName!.isNotEmpty) {
-          nickname = user.displayName;
-          debugPrint('✅ [RecipeScreen] Firebase displayName 사용: $nickname');
-        } 
-        // displayName이 없으면 email의 @ 앞부분 사용
-        else if (user.email != null && user.email!.isNotEmpty) {
-          final emailParts = user.email!.split('@');
-          if (emailParts.isNotEmpty && emailParts[0].isNotEmpty) {
-            nickname = emailParts[0];
-            debugPrint('✅ [RecipeScreen] Firebase email에서 추출: $nickname');
-          }
+        try {
+          final healthInfo = await MemberApiService.instance.getHealthInfo(user.uid);
+          debugPrint('🔍 [RecipeScreen] 건강 정보 API 응답: $healthInfo');
+
+          // nickname 필드 확인 (다양한 가능한 필드명 체크)
+          nickname =
+              healthInfo['nickname'] as String? ?? healthInfo['user_nickname'] as String? ?? healthInfo['name'] as String?;
+
+          debugPrint('🔍 [RecipeScreen] 건강정보에서 추출된 닉네임: $nickname');
+        } catch (e) {
+          debugPrint('⚠️ [RecipeScreen] 건강 정보 로드 실패 (건강정보 없음): $e');
         }
       }
 

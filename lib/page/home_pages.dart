@@ -64,19 +64,33 @@ class _HomeScreenState extends State<HomeScreen> {
       int? userPregnancyWeek;
 
       if (user != null) {
+        // 1) 먼저 register_member API에서 닉네임 가져오기 (건강정보가 없어도 회원 정보는 있음)
         try {
-          // Django API에서 사용자 건강 정보 가져오기
+          final memberInfo = await MemberApiService.instance.registerMember(
+            user.uid,
+            email: user.email,
+          );
+          debugPrint('🔍 [HomeScreen] register_member 응답: $memberInfo');
+
+          userNickname = memberInfo['nickname'] as String?;
+          debugPrint('✅ [HomeScreen] register_member에서 닉네임: $userNickname');
+        } catch (e) {
+          debugPrint('⚠️ [HomeScreen] register_member 호출 실패: $e');
+        }
+
+        // 2) 건강 정보에서 추가 정보 가져오기 (닉네임이 없으면 건강정보에서도 시도)
+        try {
           final healthInfo = await MemberApiService.instance.getHealthInfo(user.uid);
-          // ignore: avoid_print
-          print('🔍 [HomeScreen] API 응답 전체: $healthInfo');
+          debugPrint('🔍 [HomeScreen] 건강 정보 API 응답: $healthInfo');
 
-          // nickname 필드 확인 (다양한 가능한 필드명 체크)
-          userNickname =
-              healthInfo['nickname'] as String? ??
-              healthInfo['user_nickname'] as String? ??
-              healthInfo['name'] as String?;
-
-          debugPrint('🔍 [HomeScreen] 추출된 닉네임: $userNickname');
+          // 닉네임이 아직 없으면 건강정보에서 가져오기
+          if (userNickname == null || userNickname.isEmpty) {
+            userNickname =
+                healthInfo['nickname'] as String? ??
+                healthInfo['user_nickname'] as String? ??
+                healthInfo['name'] as String?;
+            debugPrint('🔍 [HomeScreen] 건강정보에서 추출된 닉네임: $userNickname');
+          }
 
           userPregnancyWeek = healthInfo['pregnancy_week'] as int? ?? healthInfo['pregWeek'] as int?;
 
@@ -88,27 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           debugPrint('✅ [HomeScreen] 사용자 정보 로드: nickname=$userNickname, week=$userPregnancyWeek');
         } catch (e) {
-          debugPrint('⚠️ [HomeScreen] 건강 정보 로드 실패 (Firebase Auth 정보 사용): $e');
-          // 건강 정보가 없어도 Firebase Auth 정보로 닉네임 가져오기 시도
-        }
-      }
-
-      // 닉네임 fallback 로직: Django API → Firebase displayName → email 앞부분 → '사용자'
-      if (userNickname == null || userNickname.isEmpty) {
-        if (user != null) {
-          // Firebase Auth의 displayName 사용
-          if (user.displayName != null && user.displayName!.isNotEmpty) {
-            userNickname = user.displayName;
-            debugPrint('✅ [HomeScreen] Firebase displayName 사용: $userNickname');
-          }
-          // displayName이 없으면 email의 @ 앞부분 사용
-          else if (user.email != null && user.email!.isNotEmpty) {
-            final emailParts = user.email!.split('@');
-            if (emailParts.isNotEmpty && emailParts[0].isNotEmpty) {
-              userNickname = emailParts[0];
-              debugPrint('✅ [HomeScreen] Firebase email에서 추출: $userNickname');
-            }
-          }
+          debugPrint('⚠️ [HomeScreen] 건강 정보 로드 실패 (건강정보 없음): $e');
         }
       }
 
