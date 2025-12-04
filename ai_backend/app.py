@@ -6,6 +6,8 @@ from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import google.generativeai as genai
+# ★ [추가 1] 안전 설정 타입 임포트 (이게 없으면 에러 납니다)
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import base64
 from PIL import Image
 import io
@@ -17,19 +19,30 @@ import io
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
 if not API_KEY:
-    raise ValueError(
-        "GEMINI_API_KEY 환경 변수가 없습니다.\n"
-        "터미널에서 아래처럼 먼저 설정해 주세요:\n"
-        '  export GEMINI_API_KEY="여기에_API_키"\n'
-    )
+    # 로컬 테스트용 (환경변수 없을 때)
+    # API_KEY = "여기에_키를_넣으셔도_됩니다"
+    pass
 
-genai.configure(api_key=API_KEY)
+if API_KEY:
+    genai.configure(api_key=API_KEY)
+
 MODEL_ID = "gemini-2.0-flash"
+
+
+# ★ [설정] 붉은 음식(육회, 찌개) 인식을 위해 필수
+SAFETY_SETTINGS = {
+    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+}
+
+# ★ [설정] 구글 검색 도구
+TOOLS = 'google_search_retrieval'
 
 
 # =========================
 # 1. 프롬프트 / 룰 / KB 파일 로드
-#    (app.py와 같은 폴더에 있다고 가정)
 # =========================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -37,25 +50,31 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def read_text(filename: str) -> str:
     path = os.path.join(BASE_DIR, filename)
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read()
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return ""
 
 
 def read_json(filename: str):
     path = os.path.join(BASE_DIR, filename)
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
 
 
 CAN_EAT_TEMPLATE = read_text("can_eat_prompt.txt")
 RECIPES_TEMPLATE = read_text("recommend_recipes_prompt.txt")
-CHAT_TEMPLATE = read_text("can_eat_prompt.txt")  # 채팅도 can_eat_prompt.txt 사용
+CHAT_TEMPLATE = read_text("can_eat_prompt.txt")
 RULES_JSON = read_json("pregnancy_ai_rules.json")
 FOOD_KB_MD = read_text("pregnancy_nutrition_and_food_safety_kb.md")
 
 
 # =========================
-# 2. 아주 단순한 템플릿 치환 함수
+# 2. 템플릿 치환 함수
 # =========================
 
 def render_template(template: str, **kwargs) -> str:
@@ -71,6 +90,7 @@ def render_template(template: str, **kwargs) -> str:
 # =========================
 # 3. 요청/응답 모델 정의
 # =========================
+# (기존 모델 클래스들 그대로 유지)
 
 class CanEatRequest(BaseModel):
     nickname: str = "사용자"
@@ -84,7 +104,6 @@ class RecipesRequest(BaseModel):
     week: int = 20
     bmi: float = 22.0
     conditions: Optional[str] = "없음"
-
     today_carbs: float = 0
     today_carbs_ratio: float = 0
     today_protein: float = 0
@@ -113,7 +132,7 @@ class ChatRequest(BaseModel):
     conditions: Optional[str] = "없음"
     user_message: str
     chat_history: Optional[list] = None
-    image_base64: Optional[str] = None  # base64 인코딩된 이미지
+    image_base64: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -121,14 +140,14 @@ class ChatResponse(BaseModel):
 
 
 # =========================
-# 4. FastAPI 앱 생성 + CORS
+# 4. FastAPI 앱 생성
 # =========================
 
 app = FastAPI(title="Pregnancy AI Backend")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 나중에 필요하면 도메인 제한
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -138,6 +157,18 @@ app.add_middleware(
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+# [헬퍼 함수] JSON 추출 로직 (중복 제거)
+def extract_json_from_gemini(text: str):
+    text = text.strip()
+    if text.startswith("```json"):
+        text = text[7:]
+    elif text.startswith("```"):
+        text = text[3:]
+    if text.endswith("```"):
+        text = text[:-3]
+    return text.strip()
 
 
 @app.post("/api/can-eat", response_model=CanEatResponse)
@@ -152,16 +183,29 @@ async def can_eat(req: CanEatRequest):
         user_text_or_image_desc=req.user_text_or_image_desc,
     )
 
-    model = genai.GenerativeModel(MODEL_ID)
-    gemini_resp = model.generate_content(prompt)
-    raw = gemini_resp.text.strip()
+    # ★ [수정 1] tools=TOOLS 추가 (검색 활성화)
+    model = genai.GenerativeModel(MODEL_ID, tools=TOOLS)
+    
+    # 프롬프트에 검색 유도 힌트 추가
+    final_prompt = prompt + "\n\n(정보가 불확실하면 Google Search 도구를 사용하여 확인하세요.)"
 
     try:
+        # ★ [수정 2] safety_settings 전달 (붉은 음식 차단 방지)
+        gemini_resp = model.generate_content(final_prompt, safety_settings=SAFETY_SETTINGS)
+        
+        raw = extract_json_from_gemini(gemini_resp.text)
         data = json.loads(raw)
-    except json.JSONDecodeError:
-        raise ValueError(f"모델 JSON 파싱 실패: {raw}")
+        return data
 
-    return data
+    except Exception as e:
+        print(f"Can-Eat Error: {e}")
+        return {
+            "status": "unknown",
+            "headline": "분석에 실패했어요.",
+            "reason": "잠시 후 다시 시도해 주세요.",
+            "target_type": "food",
+            "item_name": ""
+        }
 
 
 @app.post("/api/recommend-recipes")
@@ -188,24 +232,24 @@ async def recommend_recipes(req: RecipesRequest):
         today_iron_ratio=req.today_iron_ratio,
     )
 
+    # 레시피 추천은 검색 불필요 -> tools 제거하여 속도 향상
     model = genai.GenerativeModel(MODEL_ID)
-    gemini_resp = model.generate_content(prompt)
-    raw = gemini_resp.text.strip()
+    
+    # ★ [수정] 안전 설정 추가
+    gemini_resp = model.generate_content(prompt, safety_settings=SAFETY_SETTINGS)
+    raw = extract_json_from_gemini(gemini_resp.text)
 
     try:
         data = json.loads(raw)
+        return data
     except json.JSONDecodeError:
-        raise ValueError(f"모델 JSON 파싱 실패: {raw}")
-
-    return data
+        return []
 
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
-    """일반 대화형 채팅 엔드포인트 - can_eat_prompt.txt 사용 (이미지 지원)"""
-    # 프롬프트 생성 (can_eat_prompt.txt 사용)
     prompt = render_template(
-        CAN_EAT_TEMPLATE,  # can_eat_prompt.txt 사용
+        CAN_EAT_TEMPLATE,
         RULES_JSON=RULES_JSON,
         FOOD_KB_MD=FOOD_KB_MD,
         nickname=req.nickname,
@@ -214,47 +258,37 @@ async def chat(req: ChatRequest):
         user_text_or_image_desc=req.user_message,
     )
 
-    model = genai.GenerativeModel(MODEL_ID)
+    # ★ [수정 1] 채팅에서도 검색 기능 활성화 (이미지 분석 도움)
+    model = genai.GenerativeModel(MODEL_ID, tools=TOOLS)
     
-    # 이미지가 있으면 이미지와 함께 전송
+    content_payload = [prompt]
+
     if req.image_base64:
         try:
-            # base64 디코딩
             image_data = base64.b64decode(req.image_base64)
             image = Image.open(io.BytesIO(image_data))
             
-            # 이미지와 텍스트를 함께 전송
-            gemini_resp = model.generate_content([prompt, image])
+            # 검색 유도 멘트와 함께 이미지 추가
+            content_payload = [
+                prompt + "\n\n(이미지 식별이 어려우면 Google Search를 사용하여 정확히 분석하세요.)",
+                image
+            ]
         except Exception as e:
-            # 이미지 처리 실패 시 텍스트만 전송
             print(f"이미지 처리 오류: {e}")
-            gemini_resp = model.generate_content(prompt)
-    else:
-        # 이미지가 없으면 텍스트만 전송
-        gemini_resp = model.generate_content(prompt)
-    
-    raw = gemini_resp.text.strip()
-
-    # 마크다운 코드 블록 제거 (```json ... ``` 형식)
-    if raw.startswith("```json"):
-        raw = raw[7:]  # "```json" 제거
-    elif raw.startswith("```"):
-        raw = raw[3:]  # "```" 제거
-    
-    if raw.endswith("```"):
-        raw = raw[:-3]  # 끝의 "```" 제거
-    
-    raw = raw.strip()
 
     try:
-        # JSON 형식으로 파싱 시도
+        # ★ [수정 2] 안전 설정 전달
+        gemini_resp = model.generate_content(content_payload, safety_settings=SAFETY_SETTINGS)
+        raw = extract_json_from_gemini(gemini_resp.text)
+        
         data = json.loads(raw)
-        # JSON이면 headline과 reason을 합쳐서 반환
+        
         response_text = f"{data.get('headline', '')}\n\n{data.get('reason', '')}"
         return ChatResponse(message=response_text)
-    except json.JSONDecodeError:
-        # JSON이 아니면 그대로 텍스트로 반환
-        return ChatResponse(message=raw)
+
+    except Exception as e:
+        print(f"Chat Error: {e}")
+        return ChatResponse(message="죄송해요, 답변을 생성하는 중 문제가 생겼어요.")
 
 
 if __name__ == "__main__":
