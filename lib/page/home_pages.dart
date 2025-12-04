@@ -972,151 +972,80 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 /// 2) RoundedContainer를 자연스럽게 위로 끌어올림
                 Transform.translate(
-                  offset: Offset(0, -ResponsiveHelper.height(context, 0.21)), // 흰색 박스 배경 침투 조절
+                  offset: Offset(0, -ResponsiveHelper.height(context, 0.26)), // 흰색 박스 배경 침투 조절
                   child: RoundedContainer(
                     child: Padding(
-                      padding: ResponsiveHelper.padding(context, all: 16.0), // 패딩을 20에서 16으로 줄여 공간 확보
+                      padding: ResponsiveHelper.padding(context, all: 20.0), // 패딩을 20에서 16으로 줄여 공간 확보
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Center(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  dateFormat.format(now),
-                                  style:
-                                      textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: ResponsiveHelper.fontSize(context, 13),
-                                        letterSpacing: 0.5,
-                                      ) ??
-                                      TextStyle(
-                                        fontSize: ResponsiveHelper.fontSize(context, 13),
-                                        fontWeight: FontWeight.w600,
-                                        letterSpacing: 0.5,
-                                      ),
-                                ),
-                                SizedBox(width: ResponsiveHelper.width(context, 0.032)),
-                                Bounceable(
-                                  onTap: () {},
-                                  child: TextButton(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => const ReportScreen(),
-                                        ),
-                                      );
-                                    },
-                                    style: TextButton.styleFrom(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: ResponsiveHelper.width(context, 0.027),
-                                        vertical: ResponsiveHelper.height(context, 0.005),
-                                      ),
-                                      backgroundColor: const Color(0xFFBCE7F0),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.021)),
-                                      ),
-                                      foregroundColor: const Color(0xFF49454F),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                    child: Text(
-                                      '종합리포트 가기',
-                                      style: TextStyle(
-                                        fontSize: ResponsiveHelper.fontSize(context, 9),
-                                        fontWeight: FontWeight.w600,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(height: ResponsiveHelper.height(context, 0.02)),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          Column(
                             children: [
-                              // 칼로리 게이지 영역 - flex 비율을 줄여서 오른쪽으로 이동
-                              Expanded(
-                                flex: 4,
-                                child: Column(
+                              SizedBox(height: ResponsiveHelper.height(context, 0.02)),
+                              Center(
+                                child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    SizedBox(
-                                      width: double.infinity,
-                                      height: ResponsiveHelper.height(context, 0.14),
-                                      child: CalorieArcGauge(
-                                        current: _currentCalorie,
-                                        target: _targetCalorie,
-                                        gradientColors: const [
-                                          Color(0xFFBCE7F0),
-                                          Color(0xFFFEF493),
-                                          Color(0xFFDDEDC1),
-                                          Color(0xFFBCE7F0),
-                                        ],
-                                        child: SizedBox(
-                                          height: ResponsiveHelper.height(context, 0.12),
-                                          width: ResponsiveHelper.width(context, 0.293),
-                                          child: Image.asset(
-                                            'assets/image/baby.png',
-                                            fit: BoxFit.contain,
-                                            errorBuilder: (context, error, stackTrace) {
-                                              return Container(
-                                                width: ResponsiveHelper.width(context, 0.24),
-                                                height: ResponsiveHelper.width(context, 0.24),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFFBCE7F0).withOpacity(0.3),
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: Icon(
-                                                  Icons.child_care,
-                                                  size: ResponsiveHelper.fontSize(context, 50),
-                                                  color: const Color(0xFF5BB5C8),
-                                                ),
-                                              );
-                                            },
+                                    Text(
+                                      dateFormat.format(now),
+                                      style:
+                                          textTheme.titleMedium?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: ResponsiveHelper.fontSize(context, 13),
+                                            letterSpacing: 0.5,
+                                          ) ??
+                                          TextStyle(
+                                            fontSize: ResponsiveHelper.fontSize(context, 13),
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 0.5,
                                           ),
-                                        ),
-                                      ),
                                     ),
-                                    Transform.translate(
-                                      offset: Offset(0, -ResponsiveHelper.height(context, 0.012)),
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
+                                    SizedBox(width: ResponsiveHelper.width(context, 0.048)),
+                                    Bounceable(
+                                      onTap: () {},
+                                      child: TextButton(
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) => const ReportScreen(),
+                                            ),
+                                          );
+                                        },
+                                        style: TextButton.styleFrom(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: ResponsiveHelper.width(context, 0.027),
+                                            vertical: ResponsiveHelper.height(context, 0.005),
+                                          ),
+                                          backgroundColor: const Color(0xFFBCE7F0),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.021)),
+                                          ),
+                                          foregroundColor: const Color(0xFF49454F),
+                                          minimumSize: Size.zero,
+                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        ),
                                         child: Text(
-                                          '${_currentCalorie.toStringAsFixed(0)}Kcal',
-                                          style:
-                                              textTheme.displaySmall?.copyWith(
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: ResponsiveHelper.fontSize(context, 22),
-                                                height: 1.0,
-                                                letterSpacing: 0.5,
-                                              ) ??
-                                              TextStyle(
-                                                fontSize: ResponsiveHelper.fontSize(context, 22),
-                                                fontWeight: FontWeight.w700,
-                                                height: 1.0,
-                                                letterSpacing: 0.5,
-                                              ),
+                                          '종합리포트 가기',
+                                          style: TextStyle(
+                                            fontSize: ResponsiveHelper.fontSize(context, 9),
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 0.5,
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                              SizedBox(width: ResponsiveHelper.width(context, 0.003)), // 아기와 상태바 간격
-                              // NutrientGrid 영역 - flex 비율을 늘려서 더 많은 공간 확보
-                              Expanded(
-                                child: SizedBox(
-                                  // NutrientGrid의 최소 높이 보장
-                                  height: ResponsiveHelper.height(context, 0.14),
-                                  child: NutrientGrid(nutrients: _nutrientData),
-                                ),
-                              ),
                             ],
+                          ),
+                          SizedBox(height: ResponsiveHelper.height(context, 0.042)),
+                          _CalorieAndNutrientSection(
+                            currentCalorie: _currentCalorie,
+                            targetCalorie: _targetCalorie,
+                            nutrientData: _nutrientData,
+                            textTheme: textTheme,
                           ),
                           SizedBox(height: ResponsiveHelper.height(context, 0.02)),
 
@@ -1489,3 +1418,145 @@ class _RecommendedMeal {
 }
 
 // NutrientType enum은 lib/model/nutrient_type.dart로 이동됨
+
+/// 칼로리 게이지와 영양소 그리드를 함께 표시하는 섹션
+class _CalorieAndNutrientSection extends StatelessWidget {
+  const _CalorieAndNutrientSection({
+    required this.currentCalorie,
+    required this.targetCalorie,
+    required this.nutrientData,
+    required this.textTheme,
+  });
+
+  final double currentCalorie;
+  final double targetCalorie;
+  final List<Map<String, dynamic>> nutrientData;
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final gaugeHeight = ResponsiveHelper.height(context, 0.14);
+    final spacing = ResponsiveHelper.width(context, 0.003);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start, // 가운데 정렬로 변경
+      mainAxisAlignment: MainAxisAlignment.start, // 가운데 정렬
+      children: [
+        // 칼로리 게이지 영역
+        Expanded(
+          flex: 2,
+          child: _CalorieGaugeWidget(
+            currentCalorie: currentCalorie,
+            targetCalorie: targetCalorie,
+            height: gaugeHeight,
+            textTheme: textTheme,
+          ),
+        ),
+        SizedBox(width: spacing),
+        // 영양소 그리드 영역
+        Expanded(
+          flex: 3,
+          child: SizedBox(
+            height: gaugeHeight,
+            child: NutrientGrid(nutrients: nutrientData),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 칼로리 게이지 위젯
+class _CalorieGaugeWidget extends StatelessWidget {
+  const _CalorieGaugeWidget({
+    required this.currentCalorie,
+    required this.targetCalorie,
+    required this.height,
+    required this.textTheme,
+  });
+
+  final double currentCalorie;
+  final double targetCalorie;
+  final double height;
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min, // 최소 크기만 차지
+      mainAxisAlignment: MainAxisAlignment.center, // 가운데 정렬
+      crossAxisAlignment: CrossAxisAlignment.center, // 가운데 정렬
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: height,
+          child: CalorieArcGauge(
+            current: currentCalorie,
+            target: targetCalorie,
+            gradientColors: const [
+              Color(0xFFBCE7F0),
+              Color(0xFFFEF493),
+              Color(0xFFDDEDC1),
+              Color(0xFFBCE7F0),
+            ],
+            child: _BabyImageWidget(),
+          ),
+        ),
+        Transform.translate(
+          offset: Offset(0, -ResponsiveHelper.height(context, 0.012)),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center, // 가운데 정렬
+            child: Text(
+              '${currentCalorie.toStringAsFixed(0)}Kcal',
+              textAlign: TextAlign.center, // 텍스트 가운데 정렬
+              style:
+                  textTheme.displaySmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: ResponsiveHelper.fontSize(context, 22),
+                    height: 1.0,
+                    letterSpacing: 0.5,
+                  ) ??
+                  TextStyle(
+                    fontSize: ResponsiveHelper.fontSize(context, 22),
+                    fontWeight: FontWeight.w700,
+                    height: 1.0,
+                    letterSpacing: 0.5,
+                  ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 아기 이미지 위젯
+class _BabyImageWidget extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final iconSize = ResponsiveHelper.width(context, 0.24);
+
+    return Center(
+      child: Image.asset(
+        'assets/image/baby.png',
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            width: iconSize,
+            height: iconSize,
+            decoration: BoxDecoration(
+              color: const Color(0xFFBCE7F0).withOpacity(0.3),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.child_care,
+              size: ResponsiveHelper.fontSize(context, 50),
+              color: const Color(0xFF5BB5C8),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
