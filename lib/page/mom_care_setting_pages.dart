@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:prototype/utils/responsive_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/color_palette.dart';
 import '../widget/bottom_bar_widget.dart';
@@ -190,13 +191,14 @@ class _MomCareSettingScreenState extends State<MomCareSettingScreen> {
                   color: ColorPalette.primary300,
                   size: 32,
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 24),
                 Expanded(
                   child: Text(
-                    '엄마를 위한 케어,\nLG ThinQ를 Mom Care 모드로 전환합니다.',
+                    '엄마를 위한 케어,\nLG ThinQ를 Mom Care 모드로\n전환합니다.',
                     style: theme.bodyMedium?.copyWith(
                       color: _primaryText,
-                      height: 1.4,
+                      fontWeight: FontWeight.w400,
+                      fontSize: ResponsiveHelper.fontSize(context, 14),
                     ),
                   ),
                 ),

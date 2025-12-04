@@ -18,37 +18,31 @@ class _AddFamilyScreenState extends State<AddFamilyScreen> {
       id: 'partner',
       relation: '배우자',
       name: '남편',
-      description: '긴급 알림을 가장 먼저 전달할 케어 메이트입니다.',
     ),
     const _FamilyMember(
       id: 'mother',
       relation: '부모님',
       name: '엄마',
-      description: '기본 건강 리포트를 자동 공유해요.',
     ),
     const _FamilyMember(
       id: 'father',
       relation: '부모님',
       name: '아빠',
-      description: '투약 알림 연동 시 알림을 함께 받습니다.',
     ),
     const _FamilyMember(
       id: 'aunt',
       relation: '가족',
       name: '이모',
-      description: '케어 기록 열람만 가능한 뷰어 권한입니다.',
     ),
     const _FamilyMember(
       id: 'sibling',
       relation: '형제자매',
       name: '언니',
-      description: '주간 리포트를 이메일로 받아요.',
     ),
     const _FamilyMember(
       id: 'friend',
       relation: '지인',
       name: '친구',
-      description: '긴급 상황 시 문자 알림만 전송됩니다.',
     ),
   ];
 
@@ -360,15 +354,6 @@ class _FamilyMemberTile extends StatelessWidget {
                       color: ColorPalette.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    member.description,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      height: 1.4,
-                      color: ColorPalette.textSecondary,
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -425,11 +410,9 @@ class _FamilyMember {
     required this.id,
     required this.relation,
     required this.name,
-    required this.description,
   });
 
   final String id;
   final String relation;
   final String name;
-  final String description;
 }
