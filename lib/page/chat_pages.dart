@@ -49,6 +49,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> _messages = [];
   final ImagePicker _imagePicker = ImagePicker();
   bool _isLoading = false;
+  XFile? _selectedImageFile; // 선택된 이미지 파일 (전송 전까지 보관)
 
   // DB 저장을 위한 변수들
   String? _currentMemberId;
@@ -516,32 +517,13 @@ class _ChatScreenState extends State<ChatScreen> {
       try {
         final XFile? image = await _imagePicker.pickImage(source: result);
         if (image != null && mounted) {
-          // 1. UI에 이미지 메시지 추가
+          // 이미지 선택 시 바로 전송하지 않고 변수에만 저장
+          // 전송 버튼을 눌러야 실제로 전송됨
           setState(() {
-            _messages.add(
-              ChatMessage(
-                isUser: true,
-                text: '',
-                imagePath: image.path,
-              ),
-            );
+            _selectedImageFile = image;
           });
 
-          // 2. Firebase 업로드 (백그라운드)
-          await _uploadImage(File(image.path));
-
-          // 3. 이미지 메시지를 DB에 저장 (이미지만 있으므로 content는 빈 문자열)
-          await _saveMessageToDb(
-            type: 'user',
-            content: '', // 이미지만 표시하므로 텍스트는 빈 문자열
-            imagePath: image.path,
-          );
-
-          // 4. [핵심] AI에게 이미지 파일 실어서 전송 (await로 기다림)
-          await _sendRequestToAI(
-            query: '이 음식 먹어도 되나요?', // AI에게 던지는 힌트 질문
-            imageFile: image, // 실제 이미지 파일 전달
-          );
+          debugPrint('📷 [ChatScreen] 이미지 선택됨 (전송 대기): ${image.path}');
         }
       } catch (e) {
         if (mounted) {
@@ -602,26 +584,71 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _handleSendMessage() async {
     final text = _textController.text.trim();
-    if (text.isEmpty) return;
+    // 텍스트와 이미지 중 하나라도 있어야 전송 가능
+    if (text.isEmpty && _selectedImageFile == null) return;
     if (_isLoading) return;
 
     // 키보드 숨기기
     _textFieldFocusNode.unfocus();
     SystemChannels.textInput.invokeMethod('TextInput.hide');
 
+    // 선택된 이미지 파일 저장 (전송 전에 백업)
+    final imageFileToSend = _selectedImageFile;
+    final messageText = text.isEmpty ? '' : text;
+
+    // UI에 메시지 추가
     setState(() {
-      _messages.add(ChatMessage(isUser: true, text: text));
+      _messages.add(
+        ChatMessage(
+          isUser: true,
+          text: messageText,
+          imagePath: imageFileToSend?.path,
+        ),
+      );
       _textController.clear();
+      _selectedImageFile = null; // 전송 후 초기화
     });
 
-    // 사용자 메시지를 DB에 저장
-    await _saveMessageToDb(
-      type: 'user',
-      content: text,
-    );
+    _scrollToBottom();
 
-    // 텍스트만 전송
-    _sendRequestToAI(query: text);
+    // Firebase 업로드 및 DB 저장
+    if (imageFileToSend != null) {
+      try {
+        // Firebase 업로드
+        await _uploadImage(File(imageFileToSend.path));
+
+        // 이미지 메시지를 DB에 저장
+        await _saveMessageToDb(
+          type: 'user',
+          content: messageText.isEmpty ? '' : messageText, // 텍스트가 있으면 함께 저장
+          imagePath: imageFileToSend.path,
+        );
+      } catch (e) {
+        debugPrint('❌ [ChatScreen] 이미지 업로드/저장 실패: $e');
+      }
+    } else {
+      // 텍스트만 있는 경우 DB에 저장
+      await _saveMessageToDb(
+        type: 'user',
+        content: messageText,
+      );
+    }
+
+    // AI에게 전송 (텍스트와 이미지 함께)
+    if (imageFileToSend != null) {
+      // 이미지가 있으면 이미지와 함께 전송
+      // 사용자가 입력한 텍스트가 있으면 그대로 사용, 없으면 기본 질문 사용
+      final query = messageText.isEmpty ? '이 음식 먹어도 되나요?' : messageText;
+      debugPrint('📤 [ChatScreen] 이미지와 텍스트 함께 전송: query="$query", hasImage=true');
+      await _sendRequestToAI(
+        query: query,
+        imageFile: imageFileToSend,
+      );
+    } else {
+      // 텍스트만 전송
+      debugPrint('📤 [ChatScreen] 텍스트만 전송: query="$messageText"');
+      await _sendRequestToAI(query: messageText);
+    }
   }
 
   @override
@@ -681,96 +708,141 @@ class _ChatScreenState extends State<ChatScreen> {
                   },
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                decoration: const BoxDecoration(
-                  color: Colors.transparent,
-                ),
-                child: SafeArea(
-                  child: Row(
-                    children: [
-                      Bounceable(
-                        onTap: _handleImagePicker,
-                        child: Container(
-                          width: ResponsiveHelper.width(context, 0.107),
-                          height: ResponsiveHelper.width(context, 0.107),
-                          decoration: BoxDecoration(
-                            color: ColorPalette.bg200,
-                            borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.053)),
-                          ),
-                          child: Icon(
-                            Icons.add,
-                            color: ColorPalette.text100,
-                            size: ResponsiveHelper.fontSize(context, 24),
-                          ),
-                        ),
+              Column(
+                children: [
+                  // 선택된 이미지 미리보기
+                  if (_selectedImageFile != null)
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: ColorPalette.bg200,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      SizedBox(width: ResponsiveHelper.width(context, 0.032)),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: ColorPalette.bg100,
-                            borderRadius: BorderRadius.circular(27.5),
-                            border: Border.all(color: ColorPalette.bg300),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.file(
+                              File(_selectedImageFile!.path),
+                              width: 60,
+                              height: 60,
+                              fit: BoxFit.cover,
+                            ),
                           ),
-                          child: TextField(
-                            controller: _textController,
-                            focusNode: _textFieldFocusNode,
-                            decoration: const InputDecoration(
-                              hintText: '궁금한 음식/약을 물어보세요',
-                              hintStyle: TextStyle(
-                                color: ColorPalette.text300,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 0.5,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              '이미지가 선택되었습니다',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: ColorPalette.text200,
                               ),
-                              border: InputBorder.none,
                             ),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: ColorPalette.text100,
-                            ),
-                            maxLines: null,
-                            textInputAction: TextInputAction.send,
-                            onSubmitted: (_) {
-                              _textFieldFocusNode.unfocus();
-                              _handleSendMessage();
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20, color: ColorPalette.text200),
+                            onPressed: () {
+                              setState(() {
+                                _selectedImageFile = null;
+                              });
                             },
                           ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Bounceable(
-                        onTap: _isLoading ? null : _handleSendMessage,
-                        child: Container(
-                          width: ResponsiveHelper.width(context, 0.12),
-                          height: ResponsiveHelper.width(context, 0.12),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _isLoading ? ColorPalette.primary100.withOpacity(0.5) : ColorPalette.primary100,
+                    ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    decoration: const BoxDecoration(
+                      color: Colors.transparent,
+                    ),
+                    child: SafeArea(
+                      child: Row(
+                        children: [
+                          Bounceable(
+                            onTap: _handleImagePicker,
+                            child: Container(
+                              width: ResponsiveHelper.width(context, 0.107),
+                              height: ResponsiveHelper.width(context, 0.107),
+                              decoration: BoxDecoration(
+                                color: ColorPalette.bg200,
+                                borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.053)),
+                              ),
+                              child: Icon(
+                                Icons.add,
+                                color: ColorPalette.text100,
+                                size: ResponsiveHelper.fontSize(context, 24),
+                              ),
+                            ),
                           ),
-                          child: _isLoading
-                              ? Center(
-                                  child: SizedBox(
-                                    width: ResponsiveHelper.width(context, 0.053),
-                                    height: ResponsiveHelper.width(context, 0.053),
-                                    child: const CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(ColorPalette.text100),
-                                    ),
+                          SizedBox(width: ResponsiveHelper.width(context, 0.032)),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              decoration: BoxDecoration(
+                                color: ColorPalette.bg100,
+                                borderRadius: BorderRadius.circular(27.5),
+                                border: Border.all(color: ColorPalette.bg300),
+                              ),
+                              child: TextField(
+                                controller: _textController,
+                                focusNode: _textFieldFocusNode,
+                                decoration: const InputDecoration(
+                                  hintText: '궁금한 음식/약을 물어보세요',
+                                  hintStyle: TextStyle(
+                                    color: ColorPalette.text300,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    letterSpacing: 0.5,
                                   ),
-                                )
-                              : Icon(
-                                  Icons.send,
-                                  color: ColorPalette.text100,
-                                  size: ResponsiveHelper.fontSize(context, 20),
+                                  border: InputBorder.none,
                                 ),
-                        ),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: ColorPalette.text100,
+                                ),
+                                maxLines: null,
+                                textInputAction: TextInputAction.send,
+                                onSubmitted: (_) {
+                                  _textFieldFocusNode.unfocus();
+                                  _handleSendMessage();
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Bounceable(
+                            onTap: _isLoading ? null : _handleSendMessage,
+                            child: Container(
+                              width: ResponsiveHelper.width(context, 0.12),
+                              height: ResponsiveHelper.width(context, 0.12),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _isLoading ? ColorPalette.primary100.withOpacity(0.5) : ColorPalette.primary100,
+                              ),
+                              child: _isLoading
+                                  ? Center(
+                                      child: SizedBox(
+                                        width: ResponsiveHelper.width(context, 0.053),
+                                        height: ResponsiveHelper.width(context, 0.053),
+                                        child: const CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(ColorPalette.text100),
+                                        ),
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.send,
+                                      color: ColorPalette.text100,
+                                      size: ResponsiveHelper.fontSize(context, 20),
+                                    ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           ),
@@ -805,14 +877,14 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
             ],
-            // 이미지가 있을 때는 텍스트를 표시하지 않음 (이미지만 표시)
-            if (message.text.isNotEmpty && message.imagePath == null)
+            // 텍스트가 있으면 이미지와 함께 표시
+            if (message.text.isNotEmpty)
               Container(
                 constraints: const BoxConstraints(maxWidth: 250),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   color: ColorPalette.bg200,
-                  borderRadius: BorderRadius.circular(25),
+                  borderRadius: BorderRadius.circular(message.imagePath != null ? 10 : 25),
                 ),
                 child: Text(
                   message.text,
