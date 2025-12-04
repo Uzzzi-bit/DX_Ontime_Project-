@@ -6,11 +6,9 @@ from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import base64
 from PIL import Image
 import io
-
 
 # =========================
 # 0. GEMINI API 키 설정
@@ -27,22 +25,9 @@ if not API_KEY:
 genai.configure(api_key=API_KEY)
 MODEL_ID = "gemini-2.0-flash"
 
-# [안전 설정] 붉은 음식(육회, 찌개) 인식을 위해 필수
-SAFETY_SETTINGS = {
-    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-}
-
-# ★ [핵심] 구글 검색 도구 설정
-# 이 설정을 모델에 주입하면, AI가 필요할 때 스스로 구글 검색을 합니다.
-TOOLS = 'google_search_retrieval'
-
-
 # =========================
 # 1. 프롬프트 / 룰 / KB 파일 로드
-#    (app.py와 같은 폴더에 있다고 가정)
+# (app.py와 같은 폴더에 있다고 가정)
 # =========================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -65,7 +50,6 @@ RECIPES_TEMPLATE = read_text("recommend_recipes_prompt.txt")
 CHAT_TEMPLATE = read_text("can_eat_prompt.txt")  # 채팅도 can_eat_prompt.txt 사용
 RULES_JSON = read_json("pregnancy_ai_rules.json")
 FOOD_KB_MD = read_text("pregnancy_nutrition_and_food_safety_kb.md")
-
 
 # =========================
 # 2. 아주 단순한 템플릿 치환 함수
@@ -228,14 +212,14 @@ async def chat(req: ChatRequest):
     )
 
     model = genai.GenerativeModel(MODEL_ID)
-    
+
     # 이미지가 있으면 이미지와 함께 전송
     if req.image_base64:
         try:
             # base64 디코딩
             image_data = base64.b64decode(req.image_base64)
             image = Image.open(io.BytesIO(image_data))
-            
+
             # 이미지와 텍스트를 함께 전송
             gemini_resp = model.generate_content([prompt, image])
         except Exception as e:
@@ -245,7 +229,7 @@ async def chat(req: ChatRequest):
     else:
         # 이미지가 없으면 텍스트만 전송
         gemini_resp = model.generate_content(prompt)
-    
+
     raw = gemini_resp.text.strip()
 
     # 마크다운 코드 블록 제거 (```json ... ``` 형식)
@@ -253,10 +237,10 @@ async def chat(req: ChatRequest):
         raw = raw[7:]  # "```json" 제거
     elif raw.startswith("```"):
         raw = raw[3:]  # "```" 제거
-    
+
     if raw.endswith("```"):
         raw = raw[:-3]  # 끝의 "```" 제거
-    
+
     raw = raw.strip()
 
     try:
