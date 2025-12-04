@@ -2,4 +2,15 @@ Django>=5.2.8
 djangorestframework
 django-cors-headers
 psycopg2-binary  # PostgreSQL 사용 시 필요
+requests  # HTTP 요청을 위한 라이브러리
+
+# YOLO 객체 탐지 (Django에서 직접 사용)
+ultralytics>=8.0.0  # YOLOv3, YOLOv8 지원
+torch>=2.1.0  # YOLO를 위해 필요
+torchvision>=0.16.0
+opencv-python>=4.8.0  # 이미지 처리
+numpy>=1.24.0
+Pillow>=10.1.0  # 이미지 처리
+pyyaml>=6.0  # 설정 파일 처리
+tqdm>=4.66.0  # 진행 표시줄
 
