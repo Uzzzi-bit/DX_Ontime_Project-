@@ -23,7 +23,7 @@ if not API_KEY:
     )
 
 genai.configure(api_key=API_KEY)
-MODEL_ID = "gemini-2.0-flash"
+MODEL_ID = "gemini-2.5-flash"
 
 # =========================
 # 1. 프롬프트 / 룰 / KB 파일 로드

@@ -67,7 +67,21 @@ class _HomeScreenState extends State<HomeScreen> {
         try {
           // Django API에서 사용자 건강 정보 가져오기
           final healthInfo = await MemberApiService.instance.getHealthInfo(user.uid);
+<<<<<<< HEAD
           userNickname = healthInfo['nickname'] as String?;
+=======
+          // ignore: avoid_print
+          print('🔍 [HomeScreen] API 응답 전체: $healthInfo');
+
+          // nickname 필드 확인 (다양한 가능한 필드명 체크)
+          userNickname =
+              healthInfo['nickname'] as String? ??
+              healthInfo['user_nickname'] as String? ??
+              healthInfo['name'] as String?;
+
+          debugPrint('🔍 [HomeScreen] 추출된 닉네임: $userNickname');
+
+>>>>>>> baac00fb7613e8e5404f831a6b23b05b578aa9ae
           userPregnancyWeek = healthInfo['pregnancy_week'] as int? ?? healthInfo['pregWeek'] as int?;
 
           // dueDate 파싱
@@ -78,7 +92,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
           debugPrint('✅ [HomeScreen] 사용자 정보 로드: nickname=$userNickname, week=$userPregnancyWeek');
         } catch (e) {
+<<<<<<< HEAD
           debugPrint('⚠️ [HomeScreen] 건강 정보 로드 실패 (기본값 사용): $e');
+=======
+          debugPrint('⚠️ [HomeScreen] 건강 정보 로드 실패 (Firebase Auth 정보 사용): $e');
+          // 건강 정보가 없어도 Firebase Auth 정보로 닉네임 가져오기 시도
+        }
+      }
+
+      // 닉네임 fallback 로직: Django API → Firebase displayName → email 앞부분 → '사용자'
+      if (userNickname == null || userNickname.isEmpty) {
+        if (user != null) {
+          // Firebase Auth의 displayName 사용
+          if (user.displayName != null && user.displayName!.isNotEmpty) {
+            userNickname = user.displayName;
+            debugPrint('✅ [HomeScreen] Firebase displayName 사용: $userNickname');
+          }
+          // displayName이 없으면 email의 @ 앞부분 사용
+          else if (user.email != null && user.email!.isNotEmpty) {
+            final emailParts = user.email!.split('@');
+            if (emailParts.isNotEmpty && emailParts[0].isNotEmpty) {
+              userNickname = emailParts[0];
+              debugPrint('✅ [HomeScreen] Firebase email에서 추출: $userNickname');
+            }
+          }
+>>>>>>> baac00fb7613e8e5404f831a6b23b05b578aa9ae
         }
       }
 
@@ -412,10 +450,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _handleImageSelected(XFile file) {
+    // 이미지 선택 시 바로 채팅 화면으로 이동
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          initialText: _qaController.text.trim().isEmpty ? null : _qaController.text.trim(),
+          initialImagePath: file.path,
+        ),
+      ),
+    );
+
+    // 전송 후 상태 초기화
     setState(() {
-      _selectedImagePath = file.path;
+      _qaController.clear();
+      _selectedImagePath = null;
     });
-    // TODO: [API] 이미지 업로드 및 분석 요청
   }
 
   void _removeSelectedImage() {

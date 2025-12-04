@@ -342,6 +342,7 @@ class MemberNutritionTarget(models.Model):
     """
     trimester = models.IntegerField(
         db_column='trimester',
+        primary_key=True,
         help_text="임신 분기 (1, 2, 3)",
     )
     calories = models.IntegerField(
@@ -351,7 +352,7 @@ class MemberNutritionTarget(models.Model):
     carb = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        db_column='carb',
+        db_column='carbs',  # 실제 DB 컬럼명은 carbs (복수형)
         help_text="탄수화물 (g)",
     )
     protein = models.DecimalField(
@@ -401,12 +402,6 @@ class MemberNutritionTarget(models.Model):
         decimal_places=2,
         db_column='omega3',
         help_text="오메가3 (mg)",
-    )
-    choline = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        db_column='choline',
-        help_text="콜린 (mg)",
     )
     sugar = models.DecimalField(
         max_digits=10,
@@ -466,9 +461,8 @@ class MemberNutritionTarget(models.Model):
     )
 
     class Meta:
-        db_table = 'member_nutrition_target'
+        db_table = 'member_nutrition_targets'
         managed = True
-        unique_together = [['trimester']]
         indexes = [
             models.Index(fields=['trimester']),
         ]
