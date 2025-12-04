@@ -64,34 +64,10 @@ class _HomeScreenState extends State<HomeScreen> {
       int? userPregnancyWeek;
 
       if (user != null) {
-        // 1) 먼저 register_member API에서 닉네임 가져오기 (건강정보가 없어도 회원 정보는 있음)
         try {
-          final memberInfo = await MemberApiService.instance.registerMember(
-            user.uid,
-            email: user.email,
-          );
-          debugPrint('🔍 [HomeScreen] register_member 응답: $memberInfo');
-
-          userNickname = memberInfo['nickname'] as String?;
-          debugPrint('✅ [HomeScreen] register_member에서 닉네임: $userNickname');
-        } catch (e) {
-          debugPrint('⚠️ [HomeScreen] register_member 호출 실패: $e');
-        }
-
-        // 2) 건강 정보에서 추가 정보 가져오기 (닉네임이 없으면 건강정보에서도 시도)
-        try {
+          // Django API에서 사용자 건강 정보 가져오기
           final healthInfo = await MemberApiService.instance.getHealthInfo(user.uid);
-          debugPrint('🔍 [HomeScreen] 건강 정보 API 응답: $healthInfo');
-
-          // 닉네임이 아직 없으면 건강정보에서 가져오기
-          if (userNickname == null || userNickname.isEmpty) {
-            userNickname =
-                healthInfo['nickname'] as String? ??
-                healthInfo['user_nickname'] as String? ??
-                healthInfo['name'] as String?;
-            debugPrint('🔍 [HomeScreen] 건강정보에서 추출된 닉네임: $userNickname');
-          }
-
+          userNickname = healthInfo['nickname'] as String?;
           userPregnancyWeek = healthInfo['pregnancy_week'] as int? ?? healthInfo['pregWeek'] as int?;
 
           // dueDate 파싱
@@ -102,17 +78,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
           debugPrint('✅ [HomeScreen] 사용자 정보 로드: nickname=$userNickname, week=$userPregnancyWeek');
         } catch (e) {
-          debugPrint('⚠️ [HomeScreen] 건강 정보 로드 실패 (건강정보 없음): $e');
+          debugPrint('⚠️ [HomeScreen] 건강 정보 로드 실패 (기본값 사용): $e');
         }
       }
 
       // UserModel 생성 (실제 데이터 또는 기본값)
-      // 닉네임이 비어있지 않은 경우에만 사용, 아니면 기본값
-      final finalNickname = (userNickname?.isNotEmpty == true) ? userNickname! : '사용자';
-      debugPrint('✅ [HomeScreen] 최종 닉네임: $finalNickname');
-
       final userData = UserModel(
-        nickname: finalNickname,
+        nickname: userNickname ?? '사용자',
         pregnancyWeek: userPregnancyWeek ?? 20,
         statusMessage: '건강한 임신 생활을 응원합니다!',
         dueDate: userDueDate ?? DateTime(2026, 7, 1),
@@ -642,61 +614,38 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Expanded(
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          // 닉네임 길이에 따라 폰트 크기 동적 조정
-                          final nameLength = _userName.length;
-                          double nameFontSize = 30;
-                          double suffixFontSize = 24;
-
-                          // 닉네임이 길면 폰트 크기 조정
-                          if (nameLength > 8) {
-                            nameFontSize = 26;
-                            suffixFontSize = 22;
-                          }
-                          if (nameLength > 12) {
-                            nameFontSize = 22;
-                            suffixFontSize = 18;
-                          }
-                          if (nameLength > 16) {
-                            nameFontSize = 20;
-                            suffixFontSize = 16;
-                          }
-
-                          return RichText(
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            text: TextSpan(
-                              style:
-                                  textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: nameFontSize,
-                                    color: Colors.black,
-                                    letterSpacing: 0.5,
-                                    height: 1.2,
-                                  ) ??
-                                  TextStyle(
-                                    fontSize: nameFontSize,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.black,
-                                    letterSpacing: 0.5,
-                                    height: 1.2,
-                                  ),
-                              children: [
-                                TextSpan(text: '${_userName}님'),
-                                TextSpan(
-                                  text: ' 홈',
-                                  style: TextStyle(
-                                    fontSize: suffixFontSize,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
+                    Text(
+                      '${_userName}님',
+                      style:
+                          textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 30,
+                            color: Colors.black,
+                            letterSpacing: 0.5,
+                          ) ??
+                          const TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black,
+                            letterSpacing: 0.5,
+                          ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '홈',
+                      style:
+                          textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 24,
+                            color: Colors.black,
+                            letterSpacing: 0.5,
+                          ) ??
+                          const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black,
+                            letterSpacing: 0.5,
+                          ),
                     ),
                   ],
                 ),
@@ -704,8 +653,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
               // 3D 홈뷰 만들기 배너
               Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(10),
                 margin: const EdgeInsets.only(bottom: 24),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -714,7 +662,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Row(
                   children: [
                     Container(
-                      margin: EdgeInsets.all(ResponsiveHelper.width(context, 0.027)),
+                      margin: EdgeInsets.all(10),
                       width: ResponsiveHelper.width(context, 0.16),
                       height: ResponsiveHelper.width(context, 0.16),
                       decoration: BoxDecoration(
@@ -799,9 +747,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 3,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 110 / 80,
                 ),
                 itemCount: favoriteProducts.length,
                 itemBuilder: (context, index) {
@@ -814,7 +759,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       mainAxisSize: MainAxisSize.max,
                       children: [
                         Container(
-                          height: ResponsiveHelper.height(context, 0.059),
+                          height: 80,
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.037)),
@@ -830,26 +775,28 @@ class _HomeScreenState extends State<HomeScreen> {
                                       return const SizedBox.shrink();
                                     },
                                   )
-                                : SizedBox(height: ResponsiveHelper.width(context, 0.16)),
+                                : SizedBox(height: 10),
                           ),
                         ),
                         SizedBox(height: ResponsiveHelper.height(context, 0.01)),
-                        Text(
-                          product['name'] ?? '',
-                          style:
-                              textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                                color: Colors.black,
-                                letterSpacing: 0.5,
-                              ) ??
-                              const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black,
-                                letterSpacing: 0.5,
-                              ),
-                          textAlign: TextAlign.center,
+                        Expanded(
+                          child: Text(
+                            product['name'] ?? '',
+                            style:
+                                textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  color: Colors.black,
+                                  letterSpacing: 0.5,
+                                ) ??
+                                const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black,
+                                  letterSpacing: 0.5,
+                                ),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ],
                     ),
@@ -1066,7 +1013,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: [
                               // 칼로리 게이지 영역 - flex 비율을 줄여서 오른쪽으로 이동
                               Expanded(
-                                flex: 2,
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -1132,15 +1078,20 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ],
                                 ),
                               ),
-                              SizedBox(width: ResponsiveHelper.width(context, 0.003)), // 간격 더 줄이기
+                              SizedBox(width: ResponsiveHelper.width(context, 0.003)), // 아기와 상태바 간격
                               // NutrientGrid 영역 - flex 비율을 늘려서 더 많은 공간 확보
                               Expanded(
-                                flex: 8,
-                                child: NutrientGrid(nutrients: _nutrientData), // 고정 높이 제거하여 overflow 방지
+                                child: SizedBox(
+                                  // NutrientGrid의 최소 높이 보장
+                                  height: ResponsiveHelper.height(context, 0.14),
+                                  child: NutrientGrid(nutrients: _nutrientData),
+                                ),
                               ),
                             ],
                           ),
                           SizedBox(height: ResponsiveHelper.height(context, 0.02)),
+
+                          ///여기부터 수정
                           SupplementChecklist(
                             supplements: _supplementIds
                                 .map((id) {
