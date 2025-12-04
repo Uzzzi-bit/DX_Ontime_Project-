@@ -469,3 +469,258 @@ class MemberNutritionTarget(models.Model):
 
     def __str__(self):
         return f"Trimester {self.trimester} - {self.calories} kcal"
+
+
+class Meal(models.Model):
+    """
+    식사 기록 테이블 (meals)
+    """
+    meal_id = models.AutoField(primary_key=True, db_column='meal_id')
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name='meals',
+        db_column='member_id',
+        to_field='firebase_uid',
+    )
+    image = models.ForeignKey(
+        Image,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='meals',
+        db_column='image_id',
+    )
+    meal_time = models.CharField(
+        max_length=20,
+        help_text="조식/중식/석식/야식",
+        db_column='meal_time',
+    )
+    meal_date = models.DateField(
+        db_column='meal_date',
+        help_text="달력 기준 날짜",
+    )
+    memo = models.TextField(
+        null=True,
+        blank=True,
+        db_column='memo',
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_column='created_at',
+    )
+
+    class Meta:
+        db_table = 'meals'
+        managed = True
+        indexes = [
+            models.Index(fields=['member', 'meal_date']),
+            models.Index(fields=['meal_date']),
+        ]
+
+    def __str__(self):
+        return f"{self.member.nickname} - {self.meal_date} {self.meal_time}"
+
+
+class NutritionAnalysis(models.Model):
+    """
+    영양소 분석 테이블 (nutrition_analysis)
+    """
+    id = models.AutoField(primary_key=True)
+    analysis_id = models.IntegerField(
+        null=True,
+        blank=True,
+        db_column='analysis_id',
+        help_text="필요시 UNIQUE/INDEX 추가해서 사용",
+    )
+    meal = models.ForeignKey(
+        Meal,
+        on_delete=models.CASCADE,
+        related_name='nutrition_analyses',
+        db_column='meal_id',
+    )
+    food_id = models.IntegerField(
+        null=True,
+        blank=True,
+        db_column='food_id',
+        help_text="FOOD_NUTRITION_MASTER.food_id (FK 아님)",
+    )
+    food_name = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        db_column='food_name',
+        help_text="AI가 인식한 원본 음식명",
+    )
+    # 영양소 필드들
+    calories = models.FloatField(null=True, blank=True, db_column='calories')  # kcal
+    carbs = models.FloatField(null=True, blank=True, db_column='carbs')  # g
+    protein = models.FloatField(null=True, blank=True, db_column='protein')  # g
+    fat = models.FloatField(null=True, blank=True, db_column='fat')  # g
+    sugar = models.FloatField(null=True, blank=True, db_column='sugar')  # g
+    sodium = models.FloatField(null=True, blank=True, db_column='sodium')  # mg
+    iron = models.FloatField(null=True, blank=True, db_column='iron')  # mg
+    folate = models.FloatField(null=True, blank=True, db_column='folate')  # mg
+    magnesium = models.FloatField(null=True, blank=True, db_column='magnesium')  # mg
+    omega3 = models.FloatField(null=True, blank=True, db_column='omega3')  # g
+    calcium = models.FloatField(null=True, blank=True, db_column='calcium')  # mg
+    vitamin_a = models.FloatField(null=True, blank=True, db_column='vitamin_a')  # μg
+    vitamin_b = models.FloatField(null=True, blank=True, db_column='vitamin_b')  # μg
+    vitamin_c = models.FloatField(null=True, blank=True, db_column='vitamin_c')  # mg
+    vitamin_d = models.FloatField(null=True, blank=True, db_column='vitamin_d')  # μg
+    dietary_fiber = models.FloatField(null=True, blank=True, db_column='dietary_fiber')  # g
+    potassium = models.FloatField(null=True, blank=True, db_column='potassium')  # mg
+    serving_size_gram = models.FloatField(
+        null=True,
+        blank=True,
+        db_column='serving_size_gram',
+        help_text="분석 기준 섭취량(예: 230g)",
+    )
+    base_per_gram = models.FloatField(
+        null=True,
+        blank=True,
+        db_column='base_per_gram',
+        help_text="내부 계산용",
+    )
+    ai_risk_level = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        db_column='ai_risk_level',
+        help_text="예: LOW/MEDIUM/HIGH",
+    )
+    ai_recommendation = models.TextField(
+        null=True,
+        blank=True,
+        db_column='ai_recommendation',
+        help_text="AI 코멘트",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_column='created_at',
+    )
+
+    class Meta:
+        db_table = 'nutrition_analysis'
+        managed = True
+        indexes = [
+            models.Index(fields=['meal']),
+            models.Index(fields=['food_id']),
+            models.Index(fields=['analysis_id']),
+        ]
+
+    def __str__(self):
+        return f"Analysis {self.id} - {self.food_name} ({self.meal})"
+
+
+class Recommendation(models.Model):
+    """
+    추천 메뉴 테이블 (recommendations)
+    """
+    rec_id = models.AutoField(primary_key=True, db_column='rec_id')
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name='recommendations',
+        db_column='member_id',
+        to_field='firebase_uid',
+    )
+    meal = models.ForeignKey(
+        Meal,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='recommendations',
+        db_column='meal_id',
+        help_text="어떤 식단에서 나왔는지 (없으면 단독 추천)",
+    )
+    recipe_pk = models.IntegerField(
+        null=True,
+        blank=True,
+        db_column='recipe_pk',
+        help_text="RECIPES.recipe_id (FK 아님, 소프트 레퍼런스)",
+    )
+    recommended_food = models.CharField(
+        max_length=255,
+        db_column='recommended_food',
+        help_text="추천 메뉴명/타이틀",
+    )
+    reason = models.TextField(
+        null=True,
+        blank=True,
+        db_column='reason',
+        help_text="추천 이유 설명",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_column='created_at',
+    )
+
+    class Meta:
+        db_table = 'recommendations'
+        managed = True
+        indexes = [
+            models.Index(fields=['member', 'created_at']),
+            models.Index(fields=['meal']),
+        ]
+
+    def __str__(self):
+        return f"{self.member.nickname} - {self.recommended_food}"
+
+
+class Notification(models.Model):
+    """
+    알림 테이블 (notifications)
+    """
+    noti_id = models.AutoField(primary_key=True, db_column='noti_id')
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name='notifications',
+        db_column='member_id',
+        to_field='firebase_uid',
+        help_text="알림 주체(임산부)",
+    )
+    guardian_member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name='guardian_notifications',
+        null=True,
+        blank=True,
+        db_column='guardian_member_id',
+        to_field='firebase_uid',
+        help_text="보호자",
+    )
+    recommendation = models.ForeignKey(
+        Recommendation,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notifications',
+        db_column='rec_id',
+        help_text="어떤 추천 기반인지",
+    )
+    message = models.TextField(
+        db_column='message',
+        help_text="알림 내용",
+    )
+    is_read = models.BooleanField(
+        default=False,
+        db_column='is_read',
+        help_text="읽음 여부",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_column='created_at',
+    )
+
+    class Meta:
+        db_table = 'notifications'
+        managed = True
+        indexes = [
+            models.Index(fields=['member', 'is_read', 'created_at']),
+            models.Index(fields=['guardian_member', 'is_read']),
+        ]
+
+    def __str__(self):
+        return f"Notification {self.noti_id} - {self.member.nickname}"
