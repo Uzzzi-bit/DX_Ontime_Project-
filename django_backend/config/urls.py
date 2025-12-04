@@ -22,6 +22,7 @@ from members.ai_chat_views import (
     save_message,
     get_messages,
 )
+from members.meal_views import analyze_meal_image, save_meal, get_daily_nutrition, get_meals
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -52,4 +53,10 @@ urlpatterns = [
     path('api/ai-chat/sessions/<int:session_id>/reactivate/', reactivate_session, name='ai-chat-reactivate-session'),
     path('api/ai-chat/messages/', save_message, name='ai-chat-save-message'),
     path('api/ai-chat/sessions/<int:session_id>/messages/', get_messages, name='ai-chat-get-messages'),
+    
+    # 식사 기록 API
+    path('api/meals/analyze/', analyze_meal_image, name='meal-analyze'),
+    path('api/meals/', save_meal, name='meal-save'),
+    path('api/meals/<str:member_id>/<str:date_str>/', get_meals, name='meal-list'),
+    path('api/meals/daily-nutrition/<str:member_id>/<str:date_str>/', get_daily_nutrition, name='meal-daily-nutrition'),
 ]

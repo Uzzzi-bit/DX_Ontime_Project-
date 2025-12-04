@@ -4,10 +4,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 import '../theme/color_palette.dart';
 import '../service/storage_service.dart';
-import '../repository/image_repository.dart';
-import '../model/image_model.dart';
+import '../api/meal_api_service.dart';
+import '../api/image_api_service.dart';
 
 enum _AnalysisStep { capture, analyzingImage, reviewFoods, nutrientAnalysis }
 
@@ -34,9 +36,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   _AnalysisStep _currentStep = _AnalysisStep.capture;
   final List<String> _foodItems = [];
   File? _selectedImage;
-  bool _seededReviewData = false;
-  String? _uploadedImageDocId; // 업로드된 이미지의 Firestore 문서 ID
   String? _uploadedImageUrl; // 업로드된 이미지의 Firebase Storage URL
+  int? _savedImageId; // Django DB에 저장된 이미지 ID
 
   @override
   void dispose() {
@@ -44,7 +45,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     super.dispose();
   }
 
-  // TODO: [AI] [DB] 사진 선택 및 AI 이미지 분석
+  // [AI] [DB] 사진 선택 및 AI 이미지 분석
   Future<void> _handleImageSelection(ImageSource source) async {
     try {
       final picked = await _picker.pickImage(source: source);
@@ -56,10 +57,9 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         _currentStep = _AnalysisStep.analyzingImage;
       });
 
-      // Firebase Storage에 이미지 업로드 및 Firestore에 메타데이터 저장
+      // Firebase Storage에 이미지 업로드
       try {
         final storageService = StorageService();
-        final imageRepository = ImageRepository();
 
         // 1. Firebase Storage에 이미지 업로드
         final imageUrl = await storageService.uploadImage(
@@ -67,35 +67,120 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           folder: 'meal_images',
         );
 
-        // 2. Firestore에 이미지 정보 저장
-        final docId = await imageRepository.saveImageWithUrl(
-          imageUrl: imageUrl,
-          imageType: ImageType.meal,
-          source: ImageSourceType.mealForm,
-        );
-
         setState(() {
-          _uploadedImageDocId = docId;
-          _uploadedImageUrl = imageUrl; // 이미지 URL 저장
+          _uploadedImageUrl = imageUrl;
         });
 
-        // TODO: [AI] 실제 AI 서버에 이미지 분석 요청
-        // await _analyzeImageWithAI(imageFile, docId);
+        // 2. Django DB에 이미지 정보 저장하여 image_id 얻기
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          try {
+            final imageApiService = ImageApiService.instance;
+            final imageData = await imageApiService.saveImage(
+              memberId: user.uid,
+              imageUrl: imageUrl,
+              imageType: 'meal',
+              source: 'meal_form',
+            );
+            // image_id 저장 (나중에 meal 저장 시 사용)
+            _savedImageId = imageData['id'] as int?;
+            debugPrint('✅ [AnalysisScreen] 이미지 DB 저장 완료: image_id=$_savedImageId');
+          } catch (e) {
+            debugPrint('⚠️ [AnalysisScreen] 이미지 DB 저장 실패: $e');
+            // 이미지 DB 저장 실패해도 계속 진행
+          }
+
+          // 3. YOLO로 이미지 분석
+          await _analyzeImageWithYOLO(imageFile, user.uid);
+        } else {
+          throw Exception('로그인이 필요합니다');
+        }
       } catch (uploadError) {
-        // 업로드 실패해도 이미지 분석은 진행
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('이미지 업로드 중 오류가 발생했습니다: $uploadError')),
+            SnackBar(content: Text('이미지 처리 중 오류: $uploadError')),
           );
+          setState(() {
+            _currentStep = _AnalysisStep.capture;
+          });
         }
       }
-
-      _simulateImageAnalysis();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('이미지를 불러오지 못했습니다: $e')),
       );
+      setState(() {
+        _currentStep = _AnalysisStep.capture;
+      });
+    }
+  }
+
+  // YOLO로 이미지 분석
+  Future<void> _analyzeImageWithYOLO(File imageFile, String memberId) async {
+    try {
+      debugPrint('🔄 [AnalysisScreen] YOLO 이미지 분석 시작');
+      debugPrint('   이미지 경로: ${imageFile.path}');
+      debugPrint('   이미지 존재: ${await imageFile.exists()}');
+
+      final mealApiService = MealApiService.instance;
+      final result = await mealApiService.analyzeMealImage(
+        imageFile: imageFile,
+        memberId: memberId,
+      );
+
+      debugPrint('📥 [AnalysisScreen] 분석 결과: $result');
+
+      if (mounted) {
+        if (result['success'] == true) {
+          final foods = result['foods'] as List;
+          debugPrint('✅ [AnalysisScreen] 분석 성공: ${foods.length}개 음식 탐지');
+
+          setState(() {
+            _currentStep = _AnalysisStep.reviewFoods;
+            _foodItems.clear();
+            if (foods.isNotEmpty) {
+              _foodItems.addAll(
+                foods.map((f) => f['name'] as String).toList(),
+              );
+            }
+          });
+        } else {
+          // YOLO 분석 실패해도 사용자가 수동으로 음식을 입력할 수 있도록 reviewFoods 단계로 진행
+          final errorMsg = result['error'] as String? ?? '알 수 없는 오류';
+          debugPrint('⚠️ [AnalysisScreen] 분석 실패: $errorMsg');
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('이미지 분석에 실패했습니다: $errorMsg\n음식을 수동으로 입력해주세요.'),
+                duration: const Duration(seconds: 5),
+              ),
+            );
+            setState(() {
+              _currentStep = _AnalysisStep.reviewFoods;
+              // 기존 음식 리스트는 유지 (사용자가 수동으로 추가 가능)
+            });
+          }
+        }
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ [AnalysisScreen] 이미지 분석 중 예외 발생: $e');
+      debugPrint('   스택 트레이스: $stackTrace');
+
+      // YOLO 분석 실패해도 사용자가 수동으로 음식을 입력할 수 있도록 reviewFoods 단계로 진행
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('이미지 분석에 실패했습니다. 음식을 수동으로 입력해주세요.'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        setState(() {
+          _currentStep = _AnalysisStep.reviewFoods;
+          // 기존 음식 리스트는 유지 (사용자가 수동으로 추가 가능)
+        });
+      }
     }
   }
 
@@ -125,21 +210,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   //     );
   //   }
   // }
-
-  void _simulateImageAnalysis() {
-    Future.delayed(const Duration(seconds: 3), () {
-      if (!mounted) return;
-      setState(() {
-        _currentStep = _AnalysisStep.reviewFoods;
-        if (!_seededReviewData) {
-          _foodItems
-            ..clear()
-            ..addAll(['김치찌개', '현미밥', '녹두전']);
-          _seededReviewData = true;
-        }
-      });
-    });
-  }
 
   void _handleAddFood() {
     final text = _foodController.text.trim();
@@ -185,38 +255,74 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     }
   }
 
-  // TODO: [AI] [DB] 영양소 분석 및 데이터베이스 저장
-  void _startNutrientAnalysis() {
+  // [AI] [DB] 영양소 분석 및 데이터베이스 저장
+  Future<void> _startNutrientAnalysis() async {
     setState(() {
       _currentStep = _AnalysisStep.nutrientAnalysis;
     });
 
-    // TODO: [AI] 실제 AI 서버에 영양소 분석 요청
-    // _analyzeNutrientsAndSave();
-
-    // 분석 완료 후 ingredient_info 업데이트 (나중에 AI 분석 결과를 여기에 저장)
-    Future.delayed(const Duration(seconds: 3), () async {
-      if (!mounted) return;
-
-      // TODO: [AI] AI 분석 결과가 나오면 _uploadedImageDocId를 사용하여
-      // ImageRepository.updateIngredientInfo()로 ingredient_info 업데이트
-      // 예: await ImageRepository().updateIngredientInfo(_uploadedImageDocId!, jsonResult);
-
-      // 분석 완료 콜백 호출 (이미지 URL과 메뉴 텍스트 전달)
-      if (widget.onAnalysisComplete != null && _uploadedImageUrl != null) {
-        widget.onAnalysisComplete!({
-          'imageUrl': _uploadedImageUrl,
-          'menuText': _foodItems.join(', '),
-          'mealType': widget.mealType ?? '',
-          'selectedDate': widget.selectedDate ?? DateTime.now(),
-        });
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('로그인이 필요합니다');
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('분석이 완료되었습니다. 리포트로 돌아갑니다.')),
+      // 1. 이미지 ID 가져오기 (이미 저장된 경우)
+      final imageId = _savedImageId;
+
+      // 2. 식사 타입 및 날짜 설정
+      final mealTime = widget.mealType ?? '중식';
+      final mealDate = widget.selectedDate ?? DateTime.now();
+      final mealDateStr = DateFormat('yyyy-MM-dd').format(mealDate);
+
+      // 3. YOLO 분석 결과를 음식 리스트로 변환
+      final foods = _foodItems
+          .map(
+            (name) => {
+              'name': name,
+              'confidence': 0.9, // YOLO 분석에서 가져온 값 사용 가능
+            },
+          )
+          .toList();
+
+      // 4. 식사 기록 저장 (영양소 분석 포함)
+      final mealApiService = MealApiService.instance;
+      final result = await mealApiService.saveMeal(
+        memberId: user.uid,
+        mealTime: mealTime,
+        mealDate: mealDateStr,
+        imageId: imageId,
+        memo: _foodItems.join(', '),
+        foods: foods,
       );
-      Navigator.pop(context);
-    });
+
+      if (mounted) {
+        // 분석 완료 콜백 호출
+        if (widget.onAnalysisComplete != null) {
+          widget.onAnalysisComplete!({
+            'imageUrl': _uploadedImageUrl,
+            'menuText': _foodItems.join(', '),
+            'mealType': mealTime,
+            'selectedDate': mealDate,
+            'total_nutrition': result['total_nutrition'],
+          });
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('분석이 완료되었습니다. 리포트로 돌아갑니다.')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('분석 중 오류가 발생했습니다: $e')),
+        );
+        setState(() {
+          _currentStep = _AnalysisStep.reviewFoods;
+        });
+      }
+    }
   }
 
   // TODO: [AI] [DB] 영양소 분석 및 저장 함수 구현
@@ -286,7 +392,11 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               if (_currentStep != _AnalysisStep.nutrientAnalysis) _buildFoodList(),
               const SizedBox(height: 24),
               Bounceable(
-                onTap: () {},
+                onTap: () {
+                  if (_currentStep == _AnalysisStep.reviewFoods) {
+                    _startNutrientAnalysis();
+                  }
+                },
                 child: _buildActionButton(),
               ),
             ],

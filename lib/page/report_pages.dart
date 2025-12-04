@@ -7,6 +7,7 @@ import '../widget/bottom_bar_widget.dart';
 import '../theme/color_palette.dart';
 import '../api/ai_recipe_api.dart';
 import '../api/member_api_service.dart';
+import '../api/meal_api_service.dart';
 import 'recipe_pages.dart';
 import 'analysis_pages.dart';
 import '../model/nutrient_type.dart';
@@ -17,20 +18,14 @@ class MealRecord {
   final String? imagePath;
   final String? menuText;
   final bool hasRecord;
-  // TODO: [AI] AI 분석 결과 필드 추가 필요
-  // final Map<String, dynamic>? analysisResult; // AI 분석 결과 (칼로리, 영양소 등)
-  // final DateTime? recordedAt; // 기록 시간
-  // final String? analysisId; // 분석 ID (서버에서 반환)
+  final List<String>? foods; // 분석된 음식 목록
 
   MealRecord({
     required this.mealType,
     this.imagePath,
     this.menuText,
     required this.hasRecord,
-    // TODO: [AI] 분석 결과 필드 추가
-    // this.analysisResult,
-    // this.recordedAt,
-    // this.analysisId,
+    this.foods, // 분석된 음식 목록
   });
 }
 
@@ -142,28 +137,70 @@ class _ReportScreenState extends State<ReportScreen> {
   // TODO: [AI] AI가 추천하는 음식은 AI 서버에서 가져오기
   final String _recommendedFood = '닭가슴살 샐러드';
 
-  // TODO: [DB] 식사 기록 데이터는 데이터베이스에서 조회
-  // 식사 기록 데이터
-  final List<MealRecord> _mealRecords = [
-    MealRecord(
-      mealType: '아침',
-      imagePath: 'assets/image/sample_food.png',
-      menuText: '김치찌개, 현미밥, 녹두전, 콩자반, 멸치볶음, 진미채',
-      hasRecord: true,
-    ),
-    MealRecord(
-      mealType: '점심',
-      hasRecord: false,
-    ),
-    MealRecord(
-      mealType: '간식',
-      hasRecord: false,
-    ),
-    MealRecord(
-      mealType: '저녁',
-      hasRecord: false,
-    ),
+  // 식사 기록 데이터 (DB에서 불러옴)
+  List<MealRecord> _mealRecords = [
+    MealRecord(mealType: '아침', hasRecord: false),
+    MealRecord(mealType: '점심', hasRecord: false),
+    MealRecord(mealType: '간식', hasRecord: false),
+    MealRecord(mealType: '저녁', hasRecord: false),
   ];
+
+  /// DB에서 식사 기록 불러오기
+  Future<void> _loadMealRecords(String memberId, String date) async {
+    try {
+      final mealApiService = MealApiService.instance;
+      final result = await mealApiService.getMeals(
+        memberId: memberId,
+        date: date,
+      );
+
+      if (result['success'] == true) {
+        final meals = result['meals'] as List;
+
+        // 식사 타입별로 초기화
+        final mealMap = <String, MealRecord>{
+          '아침': MealRecord(mealType: '아침', hasRecord: false),
+          '점심': MealRecord(mealType: '점심', hasRecord: false),
+          '간식': MealRecord(mealType: '간식', hasRecord: false),
+          '저녁': MealRecord(mealType: '저녁', hasRecord: false),
+        };
+
+        // DB에서 불러온 meals로 업데이트
+        for (final mealData in meals) {
+          final mealTime = mealData['meal_time'] as String;
+          final memo = mealData['memo'] as String? ?? '';
+          final imageUrl = mealData['image_url'] as String?;
+          final foods = mealData['foods'] as List? ?? [];
+
+          // foods를 List<String>으로 변환
+          final foodsList = foods.map((f) => f.toString()).toList();
+
+          mealMap[mealTime] = MealRecord(
+            mealType: mealTime,
+            imagePath: imageUrl,
+            menuText: foodsList.isNotEmpty ? foodsList.join(', ') : (memo.isNotEmpty ? memo : null),
+            hasRecord: true,
+            foods: foodsList.isNotEmpty ? foodsList : null, // 분석된 음식 목록
+          );
+        }
+
+        if (mounted) {
+          setState(() {
+            _mealRecords = [
+              mealMap['아침']!,
+              mealMap['점심']!,
+              mealMap['간식']!,
+              mealMap['저녁']!,
+            ];
+          });
+          debugPrint('✅ [ReportScreen] 식사 기록 로드 완료: ${meals.length}개');
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [ReportScreen] 식사 기록 로드 실패: $e');
+      // 에러 발생 시 기본값 유지
+    }
+  }
 
   /// 임신 분기 계산 (1-13: 1분기, 14-27: 2분기, 28-40: 3분기)
   int _calculateTrimester(int pregnancyWeek) {
@@ -408,12 +445,95 @@ class _ReportScreenState extends State<ReportScreen> {
 
   /// 선택된 날짜에 대한 일별 영양소 데이터를 다시 로드합니다.
   ///
-  /// 현재는 더미 데이터를 사용하지만, 나중에 API 연동 시
-  /// userRepository.fetchDailyNutrients()를 통해 서버에서 데이터를 가져옵니다.
+  /// DB에서 선택된 날짜의 식사 기록 및 영양소 데이터를 불러옵니다.
   Future<void> _reloadDailyNutrientsForSelectedDate() async {
-    // TODO: [SERVER][DB] 실제 API 연동 시 userRepository를 통해 데이터 가져오기
-    // 지금은 더미 데이터로 대체
-    _todayStatus = createDummyTodayStatus();
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        debugPrint('⚠️ [ReportScreen] 사용자 로그인 정보가 없습니다.');
+        _todayStatus = createDummyTodayStatus();
+        _buildNutrientSlotsFromStatus();
+        setState(() {
+          _hasNutrientData = true;
+        });
+        return;
+      }
+
+      // 선택된 날짜를 YYYY-MM-DD 형식으로 변환
+      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+
+      // DB에서 해당 날짜의 영양소 데이터 가져오기
+      final mealApiService = MealApiService.instance;
+      final dailyNutrition = await mealApiService.getDailyNutrition(
+        memberId: user.uid,
+        date: dateStr,
+      );
+
+      if (dailyNutrition['success'] == true) {
+        final totalNutrition = dailyNutrition['total_nutrition'] as Map<String, dynamic>;
+
+        // DB에서 가져온 섭취량을 NutrientType Map으로 변환
+        final consumed = <NutrientType, double>{
+          NutrientType.energy: (totalNutrition['calories'] as num?)?.toDouble() ?? 0.0,
+          NutrientType.carb: (totalNutrition['carbs'] as num?)?.toDouble() ?? 0.0,
+          NutrientType.protein: (totalNutrition['protein'] as num?)?.toDouble() ?? 0.0,
+          NutrientType.fat: (totalNutrition['fat'] as num?)?.toDouble() ?? 0.0,
+          NutrientType.sodium: (totalNutrition['sodium'] as num?)?.toDouble() ?? 0.0,
+          NutrientType.iron: (totalNutrition['iron'] as num?)?.toDouble() ?? 0.0,
+          NutrientType.folate: (totalNutrition['folate'] as num?)?.toDouble() ?? 0.0,
+          NutrientType.calcium: (totalNutrition['calcium'] as num?)?.toDouble() ?? 0.0,
+          NutrientType.vitaminD: (totalNutrition['vitamin_d'] as num?)?.toDouble() ?? 0.0,
+          NutrientType.omega3: (totalNutrition['omega3'] as num?)?.toDouble() ?? 0.0,
+        };
+
+        // 권장량은 _nutritionTargets에서 가져오기 (없으면 기본값 사용)
+        final recommended = <NutrientType, double>{};
+        if (_nutritionTargets != null) {
+          recommended[NutrientType.energy] = _nutritionTargets!['calories'] ?? 2200.0;
+          recommended[NutrientType.carb] = _nutritionTargets!['carbs'] ?? 260.0;
+          recommended[NutrientType.protein] = _nutritionTargets!['protein'] ?? 70.0;
+          recommended[NutrientType.fat] = _nutritionTargets!['fat'] ?? 70.0;
+          recommended[NutrientType.sodium] = _nutritionTargets!['sodium'] ?? 2000.0;
+          recommended[NutrientType.iron] = _nutritionTargets!['iron'] ?? 27.0;
+          recommended[NutrientType.folate] = _nutritionTargets!['folate'] ?? 600.0;
+          recommended[NutrientType.calcium] = _nutritionTargets!['calcium'] ?? 1000.0;
+          recommended[NutrientType.vitaminD] = _nutritionTargets!['vitamin_d'] ?? 15.0;
+          recommended[NutrientType.omega3] = _nutritionTargets!['omega3'] ?? 300.0;
+        } else {
+          // 권장량이 없으면 기본값 사용
+          final defaultRec = defaultMidPregnancyConfig.perDay;
+          recommended.addAll(defaultRec);
+        }
+
+        // DailyNutrientStatus 객체 생성
+        _todayStatus = DailyNutrientStatus(
+          consumed: consumed,
+          recommended: recommended,
+        );
+
+        // 홈 화면에서 사용할 칼로리 업데이트
+        _currentCalorie = consumed[NutrientType.energy] ?? 0.0;
+
+        debugPrint('✅ [ReportScreen] DB에서 영양소 데이터 로드 완료: ${consumed[NutrientType.energy]} kcal');
+
+        // 식사 기록 목록도 함께 불러오기
+        await _loadMealRecords(user.uid, dateStr);
+      } else {
+        // 데이터가 없으면 더미 데이터 사용
+        _todayStatus = createDummyTodayStatus();
+        debugPrint('⚠️ [ReportScreen] 해당 날짜에 식사 기록이 없습니다.');
+
+        // 식사 기록도 초기화
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          await _loadMealRecords(user.uid, dateStr);
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [ReportScreen] 영양소 데이터 로드 실패: $e');
+      // 에러 발생 시 더미 데이터 사용
+      _todayStatus = createDummyTodayStatus();
+    }
 
     // _nutritionTargets가 로드되었는지 확인
     if (_nutritionTargets == null || _nutritionTargets!.isEmpty) {
@@ -654,8 +774,10 @@ class _ReportScreenState extends State<ReportScreen> {
         builder: (context) => AnalysisScreen(
           mealType: mealType,
           selectedDate: _selectedWeekDate,
-          onAnalysisComplete: (Map<String, dynamic> result) {
+          onAnalysisComplete: (Map<String, dynamic> result) async {
             // AnalysisScreen에서 분석 완료 후 콜백
+            // DB에서 최신 영양소 데이터 다시 불러오기
+            await _reloadDailyNutrientsForSelectedDate();
             // result: { imageUrl, menuText, mealType, selectedDate }
             final imageUrl = result['imageUrl'] as String?;
             final menuText = result['menuText'] as String?;
@@ -665,11 +787,15 @@ class _ReportScreenState extends State<ReportScreen> {
             setState(() {
               final index = _mealRecords.indexWhere((m) => m.mealType == resultMealType);
               if (index != -1) {
+                // foods는 result에서 가져오거나 menuText에서 파싱
+                final foodsList = result['foods'] as List<String>? ?? (menuText != null ? menuText.split(', ') : null);
+
                 _mealRecords[index] = MealRecord(
                   mealType: resultMealType,
                   imagePath: imageUrl, // Firebase Storage URL 또는 로컬 경로
                   menuText: menuText,
                   hasRecord: true,
+                  foods: foodsList,
                 );
               }
             });
@@ -1160,9 +1286,35 @@ class _ReportScreenState extends State<ReportScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // TODO: [AI] AI가 분석한 음식 목록 표시
-                    // meal.analysisResult?.foods를 파싱하여 표시
-                    if (meal.hasRecord && meal.menuText != null)
+                    // 분석된 음식 목록 표시 (사진 옆에)
+                    if (meal.hasRecord && meal.foods != null && meal.foods!.isNotEmpty)
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: meal.foods!.map((food) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: ColorPalette.primary100.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: ColorPalette.primary100.withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              food,
+                              style: const TextStyle(
+                                color: Color(0xFF1D1B20),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 0.1,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      )
+                    else if (meal.hasRecord && meal.menuText != null)
                       Text(
                         meal.menuText!,
                         style: const TextStyle(

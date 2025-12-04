@@ -1,6 +1,6 @@
 import os
 import json
-from typing import Optional
+from typing import Optional, List, Dict
 
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +9,14 @@ import google.generativeai as genai
 import base64
 from PIL import Image
 import io
+
+# YOLO 모듈 import
+try:
+    from yolo_detector import detect_food_objects, load_yolo_model
+    YOLO_AVAILABLE = True
+except ImportError:
+    YOLO_AVAILABLE = False
+    print("⚠️ YOLO 모듈을 불러올 수 없습니다. YOLO 기능이 비활성화됩니다.")
 
 # =========================
 # 0. GEMINI API 키 설정
@@ -115,6 +123,17 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     message: str
+
+
+class AnalyzeNutritionRequest(BaseModel):
+    image_base64: str  # base64 인코딩된 이미지
+
+
+class AnalyzeNutritionResponse(BaseModel):
+    success: bool
+    foods: List[Dict[str, any]]  # [{"name": "apple", "confidence": 0.9}, ...]
+    count: int
+    error: Optional[str] = None
 
 
 # =========================
@@ -252,6 +271,119 @@ async def chat(req: ChatRequest):
     except json.JSONDecodeError:
         # JSON이 아니면 그대로 텍스트로 반환
         return ChatResponse(message=raw)
+
+
+@app.post("/api/analyze-nutrition", response_model=AnalyzeNutritionResponse)
+async def analyze_nutrition(req: AnalyzeNutritionRequest):
+    """
+    YOLO를 사용하여 이미지에서 음식 객체 탐지
+    반환: 음식 리스트 (JSON 형식)
+    """
+    if not YOLO_AVAILABLE:
+        print("⚠️ YOLO 모듈을 사용할 수 없습니다.")
+        return AnalyzeNutritionResponse(
+            success=False,
+            foods=[],
+            count=0,
+            error="YOLO 모듈을 사용할 수 없습니다."
+        )
+    
+    try:
+        print(f"🔄 YOLO 분석 시작 (이미지 크기: {len(req.image_base64)} bytes)")
+        
+        # YOLO로 음식 객체 탐지 (여러 모델 버전 시도)
+        result = None
+        model_versions = ["v3-spp", "v3", "v8"]
+        
+        for model_version in model_versions:
+            try:
+                print(f"   {model_version} 모델로 시도 중...")
+                result = detect_food_objects(
+                    image_base64=req.image_base64,
+                    model_version=model_version,
+                    confidence_threshold=0.25  # 더 낮은 임계값으로 더 많은 음식 탐지
+                )
+                
+                if result.get("success"):
+                    print(f"✅ {model_version} 모델로 탐지 성공!")
+                    break
+                else:
+                    print(f"   ⚠️ {model_version} 모델 탐지 실패: {result.get('error')}")
+            except Exception as e:
+                print(f"   ⚠️ {model_version} 모델 오류: {e}")
+                continue
+        
+        if result is None or not result.get("success"):
+            error_msg = result.get("error", "YOLO 탐지 실패") if result else "모든 YOLO 모델 로드 실패"
+            print(f"❌ YOLO 분석 실패: {error_msg}")
+            return AnalyzeNutritionResponse(
+                success=False,
+                foods=[],
+                count=0,
+                error=error_msg
+            )
+        
+        # 탐지된 객체를 음식 리스트로 변환
+        detections = result.get("detections", [])
+        foods = []
+        
+        for det in detections:
+            foods.append({
+                "name": det.get("class", ""),
+                "confidence": det.get("confidence", 0.0)
+            })
+        
+        print(f"✅ YOLO 분석 완료: {len(foods)}개 음식 탐지")
+        return AnalyzeNutritionResponse(
+            success=True,
+            foods=foods,
+            count=len(foods)
+        )
+    
+    except Exception as e:
+        print(f"❌ YOLO 분석 중 예외 발생: {e}")
+        import traceback
+        traceback.print_exc()
+        return AnalyzeNutritionResponse(
+            success=False,
+            foods=[],
+            count=0,
+            error=f"YOLO 분석 오류: {str(e)}"
+        )
+
+
+@app.on_event("startup")
+async def startup_event():
+    """서버 시작 시 YOLO 모델 미리 로드"""
+    print("🚀 AI 백엔드 서버 시작 중...")
+    if YOLO_AVAILABLE:
+        print("🔄 YOLO 모델 사전 로드 중...")
+        try:
+            # 여러 모델 버전 시도
+            model_versions = ["v3-spp", "v3", "v8"]
+            loaded = False
+            
+            for model_version in model_versions:
+                try:
+                    print(f"   {model_version} 모델 로드 시도 중...")
+                    load_yolo_model(model_version)
+                    print(f"✅ {model_version} 모델 사전 로드 완료!")
+                    loaded = True
+                    break
+                except Exception as e:
+                    print(f"   ⚠️ {model_version} 모델 로드 실패: {e}")
+                    continue
+            
+            if not loaded:
+                print("⚠️ 모든 YOLO 모델 로드 실패. 첫 요청 시 다시 시도합니다.")
+            else:
+                print("✅ YOLO 모델 사전 로드 완료!")
+        except Exception as e:
+            print(f"⚠️ YOLO 모델 사전 로드 실패: {e}")
+            print("   첫 요청 시 로드됩니다.")
+    else:
+        print("⚠️ YOLO 모듈을 사용할 수 없습니다.")
+    print("✅ AI 백엔드 서버 준비 완료!")
 
 
 if __name__ == "__main__":
