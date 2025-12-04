@@ -391,7 +391,7 @@ def get_nutrition_target(request, trimester):
         result = {
             'trimester': target.trimester,
             'calories': target.calories,
-            'carbs': float(target.carbs),  # 모델 필드명은 carb, DB 컬럼명은 carbs
+            'carb': float(target.carb),  # 모델 필드명은 carb, DB 컬럼명은 carbs
             'protein': float(target.protein),
             'fat': float(target.fat),
             'sodium': float(target.sodium),

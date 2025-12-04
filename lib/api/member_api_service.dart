@@ -118,7 +118,26 @@ class MemberApiService {
     return body;
   }
 
-  /// 5) 일별 영양소 데이터 조회 API
+  /// 5) 임신 분기별 영양소 권장량 조회 API
+  /// GET {apiBaseUrl}/api/nutrition-target/{trimester}/
+  ///
+  /// [trimester] 임신 분기 (1, 2, 3)
+  /// Returns MemberNutritionTarget 데이터
+  Future<Map<String, dynamic>> getNutritionTarget(int trimester) async {
+    final url = Uri.parse('$apiBaseUrl/api/nutrition-target/$trimester/');
+
+    final res = await http.get(url);
+
+    if (res.statusCode != 200) {
+      throw Exception(
+        'getNutritionTarget 실패: ${res.statusCode} ${res.body}',
+      );
+    }
+
+    return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+  }
+
+  /// 6) 일별 영양소 데이터 조회 API
   /// GET {apiBaseUrl}/api/nutrients/daily?date=YYYY-MM-DD
   ///
   /// [date] 조회할 날짜

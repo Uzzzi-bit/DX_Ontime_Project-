@@ -2,9 +2,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../widget/bottom_bar_widget.dart';
 import '../theme/color_palette.dart';
 import '../api/ai_recipe_api.dart';
+import '../api/member_api_service.dart';
 import 'recipe_pages.dart';
 import 'analysis_pages.dart';
 import '../model/nutrient_type.dart';
@@ -34,15 +36,17 @@ class MealRecord {
 
 class NutrientSlot {
   final String name;
-  final double current; // 현재 섭취량 (mg)
-  final double target; // 목표 섭취량 (mg)
+  final double current; // 현재 섭취량
+  final double target; // 목표 섭취량
   final double percent; // 퍼센트
+  final String unit; // 단위
 
   NutrientSlot({
     required this.name,
     required this.current,
     required this.target,
     required this.percent,
+    required this.unit,
   });
 }
 
@@ -61,7 +65,8 @@ class ReportScreen extends StatefulWidget {
 class _ReportScreenState extends State<ReportScreen> {
   // TODO: [SERVER] 사용자 정보는 서버에서 가져오기
   // TODO: [DB] 사용자 이름은 데이터베이스에서 조회
-  final String _userName = '김레제';
+  String _userName = '사용자';
+  int? _pregnancyWeek;
 
   late DateTime _selectedDate;
   late DateTime _selectedWeekDate; // 주간 달력에서 선택된 날짜
@@ -72,6 +77,7 @@ class _ReportScreenState extends State<ReportScreen> {
   late DailyNutrientStatus _todayStatus;
   late List<NutrientSlot> _nutrientSlots;
   bool _hasNutrientData = true; // 기존 필드는 그대로 사용하되, 이제 실제 상태에 맞게 바꾸도록 준비
+  Map<String, double>? _nutritionTargets; // API에서 가져온 영양소 권장량
 
   // AI 추천 레시피 관련 상태 변수
   String? _bannerMessageFromAi; // AI가 보내준 배너 문장
@@ -88,7 +94,10 @@ class _ReportScreenState extends State<ReportScreen> {
 
     // TODO: [SERVER][DB] 나중에 API 연동으로 교체
     _todayStatus = createDummyTodayStatus();
-    _buildNutrientSlotsFromStatus();
+    // _buildNutrientSlotsFromStatus()는 _loadUserInfoAndNutritionTargets() 완료 후 호출됨
+
+    // 사용자 정보 및 영양소 권장량 로드
+    _loadUserInfoAndNutritionTargets();
 
     // 화면 초기 로드 시 AI 추천 레시피 호출
     _reloadDailyNutrientsForSelectedDate();
@@ -136,50 +145,234 @@ class _ReportScreenState extends State<ReportScreen> {
     ),
   ];
 
+  /// 임신 분기 계산 (1-13: 1분기, 14-27: 2분기, 28-40: 3분기)
+  int _calculateTrimester(int pregnancyWeek) {
+    if (pregnancyWeek >= 1 && pregnancyWeek <= 13) {
+      return 1;
+    } else if (pregnancyWeek >= 14 && pregnancyWeek <= 27) {
+      return 2;
+    } else if (pregnancyWeek >= 28 && pregnancyWeek <= 40) {
+      return 3;
+    }
+    return 1; // 기본값
+  }
+
+  /// 사용자 정보 및 영양소 권장량 로드
+  Future<void> _loadUserInfoAndNutritionTargets() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      // 사용자 건강 정보 가져오기
+      try {
+        final healthInfo = await MemberApiService.instance.getHealthInfo(user.uid);
+        _userName = healthInfo['nickname'] as String? ?? '사용자';
+
+        // preg_week를 직접 사용 (DB에서 가져온 값)
+        _pregnancyWeek = healthInfo['pregWeek'] as int? ?? healthInfo['pregnancy_week'] as int?;
+      } catch (e) {
+        debugPrint('⚠️ [ReportScreen] 건강 정보 로드 실패: $e');
+      }
+
+      // 임신 주차가 있으면 영양소 권장량 가져오기
+      if (_pregnancyWeek != null) {
+        final trimester = _calculateTrimester(_pregnancyWeek!);
+        try {
+          final nutritionTarget = await MemberApiService.instance.getNutritionTarget(trimester);
+          _nutritionTargets = Map<String, double>.from(
+            nutritionTarget.map((key, value) => MapEntry(key, (value as num).toDouble())),
+          );
+          debugPrint(
+            '✅ [ReportScreen] 영양소 권장량 로드 완료: trimester=$trimester, targets=${_nutritionTargets?.keys.toList()}',
+          );
+
+          // 영양소 슬롯 빌드 (권장량이 로드된 후)
+          _buildNutrientSlotsFromStatus();
+          debugPrint('✅ [ReportScreen] 영양소 슬롯 개수: ${_nutrientSlots.length}');
+
+          if (mounted) {
+            setState(() {});
+          }
+        } catch (e) {
+          debugPrint('⚠️ [ReportScreen] 영양소 권장량 로드 실패: $e');
+          // 권장량 로드 실패 시에도 빈 슬롯 리스트로 초기화
+          _nutrientSlots = [];
+          if (mounted) {
+            setState(() {});
+          }
+        }
+      } else {
+        // 임신 주차가 없으면 빈 슬롯 리스트
+        debugPrint('⚠️ [ReportScreen] 임신 주차 정보가 없어 영양소 권장량을 가져올 수 없습니다.');
+        _nutrientSlots = [];
+        if (mounted) {
+          setState(() {});
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [ReportScreen] 사용자 정보 로드 실패: $e');
+    }
+  }
+
   /// DailyNutrientStatus로부터 NutrientSlot 리스트를 생성합니다.
   void _buildNutrientSlotsFromStatus() {
-    // 리포트 화면에 보여줄 영양소 순서
-    const displayOrder = <NutrientType>[
-      NutrientType.carb,
-      NutrientType.sodium,
-      NutrientType.protein,
-      NutrientType.fat,
-      NutrientType.calcium,
-      NutrientType.iron,
+    // MemberNutritionTarget의 모든 영양소 필드
+    final allNutrients = [
+      'carb',
+      'protein',
+      'fat',
+      'sodium',
+      'iron',
+      'folate',
+      'calcium',
+      'vitamin_d',
+      'omega3',
+      'sugar',
+      'magnesium',
+      'vitamin_a',
+      'vitamin_b12',
+      'vitamin_c',
+      'dietary_fiber',
+      'potassium',
     ];
 
-    String _nameOf(NutrientType type) {
-      switch (type) {
-        case NutrientType.carb:
+    String _nameOf(String nutrientKey) {
+      switch (nutrientKey) {
+        case 'calories':
+          return '칼로리';
+        case 'carb':
           return '탄수화물';
-        case NutrientType.sodium:
-          return '나트륨';
-        case NutrientType.protein:
+        case 'protein':
           return '단백질';
-        case NutrientType.fat:
+        case 'fat':
           return '지방';
-        case NutrientType.calcium:
-          return '칼슘';
-        case NutrientType.iron:
+        case 'sodium':
+          return '나트륨';
+        case 'iron':
           return '철분';
+        case 'folate':
+          return '엽산';
+        case 'calcium':
+          return '칼슘';
+        case 'vitamin_d':
+          return '비타민D';
+        case 'omega3':
+          return '오메가3';
+        case 'sugar':
+          return '당';
+        case 'magnesium':
+          return '마그네슘';
+        case 'vitamin_a':
+          return '비타민A';
+        case 'vitamin_b12':
+          return '비타민B12';
+        case 'vitamin_c':
+          return '비타민C';
+        case 'dietary_fiber':
+          return '식이섬유';
+        case 'potassium':
+          return '칼륨';
         default:
-          return type.toString();
+          return nutrientKey;
       }
     }
 
-    _nutrientSlots = displayOrder.map((type) {
-      final current = _todayStatus.consumed[type] ?? 0;
-      final target = _todayStatus.recommended[type] ?? 0;
-      final ratio = _todayStatus.getProgress(type); // 0.0~2.0
-      final percent = (ratio * 100).clamp(0, 200);
+    /// 영양소 단위 변환 함수
+    String _getUnit(String nutrientKey) {
+      switch (nutrientKey) {
+        case 'calories':
+          return 'kcal';
+        case 'carb':
+        case 'protein':
+        case 'fat':
+        case 'omega3':
+        case 'sugar':
+        case 'dietary_fiber':
+          return 'g';
+        case 'sodium':
+        case 'iron':
+        case 'calcium':
+        case 'magnesium':
+        case 'vitamin_c':
+        case 'potassium':
+          return 'mg';
+        case 'folate':
+        case 'vitamin_d':
+        case 'vitamin_a':
+        case 'vitamin_b12':
+          return 'μg';
+        default:
+          return '';
+      }
+    }
 
-      return NutrientSlot(
-        name: _nameOf(type),
-        current: current,
-        target: target,
-        percent: percent.toDouble(),
-      );
-    }).toList();
+    _nutrientSlots = allNutrients
+        .map((nutrientKey) {
+          // 권장량은 PostgreSQL DB에서 조회한 값만 사용 (필수)
+          double target = 0;
+          if (_nutritionTargets != null && _nutritionTargets!.containsKey(nutrientKey)) {
+            target = _nutritionTargets![nutrientKey] ?? 0;
+          }
+
+          // 현재 섭취량은 DailyNutrientStatus에서 가져오기 (없으면 0)
+          double current = 0;
+          NutrientType? type;
+          switch (nutrientKey) {
+            case 'carb':
+              type = NutrientType.carb;
+              break;
+            case 'protein':
+              type = NutrientType.protein;
+              break;
+            case 'fat':
+              type = NutrientType.fat;
+              break;
+            case 'sodium':
+              type = NutrientType.sodium;
+              break;
+            case 'iron':
+              type = NutrientType.iron;
+              break;
+            case 'folate':
+              type = NutrientType.folate;
+              break;
+            case 'calcium':
+              type = NutrientType.calcium;
+              break;
+            case 'vitamin_d':
+              type = NutrientType.vitaminD;
+              break;
+            case 'omega3':
+              type = NutrientType.omega3;
+              break;
+            // DailyNutrientStatus에 없는 영양소는 current = 0으로 유지
+            case 'sugar':
+            case 'magnesium':
+            case 'vitamin_a':
+            case 'vitamin_b12':
+            case 'vitamin_c':
+            case 'dietary_fiber':
+            case 'potassium':
+              current = 0; // 아직 DailyNutrientStatus에 없으므로 0
+              break;
+          }
+          if (type != null) {
+            current = _todayStatus.consumed[type] ?? 0;
+          }
+
+          // 권장량 달성율 계산 (0~200%)
+          final percent = target > 0 ? ((current / target) * 100).clamp(0, 200) : 0;
+
+          return NutrientSlot(
+            name: _nameOf(nutrientKey),
+            current: current,
+            target: target,
+            percent: percent.toDouble(),
+            unit: _getUnit(nutrientKey),
+          );
+        })
+        .where((slot) => slot.target > 0)
+        .toList(); // target이 0보다 큰 것만 표시 (PostgreSQL DB에서 조회한 권장량이 있는 것만)
   }
 
   /// 선택된 날짜에 대한 일별 영양소 데이터를 다시 로드합니다.
@@ -199,7 +392,7 @@ class _ReportScreenState extends State<ReportScreen> {
     // 🔽 AI 추천 식단 호출 (백엔드 없어도 try/catch 때문에 앱이 깨지지 않아야 함)
     final aiResp = await fetchAiRecommendedRecipes(
       nickname: _userName,
-      week: 12, // TODO: 실제 주수로 교체
+      week: _pregnancyWeek ?? 12,
       bmi: 22.0, // TODO: 실제 BMI로 교체
       conditions: '없음', // TODO: 실제 진단/질환 정보로 교체
     );
@@ -688,6 +881,7 @@ class _ReportScreenState extends State<ReportScreen> {
                 height: 200,
                 child: GridView.builder(
                   scrollDirection: Axis.vertical,
+                  physics: const AlwaysScrollableScrollPhysics(), // 스크롤 가능하게
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 3,
                     crossAxisSpacing: 12,
@@ -698,13 +892,14 @@ class _ReportScreenState extends State<ReportScreen> {
                   itemBuilder: (context, index) {
                     final slot = _nutrientSlots[index];
                     return Container(
-                      padding: const EdgeInsets.all(10),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: ColorPalette.primary100.withOpacity(0.2),
                         border: Border.all(color: ColorPalette.primary100),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -715,18 +910,20 @@ class _ReportScreenState extends State<ReportScreen> {
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           Text(
-                            '${slot.current.toInt()}/${slot.target.toInt()}mg',
+                            '${slot.current.toInt()}${slot.unit}/${slot.target.toInt()}${slot.unit}',
                             style: const TextStyle(
                               color: ColorPalette.text100,
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          // 작은 프로그레스 바
+                          const SizedBox(height: 4),
+                          // 작은 프로그레스 바 (권장량 달성율)
                           Container(
                             height: 4,
                             decoration: BoxDecoration(
@@ -744,7 +941,7 @@ class _ReportScreenState extends State<ReportScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 2),
                           Text(
                             '${slot.percent.toInt()}%',
                             style: const TextStyle(
