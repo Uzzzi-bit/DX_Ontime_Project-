@@ -1326,10 +1326,9 @@ class _ReportScreenState extends State<ReportScreen> {
                         ),
                       )
                     else
-                      InkWell(
+                      Bounceable(
                         onTap: () => _navigateToMealRecord(meal.mealType),
                         child: Row(
-                          mainAxisSize: MainAxisSize.min,
                           children: const [
                             Icon(
                               Icons.add_circle,

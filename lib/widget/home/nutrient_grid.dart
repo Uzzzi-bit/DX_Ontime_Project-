@@ -151,7 +151,7 @@ class NutrientGrid extends StatelessWidget {
 
         // 2. 게이지 바 - 고정 너비로 설정하여 6개 모두 같은 길이 보장
         SizedBox(
-          width: maxGaugeWidth, // 모든 게이지 바가 동일한 최대 너비 사용
+          width: ResponsiveHelper.width(context, 0.15), // 모든 게이지 바가 동일한 최대 너비 사용
           height: ResponsiveHelper.height(context, 0.030), // 높이 축소 (0.038 -> 0.030)
           child: ClipRRect(
             borderRadius: BorderRadius.circular(ResponsiveHelper.height(context, 0.025)), // 둥근 모서리 축소

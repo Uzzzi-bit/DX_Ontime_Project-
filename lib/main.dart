@@ -23,6 +23,7 @@ import 'page/setting_pages.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
   // ✅ 한국어 날짜/요일 로케일 초기화 (여기가 추가된 부분)
   await initializeDateFormatting('ko_KR', null);
