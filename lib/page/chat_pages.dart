@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -44,6 +45,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _textFieldFocusNode = FocusNode();
   final List<ChatMessage> _messages = [];
   final ImagePicker _imagePicker = ImagePicker();
   bool _isLoading = false;
@@ -216,14 +218,58 @@ class _ChatScreenState extends State<ChatScreen> {
 
       debugPrint('🔄 [ChatScreen] 오늘 날짜 메시지 ${todayMessages.length}개 필터링됨');
 
+      // 이미지가 있는 메시지의 image_pk 수집
+      final imagePks = todayMessages
+          .where((msg) => msg['image_pk'] != null)
+          .map((msg) => msg['image_pk'] as int)
+          .toSet()
+          .toList();
+
+      // 이미지 URL 맵 생성 (image_pk -> image_url)
+      Map<int, String> imageUrlMap = {};
+      if (imagePks.isNotEmpty && _currentMemberId != null) {
+        try {
+          // 사용자의 모든 채팅 이미지 가져오기
+          final images = await ImageApiService.instance.getImages(
+            memberId: _currentMemberId!,
+            imageType: 'chat',
+          );
+
+          // image_pk로 필터링하여 URL 맵 생성
+          for (final img in images) {
+            final imgId = img['id'] as int? ?? img['image_id'] as int?;
+            final imgUrl = img['image_url'] as String?;
+            if (imgId != null && imgUrl != null && imagePks.contains(imgId)) {
+              imageUrlMap[imgId] = imgUrl;
+            }
+          }
+          debugPrint('🖼️ [ChatScreen] 이미지 URL 맵 생성: ${imageUrlMap.length}개');
+        } catch (e) {
+          debugPrint('⚠️ [ChatScreen] 이미지 URL 로드 실패: $e');
+        }
+      }
+
       if (mounted) {
         setState(() {
           _messages.clear();
           for (final msg in todayMessages) {
+            String? imagePath;
+            final imagePk = msg['image_pk'] as int?;
+
+            if (imagePk != null && imageUrlMap.containsKey(imagePk)) {
+              imagePath = imageUrlMap[imagePk];
+              debugPrint('🖼️ [ChatScreen] 이미지 URL 매핑: image_pk=$imagePk');
+            }
+
+            // 이미지가 있는 경우 텍스트는 표시하지 않음 (이미지만 표시)
+            final content = msg['content'] as String;
+            final finalText = (imagePath != null && content == '이미지') ? '' : content;
+
             _messages.add(
               ChatMessage(
                 isUser: msg['type'] == 'user',
-                text: msg['content'] as String,
+                text: finalText,
+                imagePath: imagePath,
                 timestamp: DateTime.parse(msg['created_at'] as String),
               ),
             );
@@ -309,9 +355,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    // 키보드 포커스 해제 및 숨기기
+    _textFieldFocusNode.unfocus();
+    SystemChannels.textInput.invokeMethod('TextInput.hide');
+
     _endSession();
     _textController.dispose();
     _scrollController.dispose();
+    _textFieldFocusNode.dispose();
     super.dispose();
   }
 
@@ -368,19 +419,13 @@ class _ChatScreenState extends State<ChatScreen> {
       debugPrint('🔄 [ChatScreen] AI 요청 시작: query=$query, nickname=$_userNickname, week=$_pregnancyWeek');
 
       // Gemini API를 사용한 채팅 API 호출 (이미지 포함)
-      final result =
-          await fetchChatResponse(
-            userMessage: query,
-            nickname: _userNickname,
-            week: _pregnancyWeek,
-            conditions: _conditions,
-            imageFile: imageFile, // 이미지 파일 전달
-          ).timeout(
-            const Duration(seconds: 30),
-            onTimeout: () {
-              throw Exception('요청 시간이 초과되었습니다.');
-            },
-          );
+      final result = await fetchChatResponse(
+        userMessage: query,
+        nickname: _userNickname,
+        week: _pregnancyWeek,
+        conditions: _conditions,
+        imageFile: imageFile, // 이미지 파일 전달
+      );
 
       debugPrint(
         '✅ [ChatScreen] AI 응답 받음: ${result.message.substring(0, result.message.length > 50 ? 50 : result.message.length)}...',
@@ -401,11 +446,30 @@ class _ChatScreenState extends State<ChatScreen> {
       debugPrint('❌ [ChatScreen] AI 응답 실패: $e');
       if (!mounted) return;
 
-      // 에러 발생 시 기본 응답 표시
-      final defaultResponse = _getDefaultResponse(query);
+      // 에러 메시지를 사용자에게 표시
+      String errorMessage;
+      if (e.toString().contains('연결') || e.toString().contains('서버')) {
+        errorMessage = 'AI 서버에 연결할 수 없습니다.\n\n서버가 실행 중인지 확인해주세요.\n(에뮬레이터: http://10.0.2.2:8001)';
+      } else {
+        errorMessage = 'AI 응답을 받는 중 오류가 발생했습니다.\n\n${e.toString()}';
+      }
+
       setState(() {
-        _messages.add(ChatMessage(isUser: false, text: defaultResponse));
+        _messages.add(ChatMessage(isUser: false, text: errorMessage));
       });
+
+      // 사용자에게 스낵바로도 알림
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'AI 응답 오류: ${e.toString().substring(0, e.toString().length > 50 ? 50 : e.toString().length)}...',
+            ),
+            duration: const Duration(seconds: 5),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
       // 로딩 끝내고 스크롤 이동
       if (mounted) {
@@ -466,10 +530,10 @@ class _ChatScreenState extends State<ChatScreen> {
           // 2. Firebase 업로드 (백그라운드)
           await _uploadImage(File(image.path));
 
-          // 3. 이미지 메시지를 DB에 저장
+          // 3. 이미지 메시지를 DB에 저장 (이미지만 있으므로 content는 빈 문자열)
           await _saveMessageToDb(
             type: 'user',
-            content: '이미지',
+            content: '', // 이미지만 표시하므로 텍스트는 빈 문자열
             imagePath: image.path,
           );
 
@@ -540,6 +604,10 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
     if (_isLoading) return;
+
+    // 키보드 숨기기
+    _textFieldFocusNode.unfocus();
+    SystemChannels.textInput.invokeMethod('TextInput.hide');
 
     setState(() {
       _messages.add(ChatMessage(isUser: true, text: text));
@@ -648,6 +716,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                           child: TextField(
                             controller: _textController,
+                            focusNode: _textFieldFocusNode,
                             decoration: const InputDecoration(
                               hintText: '궁금한 음식/약을 물어보세요',
                               hintStyle: TextStyle(
@@ -664,7 +733,10 @@ class _ChatScreenState extends State<ChatScreen> {
                             ),
                             maxLines: null,
                             textInputAction: TextInputAction.send,
-                            onSubmitted: (_) => _handleSendMessage(),
+                            onSubmitted: (_) {
+                              _textFieldFocusNode.unfocus();
+                              _handleSendMessage();
+                            },
                           ),
                         ),
                       ),
@@ -729,20 +801,18 @@ class _ChatScreenState extends State<ChatScreen> {
                 constraints: const BoxConstraints(maxWidth: 200),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: Image.file(
-                    File(message.imagePath!),
-                    fit: BoxFit.cover,
-                  ),
+                  child: _buildImageWidget(message.imagePath!),
                 ),
               ),
             ],
-            if (message.text.isNotEmpty)
+            // 이미지가 있을 때는 텍스트를 표시하지 않음 (이미지만 표시)
+            if (message.text.isNotEmpty && message.imagePath == null)
               Container(
                 constraints: const BoxConstraints(maxWidth: 250),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   color: ColorPalette.bg200,
-                  borderRadius: BorderRadius.circular(message.imagePath != null ? 10 : 25),
+                  borderRadius: BorderRadius.circular(25),
                 ),
                 child: Text(
                   message.text,
@@ -759,6 +829,57 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
+  }
+
+  /// 이미지 경로가 URL인지 로컬 파일 경로인지 확인하여 적절한 위젯 반환
+  Widget _buildImageWidget(String imagePath) {
+    // URL인지 확인 (http:// 또는 https://로 시작)
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      // Firebase Storage URL인 경우
+      return Image.network(
+        imagePath,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            width: 200,
+            height: 200,
+            color: ColorPalette.bg200,
+            child: Center(
+              child: CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                    : null,
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('❌ [ChatScreen] 네트워크 이미지 로드 실패: $error');
+          return Container(
+            width: 200,
+            height: 200,
+            color: ColorPalette.bg200,
+            child: const Icon(Icons.broken_image, color: ColorPalette.text300),
+          );
+        },
+      );
+    } else {
+      // 로컬 파일 경로인 경우
+      return Image.file(
+        File(imagePath),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('❌ [ChatScreen] 로컬 이미지 로드 실패: $error');
+          return Container(
+            width: 200,
+            height: 200,
+            color: ColorPalette.bg200,
+            child: const Icon(Icons.broken_image, color: ColorPalette.text300),
+          );
+        },
+      );
+    }
   }
 
   Widget _buildAIMessage(String text, {bool isLoading = false}) {

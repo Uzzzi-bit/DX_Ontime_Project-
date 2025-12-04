@@ -342,6 +342,7 @@ class MemberNutritionTarget(models.Model):
     """
     trimester = models.IntegerField(
         db_column='trimester',
+        primary_key=True,
         help_text="임신 분기 (1, 2, 3)",
     )
     calories = models.IntegerField(
@@ -466,9 +467,8 @@ class MemberNutritionTarget(models.Model):
     )
 
     class Meta:
-        db_table = 'member_nutrition_target'
+        db_table = 'member_nutrition_targets'
         managed = True
-        unique_together = [['trimester']]
         indexes = [
             models.Index(fields=['trimester']),
         ]
