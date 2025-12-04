@@ -90,7 +90,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
   // DailyNutrientStatus 기반 영양소 데이터
   late DailyNutrientStatus _todayStatus;
-  late List<NutrientSlot> _nutrientSlots;
+  List<NutrientSlot> _nutrientSlots = []; // 빈 리스트로 초기화
   bool _hasNutrientData = true; // 기존 필드는 그대로 사용하되, 이제 실제 상태에 맞게 바꾸도록 준비
   Map<String, double>? _nutritionTargets; // API에서 가져온 영양소 권장량
 
@@ -116,11 +116,11 @@ class _ReportScreenState extends State<ReportScreen> {
     _todayStatus = createDummyTodayStatus();
     // _buildNutrientSlotsFromStatus()는 _loadUserInfoAndNutritionTargets() 완료 후 호출됨
 
-    // 사용자 정보 및 영양소 권장량 로드
-    _loadUserInfoAndNutritionTargets();
-
-    // 화면 초기 로드 시 AI 추천 레시피 호출
-    _reloadDailyNutrientsForSelectedDate();
+    // 사용자 정보 및 영양소 권장량 로드 후 AI 추천 레시피 호출
+    _loadUserInfoAndNutritionTargets().then((_) {
+      // 영양소 권장량 로드 완료 후 AI 추천 레시피 호출
+      _reloadDailyNutrientsForSelectedDate();
+    });
 
     // 홈 화면에서 식사 타입 선택 시 해당 식사 타입으로 분석 화면 이동
     if (widget.initialMealType != null) {
@@ -414,6 +414,16 @@ class _ReportScreenState extends State<ReportScreen> {
     // TODO: [SERVER][DB] 실제 API 연동 시 userRepository를 통해 데이터 가져오기
     // 지금은 더미 데이터로 대체
     _todayStatus = createDummyTodayStatus();
+
+    // _nutritionTargets가 로드되었는지 확인
+    if (_nutritionTargets == null || _nutritionTargets!.isEmpty) {
+      debugPrint('⚠️ [ReportScreen] 영양소 권장량이 아직 로드되지 않았습니다. AI 레시피 추천을 건너뜁니다.');
+      setState(() {
+        _hasNutrientData = true;
+      });
+      return;
+    }
+
     _buildNutrientSlotsFromStatus();
 
     setState(() {
@@ -421,11 +431,53 @@ class _ReportScreenState extends State<ReportScreen> {
     });
 
     // 🔽 AI 추천 식단 호출 (백엔드 없어도 try/catch 때문에 앱이 깨지지 않아야 함)
+    // _nutrientSlots에서 모든 영양소 데이터 추출하여 Map으로 변환
+    final nutrientsMap = <String, Map<String, double>>{};
+
+    // 영양소 이름(한글)을 영문 키로 매핑
+    final nutrientKeyMap = {
+      '칼로리': 'calories',
+      '탄수화물': 'carbs',
+      '단백질': 'protein',
+      '지방': 'fat',
+      '나트륨': 'sodium',
+      '철분': 'iron',
+      '엽산': 'folate',
+      '칼슘': 'calcium',
+      '비타민D': 'vitamin_d',
+      '오메가3': 'omega3',
+      '당': 'sugar',
+      '마그네슘': 'magnesium',
+      '비타민A': 'vitamin_a',
+      '비타민B12': 'vitamin_b12',
+      '비타민C': 'vitamin_c',
+      '식이섬유': 'dietary_fiber',
+      '칼륨': 'potassium',
+    };
+
+    for (final slot in _nutrientSlots) {
+      final key = nutrientKeyMap[slot.name];
+      if (key != null) {
+        nutrientsMap[key] = {
+          'current': slot.current,
+          'ratio': slot.percent,
+        };
+      }
+    }
+
+    // 디버그: 추출된 영양소 데이터 확인
+    debugPrint('✅ [ReportScreen] AI 레시피 추천 요청 - 영양소 개수: ${nutrientsMap.length}');
+    nutrientsMap.forEach((key, value) {
+      debugPrint('  - $key: current=${value['current']}, ratio=${value['ratio']}%');
+    });
+
     final aiResp = await fetchAiRecommendedRecipes(
       nickname: _userName,
       week: _pregnancyWeek ?? 12,
       bmi: 22.0, // TODO: 실제 BMI로 교체
       conditions: '없음', // TODO: 실제 진단/질환 정보로 교체
+      // report_pages.dart에서 계산된 모든 영양소 값 전달
+      nutrients: nutrientsMap,
     );
     if (!mounted) return;
     setState(() {

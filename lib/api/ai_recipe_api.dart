@@ -18,29 +18,43 @@ Future<AiRecipeResponse> fetchAiRecommendedRecipes({
   required int week,
   required double bmi,
   required String conditions,
+  // 모든 영양소 데이터를 Map으로 전달 (키: 영양소명, 값: {current: double, ratio: double})
+  Map<String, Map<String, double>>? nutrients,
 }) async {
   // ✅ gemini_config.dart의 kAiBaseUrl 사용
   final uri = Uri.parse('$kAiBaseUrl/api/recommend-recipes');
+
+  // 영양소 데이터를 JSON 형식으로 변환
+  final nutrientsData = <String, dynamic>{};
+  if (nutrients != null) {
+    nutrients.forEach((key, value) {
+      nutrientsData['today_$key'] = value['current'] ?? 0;
+      nutrientsData['today_${key}_ratio'] = value['ratio'] ?? 0;
+    });
+  }
 
   final body = jsonEncode({
     "nickname": nickname,
     "week": week,
     "bmi": bmi,
     "conditions": conditions,
-    // 지금은 영양소 더미 값 (나중에 실제로 연결)
-    "today_carbs": 0,
-    "today_carbs_ratio": 0,
-    "today_protein": 0,
-    "today_protein_ratio": 0,
-    "today_fat": 0,
-    "today_fat_ratio": 0,
-    "today_sodium": 0,
-    "today_sodium_ratio": 0,
-    "today_calcium": 0,
-    "today_calcium_ratio": 0,
-    "today_iron": 0,
-    "today_iron_ratio": 0,
+    // report_pages.dart에서 계산된 모든 영양소 값 전달
+    ...nutrientsData,
   });
+
+  // 디버그: 전송되는 데이터 확인
+  print('🔍 [AI Recipe API] 요청 데이터:');
+  print('  - nickname: $nickname');
+  print('  - week: $week');
+  print('  - bmi: $bmi');
+  print('  - conditions: $conditions');
+  print('  - nutrients: ${nutrientsData.keys.toList()}');
+  if (nutrientsData.isNotEmpty) {
+    print('  - 영양소 상세:');
+    nutrientsData.forEach((key, value) {
+      print('    $key: $value');
+    });
+  }
 
   try {
     final resp = await http.post(
