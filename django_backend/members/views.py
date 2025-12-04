@@ -367,7 +367,6 @@ def get_nutrition_target(request, trimester):
         "calcium": 1000.0,
         "vitamin_d": 15.0,
         "omega3": 300.0,
-        "choline": 450.0,
         "sugar": 50.0,
         "magnesium": 350.0,
         "vitamin_a": 770.0,
@@ -382,12 +381,17 @@ def get_nutrition_target(request, trimester):
         if trimester_int not in [1, 2, 3]:
             return JsonResponse({'error': 'trimester must be 1, 2, or 3'}, status=400)
         
+        # 디버그: 모델의 테이블 이름 확인
+        print(f'>>> [get_nutrition_targets] 테이블 이름: {MemberNutritionTarget._meta.db_table}')
+        print(f'>>> [get_nutrition_targets] trimester: {trimester_int}')
+        
         target = MemberNutritionTarget.objects.get(trimester=trimester_int)
+        print(f'>>> [get_nutrition_targets] 데이터 조회 성공: {target}')
         
         result = {
             'trimester': target.trimester,
             'calories': target.calories,
-            'carb': float(target.carb),
+            'carbs': float(target.carbs),  # 모델 필드명은 carb, DB 컬럼명은 carbs
             'protein': float(target.protein),
             'fat': float(target.fat),
             'sodium': float(target.sodium),
@@ -396,7 +400,6 @@ def get_nutrition_target(request, trimester):
             'calcium': float(target.calcium),
             'vitamin_d': float(target.vitamin_d),
             'omega3': float(target.omega3),
-            'choline': float(target.choline),
         }
         
         # 추가 영양소 필드 (null일 수 있음)

@@ -352,7 +352,7 @@ class MemberNutritionTarget(models.Model):
     carb = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        db_column='carb',
+        db_column='carbs',  # 실제 DB 컬럼명은 carbs (복수형)
         help_text="탄수화물 (g)",
     )
     protein = models.DecimalField(
@@ -402,12 +402,6 @@ class MemberNutritionTarget(models.Model):
         decimal_places=2,
         db_column='omega3',
         help_text="오메가3 (mg)",
-    )
-    choline = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        db_column='choline',
-        help_text="콜린 (mg)",
     )
     sugar = models.DecimalField(
         max_digits=10,
