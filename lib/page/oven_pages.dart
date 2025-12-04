@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
+import 'package:prototype/utils/responsive_helper.dart';
 import '../theme/color_palette.dart';
 import 'recipe_pages.dart'; // OvenSettings import를 위해
 
@@ -96,7 +97,7 @@ class _OvenScreenState extends State<OvenScreen> {
     );
   }
 
-  void _sendToOven() {
+  Future<void> _sendToOven() async {
     // [API] 실제 IoT 기기 연동 시, 이 값을 디바이스 전송 패킷으로 변환 필요
     String? temperature;
     if (widget.initialSettings != null) {
@@ -107,15 +108,127 @@ class _OvenScreenState extends State<OvenScreen> {
 
     print('오븐으로 전송: 모드=$_selectedMode, 온도=$temperature, 시간=${_minutes}분 ${_seconds}초');
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$_selectedMode 모드로 ${_minutes}분 ${_seconds}초 설정을 전송했습니다!'),
-        duration: const Duration(seconds: 2),
+    // 2초 대기
+    await Future.delayed(const Duration(seconds: 2));
+
+    // 다이얼로그 표시
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return sendToOvenDialog(context);
+      },
+    );
+  }
+
+  Widget sendToOvenDialog(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 250,
+              height: 250,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    ColorPalette.gradientGreen,
+                    ColorPalette.primary,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(2000),
+                boxShadow: [
+                  BoxShadow(
+                    color: ColorPalette.primary300.withOpacity(0.5),
+                    blurRadius: 20,
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    '전송 완료',
+                    style: TextStyle(
+                      fontSize: ResponsiveHelper.fontSize(context, 20),
+                      fontWeight: FontWeight.bold,
+                      color: ColorPalette.text100,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "오븐에서 '시작' 버튼을 누르세요.",
+                    style: TextStyle(
+                      fontSize: ResponsiveHelper.fontSize(context, 14),
+                      fontWeight: FontWeight.w500,
+                      color: ColorPalette.text100,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Bounceable(
+                  onTap: () {},
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      '전송 취소',
+                      style: TextStyle(
+                        color: ColorPalette.text200,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Bounceable(
+                  onTap: () {},
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.pop(context); // 다이얼로그 닫기
+                      Navigator.pop(context); // 오븐 페이지 닫기
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('오븐에 전송되었습니다!'),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF5BB5C8),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      '확인',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
-
-    // 페이지 닫기
-    Navigator.pop(context);
   }
 
   String _getRecipeName() {
