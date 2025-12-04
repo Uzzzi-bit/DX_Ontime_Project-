@@ -60,6 +60,21 @@ class ReportScreen extends StatefulWidget {
 
   @override
   State<ReportScreen> createState() => _ReportScreenState();
+
+  /// 홈 화면에서 사용할 영양소 비율 가져오기
+  static Map<NutrientType, double> getNutrientProgress() {
+    return _ReportScreenState._nutrientProgressMap;
+  }
+
+  /// 홈 화면에서 사용할 칼로리 목표량 가져오기
+  static double getTargetCalorie() {
+    return _ReportScreenState._targetCalorie;
+  }
+
+  /// 홈 화면에서 사용할 현재 칼로리 가져오기
+  static double getCurrentCalorie() {
+    return _ReportScreenState._currentCalorie;
+  }
 }
 
 class _ReportScreenState extends State<ReportScreen> {
@@ -78,6 +93,11 @@ class _ReportScreenState extends State<ReportScreen> {
   late List<NutrientSlot> _nutrientSlots;
   bool _hasNutrientData = true; // 기존 필드는 그대로 사용하되, 이제 실제 상태에 맞게 바꾸도록 준비
   Map<String, double>? _nutritionTargets; // API에서 가져온 영양소 권장량
+
+  // 홈 화면에서 사용할 영양소 비율 (static으로 공유)
+  static final Map<NutrientType, double> _nutrientProgressMap = {};
+  static double _targetCalorie = 2000.0;
+  static double _currentCalorie = 0.0;
 
   // AI 추천 레시피 관련 상태 변수
   String? _bannerMessageFromAi; // AI가 보내준 배너 문장
@@ -361,7 +381,12 @@ class _ReportScreenState extends State<ReportScreen> {
           }
 
           // 권장량 달성율 계산 (0~200%)
-          final percent = target > 0 ? ((current / target) * 100).clamp(0, 200) : 0;
+          final percent = target > 0 ? ((current / target) * 100).clamp(0.0, 200.0) : 0.0;
+
+          // 홈 화면에서 사용할 영양소 비율 맵 업데이트
+          if (type != null) {
+            _nutrientProgressMap[type] = percent;
+          }
 
           return NutrientSlot(
             name: _nameOf(nutrientKey),
@@ -373,6 +398,12 @@ class _ReportScreenState extends State<ReportScreen> {
         })
         .where((slot) => slot.target > 0)
         .toList(); // target이 0보다 큰 것만 표시 (PostgreSQL DB에서 조회한 권장량이 있는 것만)
+
+    // 칼로리 정보 업데이트
+    if (_nutritionTargets != null && _nutritionTargets!.containsKey('calories')) {
+      _targetCalorie = (_nutritionTargets!['calories'] as num?)?.toDouble() ?? 2000.0;
+    }
+    _currentCalorie = _todayStatus.consumed[NutrientType.energy] ?? 0.0;
   }
 
   /// 선택된 날짜에 대한 일별 영양소 데이터를 다시 로드합니다.
@@ -915,7 +946,9 @@ class _ReportScreenState extends State<ReportScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '${slot.current.toInt()}${slot.unit}/${slot.target.toInt()}${slot.unit}',
+                            slot.name == '오메가3'
+                                ? '${slot.current.toStringAsFixed(2)}${slot.unit}/${slot.target.toStringAsFixed(2)}${slot.unit}'
+                                : '${slot.current.toInt()}${slot.unit}/${slot.target.toInt()}${slot.unit}',
                             style: const TextStyle(
                               color: ColorPalette.text100,
                               fontSize: 10,

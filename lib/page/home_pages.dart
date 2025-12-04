@@ -97,6 +97,8 @@ class _HomeScreenState extends State<HomeScreen> {
           _isLoading = false;
         });
         debugPrint('홈 화면 데이터 로드 완료: _isMomCareMode=$isMomCareMode, _userData=${userData.nickname}');
+        // report_pages에서 계산된 값으로 업데이트
+        _updateNutrientProgress();
       }
     } catch (e) {
       // 에러 발생 시 기본값 사용
@@ -123,20 +125,25 @@ class _HomeScreenState extends State<HomeScreen> {
   int get _pregnancyWeek => _userData?.pregnancyWeek ?? 20;
 
   // TODO: [DB] 금일 칼로리 섭취량 및 목표량 GET
-  double _currentCalorie = 1000.0; // 임시 데이터
-  double _targetCalorie = 2000.0; // 임시 데이터
+  // report_pages.dart에서 계산된 값 사용
+  double get _currentCalorie => ReportScreen.getCurrentCalorie();
+  double get _targetCalorie => ReportScreen.getTargetCalorie();
 
   // TODO: [DB] 금일 영양소 섭취 현황 데이터 로드
   // 기본 영양소 섭취량 (0.0 ~ 100.0 퍼센트) - 리포트 페이지/음식 섭취 등으로 채워진 기본값 (영양제 제외)
-  // [테스트용] 80%, 90% 확인을 위해 일부 수치 조절
-  final Map<NutrientType, double> _baseNutrientProgress = {
-    NutrientType.iron: 70.0, // 철분 기본값
-    NutrientType.vitaminD: 80.0, // 비타민D - 테스트용 80%
-    NutrientType.folate: 90.0, // 엽산 - 테스트용 90%
-    NutrientType.omega3: 0.0, // 오메가-3 기본값
-    NutrientType.calcium: 0.0, // 칼슘 기본값
-    NutrientType.vitaminB: 0.0, // 비타민B 기본값
-  };
+  // report_pages.dart에서 계산된 비율 값을 가져와서 사용
+  Map<NutrientType, double> get _baseNutrientProgress {
+    final reportProgress = ReportScreen.getNutrientProgress();
+    // report_pages에서 계산된 값이 있으면 사용, 없으면 기본값
+    return {
+      NutrientType.iron: reportProgress[NutrientType.iron] ?? 0.0,
+      NutrientType.vitaminD: reportProgress[NutrientType.vitaminD] ?? 0.0,
+      NutrientType.folate: reportProgress[NutrientType.folate] ?? 0.0,
+      NutrientType.omega3: reportProgress[NutrientType.omega3] ?? 0.0,
+      NutrientType.calcium: reportProgress[NutrientType.calcium] ?? 0.0,
+      NutrientType.vitaminB: reportProgress[NutrientType.vitaminB] ?? 0.0,
+    };
+  }
 
   // 화면에 보여줄 실제 영양소 섭취량 (기본값 + 영양제 효과 포함)
   late Map<NutrientType, double> _nutrientProgress;
@@ -517,6 +524,15 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  /// report_pages에서 계산된 영양소 비율로 업데이트
+  void _updateNutrientProgress() {
+    setState(() {
+      _nutrientProgress = Map.from(_baseNutrientProgress);
+      // 영양제 효과 반영
+      _recalculateNutrientsWithSupplements();
+    });
   }
 
   /// 영양제 효과를 반영하여 영양소 진행도를 재계산합니다.
