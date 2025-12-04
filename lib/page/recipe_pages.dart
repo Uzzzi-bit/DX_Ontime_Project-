@@ -122,14 +122,38 @@ class _RecipeScreenState extends State<RecipeScreen> {
         return;
       }
 
-      final healthInfo = await MemberApiService.instance.getHealthInfo(user.uid);
-      debugPrint('🔍 [RecipeScreen] API 응답 전체: $healthInfo');
+      String? nickname;
 
-      // nickname 필드 확인 (다양한 가능한 필드명 체크)
-      final nickname =
-          healthInfo['nickname'] as String? ?? healthInfo['user_nickname'] as String? ?? healthInfo['name'] as String?;
+      try {
+        final healthInfo = await MemberApiService.instance.getHealthInfo(user.uid);
+        debugPrint('🔍 [RecipeScreen] API 응답 전체: $healthInfo');
 
-      debugPrint('🔍 [RecipeScreen] 추출된 닉네임: $nickname');
+        // nickname 필드 확인 (다양한 가능한 필드명 체크)
+        nickname =
+            healthInfo['nickname'] as String? ?? healthInfo['user_nickname'] as String? ?? healthInfo['name'] as String?;
+
+        debugPrint('🔍 [RecipeScreen] 추출된 닉네임: $nickname');
+      } catch (e) {
+        debugPrint('⚠️ [RecipeScreen] 건강 정보 로드 실패 (Firebase Auth 정보 사용): $e');
+        // 건강 정보가 없어도 Firebase Auth 정보로 닉네임 가져오기 시도
+      }
+
+      // 닉네임 fallback 로직: Django API → Firebase displayName → email 앞부분 → '사용자'
+      if (nickname == null || nickname.isEmpty) {
+        // Firebase Auth의 displayName 사용
+        if (user.displayName != null && user.displayName!.isNotEmpty) {
+          nickname = user.displayName;
+          debugPrint('✅ [RecipeScreen] Firebase displayName 사용: $nickname');
+        } 
+        // displayName이 없으면 email의 @ 앞부분 사용
+        else if (user.email != null && user.email!.isNotEmpty) {
+          final emailParts = user.email!.split('@');
+          if (emailParts.isNotEmpty && emailParts[0].isNotEmpty) {
+            nickname = emailParts[0];
+            debugPrint('✅ [RecipeScreen] Firebase email에서 추출: $nickname');
+          }
+        }
+      }
 
       if (mounted) {
         setState(() {
@@ -375,16 +399,35 @@ class _RecipeScreenState extends State<RecipeScreen> {
             const SizedBox(height: 16),
             // 추천 멘트
             Center(
-              child: Text(
-                _getRecommendationMessage(),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: ColorPalette.text100,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.5,
-                  height: 1.5,
-                ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // 닉네임 길이에 따라 폰트 크기 동적 조정
+                  final nameLength = _userName.length;
+                  double fontSize = 20;
+                  
+                  // 닉네임이 길면 폰트 크기 조정
+                  if (nameLength > 8) {
+                    fontSize = 18;
+                  }
+                  if (nameLength > 12) {
+                    fontSize = 16;
+                  }
+                  if (nameLength > 16) {
+                    fontSize = 14;
+                  }
+                  
+                  return Text(
+                    _getRecommendationMessage(),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: ColorPalette.text100,
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
+                      height: 1.5,
+                    ),
+                  );
+                },
               ),
             ),
             const SizedBox(height: 24),

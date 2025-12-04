@@ -48,33 +48,59 @@ class HeaderSection extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Flexible(
-                child: RichText(
-                  overflow: TextOverflow.ellipsis,
-                  text: TextSpan(
-                    style:
-                        textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 28,
-                          letterSpacing: 0.5,
-                          color: Colors.black,
-                        ) ??
-                        const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
-                          color: Colors.black,
-                        ),
-                    children: [
-                      TextSpan(text: userName),
-                      TextSpan(
-                        text: '님 홈',
-                        style: TextStyle(
-                          fontSize: 20,
-                        ),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    // 닉네임 길이에 따라 폰트 크기 동적 조정
+                    final nameLength = userName.length;
+                    double nameFontSize = 28;
+                    double suffixFontSize = 20;
+                    
+                    // 닉네임이 길면 폰트 크기 조정
+                    if (nameLength > 8) {
+                      nameFontSize = 24;
+                      suffixFontSize = 18;
+                    }
+                    if (nameLength > 12) {
+                      nameFontSize = 20;
+                      suffixFontSize = 16;
+                    }
+                    if (nameLength > 16) {
+                      nameFontSize = 18;
+                      suffixFontSize = 14;
+                    }
+                    
+                    return RichText(
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      text: TextSpan(
+                        style:
+                            textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              fontSize: nameFontSize,
+                              letterSpacing: 0.5,
+                              color: Colors.black,
+                              height: 1.2,
+                            ) ??
+                            TextStyle(
+                              fontSize: nameFontSize,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                              color: Colors.black,
+                              height: 1.2,
+                            ),
+                        children: [
+                          TextSpan(text: userName),
+                          TextSpan(
+                            text: '님 홈',
+                            style: TextStyle(
+                              fontSize: suffixFontSize,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 8),

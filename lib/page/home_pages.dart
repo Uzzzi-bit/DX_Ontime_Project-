@@ -67,7 +67,8 @@ class _HomeScreenState extends State<HomeScreen> {
         try {
           // Django API에서 사용자 건강 정보 가져오기
           final healthInfo = await MemberApiService.instance.getHealthInfo(user.uid);
-          debugPrint('🔍 [HomeScreen] API 응답 전체: $healthInfo');
+          // ignore: avoid_print
+          print('🔍 [HomeScreen] API 응답 전체: $healthInfo');
 
           // nickname 필드 확인 (다양한 가능한 필드명 체크)
           userNickname =
@@ -87,7 +88,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
           debugPrint('✅ [HomeScreen] 사용자 정보 로드: nickname=$userNickname, week=$userPregnancyWeek');
         } catch (e) {
-          debugPrint('⚠️ [HomeScreen] 건강 정보 로드 실패 (기본값 사용): $e');
+          debugPrint('⚠️ [HomeScreen] 건강 정보 로드 실패 (Firebase Auth 정보 사용): $e');
+          // 건강 정보가 없어도 Firebase Auth 정보로 닉네임 가져오기 시도
+        }
+      }
+
+      // 닉네임 fallback 로직: Django API → Firebase displayName → email 앞부분 → '사용자'
+      if (userNickname == null || userNickname.isEmpty) {
+        if (user != null) {
+          // Firebase Auth의 displayName 사용
+          if (user.displayName != null && user.displayName!.isNotEmpty) {
+            userNickname = user.displayName;
+            debugPrint('✅ [HomeScreen] Firebase displayName 사용: $userNickname');
+          }
+          // displayName이 없으면 email의 @ 앞부분 사용
+          else if (user.email != null && user.email!.isNotEmpty) {
+            final emailParts = user.email!.split('@');
+            if (emailParts.isNotEmpty && emailParts[0].isNotEmpty) {
+              userNickname = emailParts[0];
+              debugPrint('✅ [HomeScreen] Firebase email에서 추출: $userNickname');
+            }
+          }
         }
       }
 
@@ -627,38 +648,61 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      '${_userName}님',
-                      style:
-                          textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 30,
-                            color: Colors.black,
-                            letterSpacing: 0.5,
-                          ) ??
-                          const TextStyle(
-                            fontSize: 30,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black,
-                            letterSpacing: 0.5,
-                          ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      '홈',
-                      style:
-                          textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 24,
-                            color: Colors.black,
-                            letterSpacing: 0.5,
-                          ) ??
-                          const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black,
-                            letterSpacing: 0.5,
-                          ),
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          // 닉네임 길이에 따라 폰트 크기 동적 조정
+                          final nameLength = _userName.length;
+                          double nameFontSize = 30;
+                          double suffixFontSize = 24;
+
+                          // 닉네임이 길면 폰트 크기 조정
+                          if (nameLength > 8) {
+                            nameFontSize = 26;
+                            suffixFontSize = 22;
+                          }
+                          if (nameLength > 12) {
+                            nameFontSize = 22;
+                            suffixFontSize = 18;
+                          }
+                          if (nameLength > 16) {
+                            nameFontSize = 20;
+                            suffixFontSize = 16;
+                          }
+
+                          return RichText(
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            text: TextSpan(
+                              style:
+                                  textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: nameFontSize,
+                                    color: Colors.black,
+                                    letterSpacing: 0.5,
+                                    height: 1.2,
+                                  ) ??
+                                  TextStyle(
+                                    fontSize: nameFontSize,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.black,
+                                    letterSpacing: 0.5,
+                                    height: 1.2,
+                                  ),
+                              children: [
+                                TextSpan(text: '${_userName}님'),
+                                TextSpan(
+                                  text: ' 홈',
+                                  style: TextStyle(
+                                    fontSize: suffixFontSize,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ],
                 ),
