@@ -67,7 +67,16 @@ class _HomeScreenState extends State<HomeScreen> {
         try {
           // Django API에서 사용자 건강 정보 가져오기
           final healthInfo = await MemberApiService.instance.getHealthInfo(user.uid);
-          userNickname = healthInfo['nickname'] as String?;
+          debugPrint('🔍 [HomeScreen] API 응답 전체: $healthInfo');
+
+          // nickname 필드 확인 (다양한 가능한 필드명 체크)
+          userNickname =
+              healthInfo['nickname'] as String? ??
+              healthInfo['user_nickname'] as String? ??
+              healthInfo['name'] as String?;
+
+          debugPrint('🔍 [HomeScreen] 추출된 닉네임: $userNickname');
+
           userPregnancyWeek = healthInfo['pregnancy_week'] as int? ?? healthInfo['pregWeek'] as int?;
 
           // dueDate 파싱
@@ -83,8 +92,12 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       // UserModel 생성 (실제 데이터 또는 기본값)
+      // 닉네임이 비어있지 않은 경우에만 사용, 아니면 기본값
+      final finalNickname = (userNickname?.isNotEmpty == true) ? userNickname! : '사용자';
+      debugPrint('✅ [HomeScreen] 최종 닉네임: $finalNickname');
+
       final userData = UserModel(
-        nickname: userNickname ?? '사용자',
+        nickname: finalNickname,
         pregnancyWeek: userPregnancyWeek ?? 20,
         statusMessage: '건강한 임신 생활을 응원합니다!',
         dueDate: userDueDate ?? DateTime(2026, 7, 1),

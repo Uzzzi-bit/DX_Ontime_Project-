@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../widget/bottom_bar_widget.dart';
 import '../theme/color_palette.dart';
+import '../api/member_api_service.dart';
 import 'oven_pages.dart';
 
 // 오븐 설정 데이터 모델
@@ -98,6 +100,7 @@ class RecipeScreen extends StatefulWidget {
 class _RecipeScreenState extends State<RecipeScreen> {
   late int _selectedMenuIndex;
   late List<RecipeData> _recipes;
+  String _userName = '사용자'; // 기본값
 
   @override
   void initState() {
@@ -106,10 +109,40 @@ class _RecipeScreenState extends State<RecipeScreen> {
     _selectedMenuIndex = widget.initialMenuIndex ?? 0;
     // AI에서 레시피가 넘어오면 그걸 사용, 아니면 기존 목 데이터를 사용
     _recipes = widget.initialRecipes ?? RecipeScreen.getRecommendedRecipes();
+    // 사용자 닉네임 로드
+    _loadUserNickname();
   }
 
-  // [API] 사용자 이름과 추천 시간대는 추후 로그인 정보 및 서버 시간으로 대체
-  final String _userName = '김레제';
+  /// 사용자 닉네임을 API에서 가져옵니다.
+  Future<void> _loadUserNickname() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        debugPrint('⚠️ [RecipeScreen] 로그인된 사용자가 없습니다.');
+        return;
+      }
+
+      final healthInfo = await MemberApiService.instance.getHealthInfo(user.uid);
+      debugPrint('🔍 [RecipeScreen] API 응답 전체: $healthInfo');
+
+      // nickname 필드 확인 (다양한 가능한 필드명 체크)
+      final nickname =
+          healthInfo['nickname'] as String? ?? healthInfo['user_nickname'] as String? ?? healthInfo['name'] as String?;
+
+      debugPrint('🔍 [RecipeScreen] 추출된 닉네임: $nickname');
+
+      if (mounted) {
+        setState(() {
+          _userName = nickname?.isNotEmpty == true ? nickname! : '사용자';
+        });
+      }
+
+      debugPrint('✅ [RecipeScreen] 최종 사용자 닉네임: $_userName');
+    } catch (e) {
+      debugPrint('⚠️ [RecipeScreen] 사용자 닉네임 로드 실패 (기본값 사용): $e');
+      // 기본값 '사용자'는 이미 설정되어 있음
+    }
+  }
 
   // 레시피 데이터 생성 함수 (static으로 분리)
   static List<RecipeData> _getRecipes() {

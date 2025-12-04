@@ -95,7 +95,12 @@ class _ChatScreenState extends State<ChatScreen> {
           text: widget.initialText ?? '',
           imagePath: widget.initialImagePath,
         );
-        _messages.add(initialMessage);
+        
+        if (mounted) {
+          setState(() {
+            _messages.add(initialMessage);
+          });
+        }
 
         // 초기 메시지를 DB에 저장
         if (_currentSessionId != null && _currentMemberId != null) {
@@ -111,14 +116,14 @@ class _ChatScreenState extends State<ChatScreen> {
           final imgFile = File(widget.initialImagePath!);
           await _uploadImage(imgFile);
 
-          // 이미지 분석 요청
-          _sendRequestToAI(
+          // 이미지 분석 요청 (await로 기다림)
+          await _sendRequestToAI(
             query: '이 음식 먹어도 되나요?',
             imageFile: XFile(widget.initialImagePath!),
           );
         } else if (widget.initialText != null && widget.initialText!.isNotEmpty) {
-          // 텍스트만 있는 경우
-          _sendRequestToAI(query: widget.initialText!);
+          // 텍스트만 있는 경우 (await로 기다림)
+          await _sendRequestToAI(query: widget.initialText!);
         }
       }
     } catch (e) {
