@@ -946,7 +946,9 @@ class _ReportScreenState extends State<ReportScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '${slot.current.toInt()}${slot.unit}/${slot.target.toInt()}${slot.unit}',
+                            slot.name == '오메가3'
+                                ? '${slot.current.toStringAsFixed(2)}${slot.unit}/${slot.target.toStringAsFixed(2)}${slot.unit}'
+                                : '${slot.current.toInt()}${slot.unit}/${slot.target.toInt()}${slot.unit}',
                             style: const TextStyle(
                               color: ColorPalette.text100,
                               fontSize: 10,
