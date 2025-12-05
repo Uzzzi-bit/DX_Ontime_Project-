@@ -110,7 +110,7 @@ class RecipeData {
       ovenTimeMinutes: ovenTimeMinutes,
       ovenSettings: ovenSettings,
       calories: (json['calories'] as num?)?.toInt() ?? 0,
-      tags: toStringList(json['tags']),
+      tags: toStringList(json['tags']).sublist(0, 3),
     );
   }
 

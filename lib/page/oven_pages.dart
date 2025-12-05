@@ -181,20 +181,6 @@ class _OvenScreenState extends State<OvenScreen> {
               children: [
                 Bounceable(
                   onTap: () {},
-                  child: TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text(
-                      '전송 취소',
-                      style: TextStyle(
-                        color: ColorPalette.text200,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Bounceable(
-                  onTap: () {},
                   child: FilledButton(
                     onPressed: () {
                       Navigator.pop(context); // 다이얼로그 닫기
@@ -214,7 +200,7 @@ class _OvenScreenState extends State<OvenScreen> {
                       ),
                     ),
                     child: const Text(
-                      '확인',
+                      '닫기',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 16,
