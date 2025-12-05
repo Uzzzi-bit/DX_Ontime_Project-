@@ -1499,7 +1499,7 @@ class _CalorieGaugeWidget extends StatelessWidget {
               Color(0xFFDDEDC1),
               Color(0xFFBCE7F0),
             ],
-            child: _BabyImageWidget(),
+            child: _BabyImageWidget(currentCalorie: currentCalorie),
           ),
         ),
         Transform.translate(
@@ -1533,13 +1533,29 @@ class _CalorieGaugeWidget extends StatelessWidget {
 
 /// 아기 이미지 위젯
 class _BabyImageWidget extends StatelessWidget {
+  const _BabyImageWidget({
+    required this.currentCalorie,
+  });
+
+  final double currentCalorie;
+
+  String _getBabyImagePath() {
+    if (currentCalorie >= 2000) {
+      return 'assets/image/happy_baby.png';
+    } else if (currentCalorie <= 600) {
+      return 'assets/image/cry_baby.png';
+    } else {
+      return 'assets/image/baby.png';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final iconSize = ResponsiveHelper.width(context, 0.24);
 
     return Center(
       child: Image.asset(
-        'assets/image/baby.png',
+        _getBabyImagePath(),
         fit: BoxFit.contain,
         errorBuilder: (context, error, stackTrace) {
           return Container(
