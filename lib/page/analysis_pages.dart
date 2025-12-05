@@ -754,6 +754,10 @@ class _ConfirmDialog extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(context, false),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: ColorPalette.primary300,
+                      side: const BorderSide(color: ColorPalette.primary300),
+                    ),
                     child: const Text('취소'),
                   ),
                 ),
