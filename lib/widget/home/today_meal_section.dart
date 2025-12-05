@@ -50,7 +50,7 @@ class TodayMealSection extends StatelessWidget {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
+                physics: const BouncingScrollPhysics(),
                 itemCount: meals.length,
                 separatorBuilder: (_, __) => SizedBox(width: ResponsiveHelper.width(context, 0.043)),
                 itemBuilder: (context, index) {
