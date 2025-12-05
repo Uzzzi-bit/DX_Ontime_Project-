@@ -1068,12 +1068,22 @@ class _ReportScreenState extends State<ReportScreen> {
   //    - 네트워크 오류 처리
   //    - 사용자에게 적절한 에러 메시지 표시
   void _navigateToMealRecord(String mealType) {
+    // 현재 선택된 날짜의 해당 식사 타입 기록 찾기
+    final currentMeal = _mealRecords.firstWhere(
+      (m) => m.mealType == mealType,
+      orElse: () => MealRecord(mealType: mealType, hasRecord: false),
+    );
+
+    // 기존에 기록된 음식 목록 가져오기
+    final existingFoods = currentMeal.foods ?? [];
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => AnalysisScreen(
           mealType: mealType,
           selectedDate: _selectedWeekDate,
+          existingFoods: existingFoods.isNotEmpty ? existingFoods : null,
           onAnalysisComplete: (Map<String, dynamic> result) async {
             // AnalysisScreen에서 분석 완료 후 콜백
             // DB에서 최신 영양소 데이터 다시 불러오기 (meal 데이터 추가로 인한 호출)
