@@ -1544,6 +1544,8 @@ class _BabyImageWidget extends StatelessWidget {
       return 'assets/image/happy_baby.png';
     } else if (currentCalorie <= 600) {
       return 'assets/image/cry_baby.png';
+    } else if (currentCalorie >= 2500) {
+      return 'assets/image/full_baby.png';
     } else {
       return 'assets/image/baby.png';
     }
