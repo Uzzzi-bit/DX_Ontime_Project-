@@ -19,6 +19,7 @@ import 'recipe_pages.dart';
 import '../model/user_model.dart';
 import '../api/member_api_service.dart';
 import '../api/meal_api_service.dart';
+import '../api/ai_recipe_api.dart';
 import '../model/supplement_effects.dart';
 import '../model/nutrient_type.dart';
 import '../utils/responsive_helper.dart';
@@ -39,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   UserModel? _userData;
   static const String _momCareModeKey = 'isMomCareMode';
+  static const String _hasCalledInitialRecipeApiKey = 'hasCalledInitialRecipeApi'; // 최초 진입 시 레시피 API 호출 여부
 
   @override
   void initState() {
@@ -112,6 +114,13 @@ class _HomeScreenState extends State<HomeScreen> {
         // 오늘 날짜의 영양소 데이터 로드
         if (user != null) {
           await _loadTodayNutritionData(user.uid, userPregnancyWeek);
+          
+          // 임산부 모드가 켜져 있고 최초 진입이면 레시피 API 호출
+          final hasCalledApi = prefs.getBool(_hasCalledInitialRecipeApiKey) ?? false;
+          if (isMomCareMode && !hasCalledApi) {
+            await prefs.setBool(_hasCalledInitialRecipeApiKey, true);
+            await _fetchInitialAiRecipes(user.uid, userPregnancyWeek);
+          }
         }
 
         // report_pages에서 계산된 값으로 업데이트
@@ -250,6 +259,58 @@ class _HomeScreenState extends State<HomeScreen> {
     if (target == null || target == 0) return 0.0;
     final currentValue = (current as num?)?.toDouble() ?? 0.0;
     return ((currentValue / target) * 100).clamp(0.0, 200.0);
+  }
+
+  /// 최초 진입 시 AI 레시피 추천 API 호출
+  Future<void> _fetchInitialAiRecipes(String memberId, int? pregnancyWeek) async {
+    try {
+      debugPrint('🆕 [HomeScreen] 최초 진입 - AI 레시피 추천 API 호출');
+      
+      // 사용자 건강 정보 가져오기
+      final healthInfo = await MemberApiService.instance.getHealthInfo(memberId);
+      final nickname = healthInfo['nickname'] as String? ?? _userName;
+      final weight = (healthInfo['weight_kg'] as num?)?.toDouble() ?? 60.0;
+      final height = (healthInfo['height_cm'] as num?)?.toDouble() ?? 160.0;
+      final hasGestationalDiabetes = healthInfo['has_gestational_diabetes'] as bool? ?? false;
+      final allergiesList = healthInfo['allergies'] as List<dynamic>? ?? [];
+      final allergies = allergiesList.map((e) => e.toString()).toList();
+      
+      final conditions = hasGestationalDiabetes ? '임신성 당뇨' : '없음';
+      
+      // 영양소 데이터 준비 (오늘은 아직 섭취하지 않았으므로 모두 0)
+      final nutrientsMap = <String, Map<String, double>>{};
+      final allNutrients = [
+        'calories', 'carbs', 'protein', 'fat', 'sugar', 'sodium', 'calcium', 'iron',
+        'folate', 'magnesium', 'omega3', 'vitamin_a', 'vitamin_b12', 'vitamin_c',
+        'vitamin_d', 'dietary_fiber', 'potassium',
+      ];
+      
+      for (final nutrientKey in allNutrients) {
+        nutrientsMap[nutrientKey] = {
+          'current': 0.0,
+          'ratio': 0.0,
+        };
+      }
+      
+      // AI 레시피 추천 API 호출
+      final aiResp = await fetchAiRecommendedRecipes(
+        nickname: nickname,
+        week: pregnancyWeek ?? _pregnancyWeek,
+        weight: weight,
+        height: height,
+        conditions: conditions,
+        allergies: allergies,
+        nutrients: nutrientsMap,
+      );
+      
+      if (mounted) {
+        // 전역 상태에 최신 AI 레시피 저장
+        RecipeScreen.setLatestAiRecipes(aiResp.recipes);
+        debugPrint('✅ [HomeScreen] 최초 진입 AI 레시피 ${aiResp.recipes.length}개 수신 완료');
+      }
+    } catch (e) {
+      debugPrint('❌ [HomeScreen] 최초 진입 AI 레시피 추천 실패: $e');
+    }
   }
 
   // TODO: [DB] 금일 칼로리 섭취량 및 목표량 GET
