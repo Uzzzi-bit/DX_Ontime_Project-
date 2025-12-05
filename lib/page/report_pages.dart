@@ -166,10 +166,30 @@ class _ReportScreenState extends State<ReportScreen> {
         };
 
         // DB에서 불러온 meals를 타입별로 그룹화
+        // 백엔드가 반환할 수 있는 meal_time 값들을 프론트엔드 표준 값으로 매핑
+        String normalizeMealTime(String mealTime) {
+          // 백엔드가 "조식", "중식", "석식", "야식" 또는 "아침", "점심", "간식", "저녁"을 반환할 수 있음
+          final mapping = {
+            '조식': '아침',
+            '중식': '점심',
+            '석식': '저녁',
+            '야식': '간식',
+            '아침': '아침',
+            '점심': '점심',
+            '간식': '간식',
+            '저녁': '저녁',
+          };
+          return mapping[mealTime] ?? mealTime; // 매핑되지 않으면 원본 반환
+        }
+
         for (final mealData in meals) {
-          final mealTime = mealData['meal_time'] as String;
+          final rawMealTime = mealData['meal_time'] as String;
+          final mealTime = normalizeMealTime(rawMealTime);
           if (mealMap.containsKey(mealTime)) {
             mealMap[mealTime]!.add(mealData);
+          } else {
+            // 매핑되지 않은 meal_time이 있으면 디버그 출력
+            debugPrint('⚠️ [ReportScreen] 알 수 없는 meal_time: $rawMealTime');
           }
         }
 
