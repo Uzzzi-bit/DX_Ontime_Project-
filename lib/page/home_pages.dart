@@ -53,13 +53,31 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // 화면이 다시 나타날 때 맘케어 모드 상태 확인 및 새로고침
+    _checkAndUpdateMomCareMode();
     // 화면이 다시 나타날 때 영양소 데이터 새로고침
     final user = FirebaseAuth.instance.currentUser;
-    if (user != null && _userData != null) {
+    if (user != null && _userData != null && _userData!.pregnancyWeek != null && _userData!.pregnancyWeek! > 0) {
       _loadTodayNutritionData(user.uid, _userData!.pregnancyWeek);
     }
     // 최신 AI 레시피 확인 및 업데이트
     _checkForLatestRecipes();
+  }
+
+  /// 맘케어 모드 상태를 확인하고 업데이트
+  Future<void> _checkAndUpdateMomCareMode() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final currentMode = prefs.getBool(_momCareModeKey) ?? false;
+      if (mounted && _isMomCareMode != currentMode) {
+        setState(() {
+          _isMomCareMode = currentMode;
+        });
+        debugPrint('✅ [HomeScreen] 맘케어 모드 상태 업데이트: $_isMomCareMode');
+      }
+    } catch (e) {
+      debugPrint('⚠️ [HomeScreen] 맘케어 모드 상태 확인 실패: $e');
+    }
   }
 
   /// 최신 AI 레시피를 확인하고 화면을 업데이트하는 메서드
@@ -85,8 +103,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       // Shared Preferences에서 Mom Care Mode 상태 불러오기
+      // 기본값은 false (꺼져있음)
       final prefs = await SharedPreferences.getInstance();
+      // 값이 없거나 null이면 false로 설정
       final isMomCareMode = prefs.getBool(_momCareModeKey) ?? false;
+      // 명시적으로 false로 초기화 (값이 없을 경우)
+      if (!prefs.containsKey(_momCareModeKey)) {
+        await prefs.setBool(_momCareModeKey, false);
+      }
 
       // Firebase 사용자 정보 가져오기
       final user = FirebaseAuth.instance.currentUser;
@@ -96,29 +120,48 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (user != null) {
         try {
-          // Django API에서 사용자 건강 정보 가져오기
-          final healthInfo = await MemberApiService.instance.getHealthInfo(user.uid);
-          userNickname = healthInfo['nickname'] as String?;
-          userPregnancyWeek = healthInfo['pregnancy_week'] as int? ?? healthInfo['pregWeek'] as int?;
-
-          // dueDate 파싱
-          final dueDateStr = healthInfo['dueDate'] as String?;
-          if (dueDateStr != null) {
-            userDueDate = DateTime.parse(dueDateStr);
+          // 먼저 register_member API에서 닉네임 가져오기 (건강정보가 없어도 회원 정보는 있음)
+          try {
+            final memberInfo = await MemberApiService.instance.registerMember(
+              user.uid,
+              email: user.email,
+            );
+            userNickname = memberInfo['nickname'] as String?;
+            debugPrint('✅ [HomeScreen] register_member에서 닉네임: $userNickname');
+          } catch (e) {
+            debugPrint('⚠️ [HomeScreen] register_member 호출 실패: $e');
           }
 
-          debugPrint('✅ [HomeScreen] 사용자 정보 로드: nickname=$userNickname, week=$userPregnancyWeek');
+          // Django API에서 사용자 건강 정보 가져오기
+          try {
+            final healthInfo = await MemberApiService.instance.getHealthInfo(user.uid);
+            // 닉네임이 없으면 건강정보에서 가져오기
+            if (userNickname == null || userNickname.isEmpty) {
+              userNickname = healthInfo['nickname'] as String?;
+            }
+            userPregnancyWeek = healthInfo['pregnancy_week'] as int? ?? healthInfo['pregWeek'] as int?;
+
+            // dueDate 파싱
+            final dueDateStr = healthInfo['dueDate'] as String?;
+            if (dueDateStr != null) {
+              userDueDate = DateTime.parse(dueDateStr);
+            }
+
+            debugPrint('✅ [HomeScreen] 사용자 정보 로드: nickname=$userNickname, week=$userPregnancyWeek');
+          } catch (e) {
+            debugPrint('⚠️ [HomeScreen] 건강 정보 로드 실패 (닉네임은 이미 가져옴): $e');
+          }
         } catch (e) {
-          debugPrint('⚠️ [HomeScreen] 건강 정보 로드 실패 (기본값 사용): $e');
+          debugPrint('⚠️ [HomeScreen] 사용자 정보 로드 실패 (기본값 사용): $e');
         }
       }
 
-      // UserModel 생성 (실제 데이터 또는 기본값)
+      // UserModel 생성 (건강정보가 있을 때만 임신주차와 출산예정일 설정)
       final userData = UserModel(
         nickname: userNickname ?? '사용자',
-        pregnancyWeek: userPregnancyWeek ?? 20,
+        pregnancyWeek: userPregnancyWeek ?? 0, // 건강정보 없으면 0으로 설정 (표시 안 함)
         statusMessage: '건강한 임신 생활을 응원합니다!',
-        dueDate: userDueDate ?? DateTime(2026, 7, 1),
+        dueDate: userDueDate, // 건강정보 없으면 null
       );
 
       if (mounted) {
@@ -165,8 +208,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // 사용자 정보 (Django API에서 로드)
   String get _userName => _userData?.nickname ?? '사용자';
-  DateTime get _dueDate => _userData?.dueDate ?? DateTime(2026, 7, 1);
-  int get _pregnancyWeek => _userData?.pregnancyWeek ?? 20;
+  DateTime? get _dueDate => _userData?.dueDate; // null일 수 있음
+  int? get _pregnancyWeek => _userData?.pregnancyWeek != null && _userData!.pregnancyWeek! > 0
+      ? _userData!.pregnancyWeek
+      : null; // 0이거나 null이면 null 반환
 
   // 오늘 날짜의 영양소 데이터를 직접 로드
   Map<String, double>? _homeNutritionTargets; // 영양소 권장량
@@ -327,7 +372,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // AI 레시피 추천 API 호출
       final aiResp = await fetchAiRecommendedRecipes(
         nickname: nickname,
-        week: pregnancyWeek ?? _pregnancyWeek,
+        week: pregnancyWeek ?? (_pregnancyWeek ?? 12),
         weight: weight,
         height: height,
         conditions: conditions,
@@ -602,13 +647,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // 임신 주차 계산
-  int _getPregnancyWeek() {
+  int? _getPregnancyWeek() {
     return _pregnancyWeek;
   }
 
-  // 임신 진행률 계산 (0.0 ~ 1.0) - 출산예정일까지의 남은 기간 기준
-  double _getPregnancyProgress() {
+  // 임신 진행률 계산 (0.0 ~ 1.0) - 임신주차와 출산예정일로부터 계산
+  double? _getPregnancyProgress() {
     final currentWeek = _pregnancyWeek;
+    final dueDate = _dueDate;
+
+    // 건강정보가 없으면 null 반환
+    if (currentWeek == null || dueDate == null) {
+      return null;
+    }
+
+    // 임신주차로부터 진행률 계산 (40주 기준)
     const int totalWeeks = 40;
     final double progress = currentWeek / totalWeeks;
     return progress.clamp(0.0, 1.0);
@@ -1191,7 +1244,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   pregnancyWeek: pregnancyWeek,
                   dueDate: _dueDate,
                   pregnancyProgress: pregnancyProgress,
-                  onHealthInfoUpdate: () => Navigator.pushNamed(context, '/healthinfo'),
+                  onHealthInfoUpdate: () async {
+                    final result = await Navigator.pushNamed(context, '/healthinfo');
+                    // 건강정보가 업데이트되면 데이터를 다시 로드
+                    if (result == true) {
+                      debugPrint('✅ [HomeScreen] 건강정보 업데이트 감지 - 데이터 새로고침');
+                      await _loadInitialData();
+                    }
+                  },
                 ),
 
                 /// 2) RoundedContainer를 자연스럽게 위로 끌어올림

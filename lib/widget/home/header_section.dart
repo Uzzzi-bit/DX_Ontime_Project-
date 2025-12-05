@@ -5,17 +5,17 @@ import '../../utils/responsive_helper.dart';
 
 class HeaderSection extends StatelessWidget {
   final String userName;
-  final int pregnancyWeek;
-  final DateTime dueDate;
-  final double pregnancyProgress;
+  final int? pregnancyWeek; // nullable로 변경
+  final DateTime? dueDate; // nullable로 변경
+  final double? pregnancyProgress; // nullable로 변경
   final VoidCallback onHealthInfoUpdate;
 
   const HeaderSection({
     super.key,
     required this.userName,
-    required this.pregnancyWeek,
-    required this.dueDate,
-    required this.pregnancyProgress,
+    this.pregnancyWeek, // optional로 변경
+    this.dueDate, // optional로 변경
+    this.pregnancyProgress, // optional로 변경
     required this.onHealthInfoUpdate,
   });
 
@@ -71,8 +71,8 @@ class HeaderSection extends StatelessWidget {
                     }
 
                     return RichText(
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      maxLines: null, // 닉네임이 길어도 전체 표시
+                      overflow: TextOverflow.visible, // 잘리지 않도록
                       text: TextSpan(
                         style:
                             textTheme.titleLarge?.copyWith(
@@ -130,101 +130,104 @@ class HeaderSection extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text(
-                    '임신 $pregnancyWeek 주차',
-                    style:
-                        textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          letterSpacing: 0.5,
-                        ) ??
-                        const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.5,
-                        ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final barWidth = constraints.maxWidth;
-                        final progressWidth = barWidth * pregnancyProgress.clamp(0.0, 1.0);
-                        return SizedBox(
-                          height: 10,
-                          child: Stack(
-                            children: [
-                              // 배경 바 (회색)
-                              Positioned(
-                                top: 3,
-                                left: 0,
-                                right: 0,
-                                child: Container(
-                                  height: 4,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF7F7F7),
-                                    borderRadius: BorderRadius.circular(50),
-                                  ),
-                                ),
-                              ),
-                              // 진행 바 (진한 하늘색)
-                              Positioned(
-                                top: 3,
-                                left: 0,
-                                child: Container(
-                                  width: progressWidth,
-                                  height: 4,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF3A8FA8), // 진한 하늘색
-                                    borderRadius: BorderRadius.circular(50),
-                                  ),
-                                ),
-                              ),
-                              // 구분선 점들
-                              ...List.generate(4, (index) {
-                                final position = index / 3;
-                                return Positioned(
-                                  left: position * barWidth,
-                                  top: 0,
+          // 건강정보가 있을 때만 임신주차, 게이지바, 출산예정일 표시
+          if (pregnancyWeek != null && dueDate != null && pregnancyProgress != null) ...[
+            const SizedBox(height: 4),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      '임신 $pregnancyWeek 주차',
+                      style:
+                          textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            letterSpacing: 0.5,
+                          ) ??
+                          const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.5,
+                          ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final barWidth = constraints.maxWidth;
+                          final progressWidth = barWidth * pregnancyProgress!.clamp(0.0, 1.0);
+                          return SizedBox(
+                            height: 10,
+                            child: Stack(
+                              children: [
+                                // 배경 바 (회색)
+                                Positioned(
+                                  top: 3,
+                                  left: 0,
+                                  right: 0,
                                   child: Container(
-                                    width: 10,
-                                    height: 10,
+                                    height: 4,
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: const Color(0xFFF0ECE4),
-                                        width: 1,
-                                      ),
+                                      color: const Color(0xFFF7F7F7),
+                                      borderRadius: BorderRadius.circular(50),
                                     ),
                                   ),
-                                );
-                              }),
-                            ],
-                          ),
-                        );
-                      },
+                                ),
+                                // 진행 바 (진한 하늘색)
+                                Positioned(
+                                  top: 3,
+                                  left: 0,
+                                  child: Container(
+                                    width: progressWidth,
+                                    height: 4,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF3A8FA8), // 진한 하늘색
+                                      borderRadius: BorderRadius.circular(50),
+                                    ),
+                                  ),
+                                ),
+                                // 구분선 점들
+                                ...List.generate(4, (index) {
+                                  final position = index / 3;
+                                  return Positioned(
+                                    left: position * barWidth,
+                                    top: 0,
+                                    child: Container(
+                                      width: 10,
+                                      height: 10,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: const Color(0xFFF0ECE4),
+                                          width: 1,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    dateFormat.format(dueDate),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.5,
+                    const SizedBox(width: 8),
+                    Text(
+                      dateFormat.format(dueDate!),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.5,
+                      ),
                     ),
-                  ),
-                ],
-              );
-            },
-          ),
+                  ],
+                );
+              },
+            ),
+          ],
         ],
       ),
     );

@@ -1,12 +1,12 @@
 class UserModel {
   final String nickname;
-  final int pregnancyWeek;
+  final int? pregnancyWeek; // nullable로 변경
   final String statusMessage;
   final DateTime? dueDate;
 
   UserModel({
     required this.nickname,
-    required this.pregnancyWeek,
+    this.pregnancyWeek, // optional로 변경
     required this.statusMessage,
     this.dueDate,
   });
@@ -25,7 +25,7 @@ class UserModel {
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       nickname: json['nickname'] as String,
-      pregnancyWeek: json['pregnancyWeek'] as int,
+      pregnancyWeek: json['pregnancyWeek'] as int?,
       statusMessage: json['statusMessage'] as String,
       dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate'] as String) : null,
     );

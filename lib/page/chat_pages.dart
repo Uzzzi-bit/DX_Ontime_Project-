@@ -327,18 +327,39 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_currentMemberId == null) return;
 
     try {
+      // 먼저 register_member API에서 닉네임 가져오기 (건강정보가 없어도 회원 정보는 있음)
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        try {
+          final memberInfo = await MemberApiService.instance.registerMember(
+            user.uid,
+            email: user.email,
+          );
+          _userNickname = memberInfo['nickname'] as String? ?? '사용자';
+          debugPrint('✅ [ChatScreen] register_member에서 닉네임: $_userNickname');
+        } catch (e) {
+          debugPrint('⚠️ [ChatScreen] register_member 호출 실패: $e');
+        }
+      }
+
       debugPrint('🔄 [ChatScreen] 사용자 건강 정보 로드 중...');
-      final healthInfo = await MemberApiService.instance.getHealthInfo(_currentMemberId!);
+      try {
+        final healthInfo = await MemberApiService.instance.getHealthInfo(_currentMemberId!);
 
-      // 닉네임은 건강 정보 API에서 가져옴 (Django에서 Member.nickname 반환)
-      _userNickname = healthInfo['nickname'] as String? ?? '사용자';
-      _pregnancyWeek = healthInfo['pregnancy_week'] as int? ?? healthInfo['pregWeek'] as int? ?? 12;
-      _conditions = healthInfo['conditions'] as String? ?? '없음';
+        // 닉네임이 없으면 건강정보에서 가져오기
+        if (_userNickname == '사용자' || _userNickname.isEmpty) {
+          _userNickname = healthInfo['nickname'] as String? ?? '사용자';
+        }
+        _pregnancyWeek = healthInfo['pregnancy_week'] as int? ?? healthInfo['pregWeek'] as int? ?? 12;
+        _conditions = healthInfo['conditions'] as String? ?? '없음';
 
-      debugPrint('✅ [ChatScreen] 사용자 정보: nickname=$_userNickname, week=$_pregnancyWeek, conditions=$_conditions');
+        debugPrint('✅ [ChatScreen] 사용자 정보: nickname=$_userNickname, week=$_pregnancyWeek, conditions=$_conditions');
+      } catch (e) {
+        debugPrint('⚠️ [ChatScreen] 건강 정보 로드 실패 (닉네임은 이미 가져옴): $e');
+        // 기본값은 이미 설정되어 있음 (_userNickname = '사용자', _pregnancyWeek = 12, _conditions = '없음')
+      }
     } catch (e) {
-      debugPrint('⚠️ [ChatScreen] 건강 정보 로드 실패 (기본값 사용): $e');
-      // 기본값은 이미 설정되어 있음 (_userNickname = '사용자', _pregnancyWeek = 12, _conditions = '없음')
+      debugPrint('⚠️ [ChatScreen] 사용자 정보 로드 실패 (기본값 사용): $e');
     }
   }
 

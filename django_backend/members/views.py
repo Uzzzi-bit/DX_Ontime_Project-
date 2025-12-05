@@ -155,38 +155,46 @@ def get_health_info(request, uid):
     """
     건강 정보 조회
     GET /api/health/<uid>/
+    건강정보가 없어도 회원가입 시 닉네임은 반환
     """
     try:
         member = Member.objects.get(firebase_uid=uid)
     except Member.DoesNotExist:
         return JsonResponse({'error': 'member not found'}, status=404)
 
-    try:
-        preg = member.pregnancy
-    except MemberPregnancy.DoesNotExist:
-        return JsonResponse({'error': 'pregnancy not found'}, status=404)
-
-    allergies_list = []
-    if preg.allergies:
-        allergies_list = [s.strip() for s in preg.allergies.split(',') if s.strip()]
-
-    # DecimalField를 float로 변환 (JSON 직렬화 문제 해결)
-    height_cm_float = float(preg.height_cm) if preg.height_cm is not None else None
-    weight_kg_float = float(preg.weight_kg) if preg.weight_kg is not None else None
-    
+    # 기본 데이터 (회원가입 시 닉네임은 항상 있음)
     data = {
         'memberId': member.firebase_uid,
-        'nickname': member.nickname,  # 닉네임 추가
-        'birthYear': preg.birth_year,
-        'heightCm': height_cm_float,
-        'weightKg': weight_kg_float,
-        'dueDate': preg.due_date.isoformat(),
-        'pregWeek': preg.preg_week,
-        'pregnancy_week': preg.preg_week,  # 호환성을 위해 둘 다 포함
-        'hasGestationalDiabetes': preg.gestational_diabetes,
-        'allergies': allergies_list,
-        'conditions': '없음',  # TODO: 나중에 conditions 필드 추가 시 수정
+        'nickname': member.nickname,  # 회원가입 시 닉네임은 항상 반환
     }
+
+    # 건강정보가 있으면 추가 정보 반환
+    try:
+        preg = member.pregnancy
+        
+        allergies_list = []
+        if preg.allergies:
+            allergies_list = [s.strip() for s in preg.allergies.split(',') if s.strip()]
+
+        # DecimalField를 float로 변환 (JSON 직렬화 문제 해결)
+        height_cm_float = float(preg.height_cm) if preg.height_cm is not None else None
+        weight_kg_float = float(preg.weight_kg) if preg.weight_kg is not None else None
+        
+        # 건강정보 추가
+        data.update({
+            'birthYear': preg.birth_year,
+            'heightCm': height_cm_float,
+            'weightKg': weight_kg_float,
+            'dueDate': preg.due_date.isoformat(),
+            'pregWeek': preg.preg_week,
+            'pregnancy_week': preg.preg_week,  # 호환성을 위해 둘 다 포함
+            'hasGestationalDiabetes': preg.gestational_diabetes,
+            'allergies': allergies_list,
+            'conditions': '없음',  # TODO: 나중에 conditions 필드 추가 시 수정
+        })
+    except MemberPregnancy.DoesNotExist:
+        # 건강정보가 없어도 닉네임은 반환 (회원가입은 했으므로)
+        pass
 
     return JsonResponse(data)
 
