@@ -232,7 +232,9 @@ class _ReportScreenState extends State<ReportScreen> {
               finalMealMap['저녁']!,
             ];
           });
-          debugPrint('✅ [ReportScreen] 식사 기록 로드 완료: ${meals.length}개 (아침: ${mealMap['아침']!.length}, 점심: ${mealMap['점심']!.length}, 간식: ${mealMap['간식']!.length}, 저녁: ${mealMap['저녁']!.length})');
+          debugPrint(
+            '✅ [ReportScreen] 식사 기록 로드 완료: ${meals.length}개 (아침: ${mealMap['아침']!.length}, 점심: ${mealMap['점심']!.length}, 간식: ${mealMap['간식']!.length}, 저녁: ${mealMap['저녁']!.length})',
+          );
         }
       }
     } catch (e) {
