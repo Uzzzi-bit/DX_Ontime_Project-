@@ -363,78 +363,80 @@ class _ReportScreenState extends State<ReportScreen> {
       }
     }
 
-    _nutrientSlots = allNutrients
-        .map((nutrientKey) {
-          // 권장량은 PostgreSQL DB에서 조회한 값만 사용 (필수)
-          double target = 0;
-          if (_nutritionTargets != null && _nutritionTargets!.containsKey(nutrientKey)) {
-            target = _nutritionTargets![nutrientKey] ?? 0;
-          }
+    _nutrientSlots =
+        allNutrients
+            .map((nutrientKey) {
+              // 권장량은 PostgreSQL DB에서 조회한 값만 사용 (필수)
+              double target = 0;
+              if (_nutritionTargets != null && _nutritionTargets!.containsKey(nutrientKey)) {
+                target = _nutritionTargets![nutrientKey] ?? 0;
+              }
 
-          // 현재 섭취량은 DailyNutrientStatus에서 가져오기 (없으면 0)
-          double current = 0;
-          NutrientType? type;
-          switch (nutrientKey) {
-            case 'carb':
-              type = NutrientType.carb;
-              break;
-            case 'protein':
-              type = NutrientType.protein;
-              break;
-            case 'fat':
-              type = NutrientType.fat;
-              break;
-            case 'sodium':
-              type = NutrientType.sodium;
-              break;
-            case 'iron':
-              type = NutrientType.iron;
-              break;
-            case 'folate':
-              type = NutrientType.folate;
-              break;
-            case 'calcium':
-              type = NutrientType.calcium;
-              break;
-            case 'vitamin_d':
-              type = NutrientType.vitaminD;
-              break;
-            case 'omega3':
-              type = NutrientType.omega3;
-              break;
-            // DailyNutrientStatus에 없는 영양소는 current = 0으로 유지
-            case 'sugar':
-            case 'magnesium':
-            case 'vitamin_a':
-            case 'vitamin_b12':
-            case 'vitamin_c':
-            case 'dietary_fiber':
-            case 'potassium':
-              current = 0; // 아직 DailyNutrientStatus에 없으므로 0
-              break;
-          }
-          if (type != null) {
-            current = _todayStatus.consumed[type] ?? 0;
-          }
+              // 현재 섭취량은 DailyNutrientStatus에서 가져오기 (없으면 0)
+              double current = 0;
+              NutrientType? type;
+              switch (nutrientKey) {
+                case 'carb':
+                  type = NutrientType.carb;
+                  break;
+                case 'protein':
+                  type = NutrientType.protein;
+                  break;
+                case 'fat':
+                  type = NutrientType.fat;
+                  break;
+                case 'sodium':
+                  type = NutrientType.sodium;
+                  break;
+                case 'iron':
+                  type = NutrientType.iron;
+                  break;
+                case 'folate':
+                  type = NutrientType.folate;
+                  break;
+                case 'calcium':
+                  type = NutrientType.calcium;
+                  break;
+                case 'vitamin_d':
+                  type = NutrientType.vitaminD;
+                  break;
+                case 'omega3':
+                  type = NutrientType.omega3;
+                  break;
+                // DailyNutrientStatus에 없는 영양소는 current = 0으로 유지
+                case 'sugar':
+                case 'magnesium':
+                case 'vitamin_a':
+                case 'vitamin_b12':
+                case 'vitamin_c':
+                case 'dietary_fiber':
+                case 'potassium':
+                  current = 0; // 아직 DailyNutrientStatus에 없으므로 0
+                  break;
+              }
+              if (type != null) {
+                current = _todayStatus.consumed[type] ?? 0;
+              }
 
-          // 권장량 달성율 계산 (0~200%)
-          final percent = target > 0 ? ((current / target) * 100).clamp(0.0, 200.0) : 0.0;
+              // 권장량 달성율 계산 (0~200%)
+              final percent = target > 0 ? ((current / target) * 100).clamp(0.0, 200.0) : 0.0;
 
-          // 홈 화면에서 사용할 영양소 비율 맵 업데이트
-          if (type != null) {
-            _nutrientProgressMap[type] = percent;
-          }
+              // 홈 화면에서 사용할 영양소 비율 맵 업데이트
+              if (type != null) {
+                _nutrientProgressMap[type] = percent;
+              }
 
-          return NutrientSlot(
-            name: _nameOf(nutrientKey),
-            current: current,
-            target: target,
-            percent: percent.toDouble(),
-            unit: _getUnit(nutrientKey),
-          );
-        })
-        .where((slot) => slot.target > 0)
-        .toList(); // target이 0보다 큰 것만 표시 (PostgreSQL DB에서 조회한 권장량이 있는 것만)
+              return NutrientSlot(
+                name: _nameOf(nutrientKey),
+                current: current,
+                target: target,
+                percent: percent.toDouble(),
+                unit: _getUnit(nutrientKey),
+              );
+            })
+            .where((slot) => slot.target > 0 && slot.percent > 0) // target이 0보다 크고 percent가 0보다 큰 것만 표시
+            .toList()
+          ..sort((a, b) => b.percent.compareTo(a.percent)); // percent 기준 내림차순 정렬
 
     // 칼로리 정보 업데이트
     if (_nutritionTargets != null && _nutritionTargets!.containsKey('calories')) {
@@ -1083,7 +1085,16 @@ class _ReportScreenState extends State<ReportScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 15),
+            Text(
+              '영양소 분석',
+              style: TextStyle(
+                color: ColorPalette.text100,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 15),
             // 영양소 분석 슬롯
             if (_isToday(_selectedWeekDate))
               // 오늘 날짜인 경우
@@ -1100,6 +1111,23 @@ class _ReportScreenState extends State<ReportScreen> {
                       itemCount: _nutrientSlots.length,
                       itemBuilder: (context, index) {
                         final slot = _nutrientSlots[index];
+
+                        // 섭취 권장량 기준으로 progress bar와 텍스트 색상 결정
+                        // 배경색과 테두리는 primary 계열로 고정
+                        Color progressBarColor;
+                        Color percentTextColor;
+
+                        if (slot.percent >= 150) {
+                          progressBarColor = Colors.red;
+                          percentTextColor = Colors.red;
+                        } else if (slot.percent >= 100) {
+                          progressBarColor = Colors.green;
+                          percentTextColor = Colors.green;
+                        } else {
+                          progressBarColor = ColorPalette.primary200;
+                          percentTextColor = Color(0xFF5BB5C8);
+                        }
+
                         return Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
@@ -1146,7 +1174,7 @@ class _ReportScreenState extends State<ReportScreen> {
                                   widthFactor: (slot.percent / 100).clamp(0.0, 1.0),
                                   child: Container(
                                     decoration: BoxDecoration(
-                                      color: ColorPalette.primary200,
+                                      color: progressBarColor,
                                       borderRadius: BorderRadius.circular(2),
                                     ),
                                   ),
@@ -1155,8 +1183,8 @@ class _ReportScreenState extends State<ReportScreen> {
                               const SizedBox(height: 2),
                               Text(
                                 '${slot.percent.toInt()}%',
-                                style: const TextStyle(
-                                  color: Color(0xFF5BB5C8),
+                                style: TextStyle(
+                                  color: percentTextColor,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w500,
                                 ),
