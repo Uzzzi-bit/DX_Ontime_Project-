@@ -70,6 +70,18 @@ class ReportScreen extends StatefulWidget {
   static double getCurrentCalorie() {
     return _ReportScreenState._currentCalorie;
   }
+
+  /// 홈 화면에서 영양소 데이터 업데이트
+  static void updateNutritionData({
+    required double currentCalorie,
+    required double targetCalorie,
+    required Map<NutrientType, double> nutrientProgress,
+  }) {
+    _ReportScreenState._currentCalorie = currentCalorie;
+    _ReportScreenState._targetCalorie = targetCalorie;
+    _ReportScreenState._nutrientProgressMap.clear();
+    _ReportScreenState._nutrientProgressMap.addAll(nutrientProgress);
+  }
 }
 
 class _ReportScreenState extends State<ReportScreen> {
@@ -92,7 +104,11 @@ class _ReportScreenState extends State<ReportScreen> {
   List<NutrientSlot> _nutrientSlots = []; // 빈 리스트로 초기화
   bool _hasNutrientData = true; // 기존 필드는 그대로 사용하되, 이제 실제 상태에 맞게 바꾸도록 준비
   Map<String, double>? _nutritionTargets; // API에서 가져온 영양소 권장량
+<<<<<<< HEAD
   Map<String, dynamic>? _dailyNutritionFromDb; // DB에서 가져온 일별 영양소 데이터 (추가 영양소 포함)
+=======
+  Map<String, double>? _dailyNutritionFromDB; // DB에서 가져온 일일 영양소 데이터 (세부 영양소 포함)
+>>>>>>> 13e75079617176146b7ada850cbf563359092501
 
   // 홈 화면에서 사용할 영양소 비율 (static으로 공유)
   static final Map<NutrientType, double> _nutrientProgressMap = {};
@@ -114,6 +130,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
     // TODO: [SERVER][DB] 나중에 API 연동으로 교체
     _todayStatus = createDummyTodayStatus();
+    _dailyNutritionFromDB = {}; // 빈 맵으로 초기화
     // _buildNutrientSlotsFromStatus()는 _loadUserInfoAndNutritionTargets() 완료 후 호출됨
 
     // 사용자 정보 및 영양소 권장량 로드 후 일별 영양소 데이터 로드
@@ -162,43 +179,104 @@ class _ReportScreenState extends State<ReportScreen> {
       if (result['success'] == true) {
         final meals = result['meals'] as List;
 
-        // 식사 타입별로 초기화
-        final mealMap = <String, MealRecord>{
-          '아침': MealRecord(mealType: '아침', hasRecord: false),
-          '점심': MealRecord(mealType: '점심', hasRecord: false),
-          '간식': MealRecord(mealType: '간식', hasRecord: false),
-          '저녁': MealRecord(mealType: '저녁', hasRecord: false),
+        // 식사 타입별로 초기화 (여러 식사 기록을 합치기 위해 리스트로 관리)
+        final mealMap = <String, List<Map<String, dynamic>>>{
+          '아침': [],
+          '점심': [],
+          '간식': [],
+          '저녁': [],
         };
 
-        // DB에서 불러온 meals로 업데이트
+        // DB에서 불러온 meals를 타입별로 그룹화
+        // 백엔드가 반환할 수 있는 meal_time 값들을 프론트엔드 표준 값으로 매핑
+        String normalizeMealTime(String mealTime) {
+          // 백엔드가 "조식", "중식", "석식", "야식" 또는 "아침", "점심", "간식", "저녁"을 반환할 수 있음
+          final mapping = {
+            '조식': '아침',
+            '중식': '점심',
+            '석식': '저녁',
+            '야식': '간식',
+            '아침': '아침',
+            '점심': '점심',
+            '간식': '간식',
+            '저녁': '저녁',
+          };
+          return mapping[mealTime] ?? mealTime; // 매핑되지 않으면 원본 반환
+        }
+
         for (final mealData in meals) {
-          final mealTime = mealData['meal_time'] as String;
-          final memo = mealData['memo'] as String? ?? '';
-          final imageUrl = mealData['image_url'] as String?;
-          final foods = mealData['foods'] as List? ?? [];
+          final rawMealTime = mealData['meal_time'] as String;
+          final mealTime = normalizeMealTime(rawMealTime);
+          if (mealMap.containsKey(mealTime)) {
+            mealMap[mealTime]!.add(mealData);
+          } else {
+            // 매핑되지 않은 meal_time이 있으면 디버그 출력
+            debugPrint('⚠️ [ReportScreen] 알 수 없는 meal_time: $rawMealTime');
+          }
+        }
 
-          // foods를 List<String>으로 변환
-          final foodsList = foods.map((f) => f.toString()).toList();
+        // 각 식사 타입별로 모든 기록을 합쳐서 하나의 MealRecord로 만들기
+        final finalMealMap = <String, MealRecord>{};
+        for (final entry in mealMap.entries) {
+          final mealTime = entry.key;
+          final mealList = entry.value;
 
-          mealMap[mealTime] = MealRecord(
-            mealType: mealTime,
-            imagePath: imageUrl,
-            menuText: foodsList.isNotEmpty ? foodsList.join(', ') : (memo.isNotEmpty ? memo : null),
-            hasRecord: true,
-            foods: foodsList.isNotEmpty ? foodsList : null, // 분석된 음식 목록
-          );
+          if (mealList.isEmpty) {
+            // 기록이 없으면 기본값
+            finalMealMap[mealTime] = MealRecord(mealType: mealTime, hasRecord: false);
+          } else {
+            // 여러 식사 기록을 합치기
+            final allFoods = <String>[];
+            final allImages = <String>[];
+            final allMemos = <String>[];
+
+            for (final mealData in mealList) {
+              final foods = mealData['foods'] as List? ?? [];
+              final imageUrl = mealData['image_url'] as String?;
+              final memo = mealData['memo'] as String? ?? '';
+
+              // foods를 List<String>으로 변환하여 추가
+              final foodsList = foods.map((f) => f.toString()).toList();
+              allFoods.addAll(foodsList);
+
+              if (imageUrl != null && imageUrl.isNotEmpty) {
+                allImages.add(imageUrl);
+              }
+              if (memo.isNotEmpty) {
+                allMemos.add(memo);
+              }
+            }
+
+            // 첫 번째 이미지를 대표 이미지로 사용 (여러 개가 있으면 첫 번째 것)
+            final representativeImage = allImages.isNotEmpty ? allImages.first : null;
+
+            // 모든 음식 목록을 합쳐서 표시
+            final combinedMenuText = allFoods.isNotEmpty
+                ? allFoods.join(', ')
+                : (allMemos.isNotEmpty ? allMemos.join(', ') : null);
+
+            finalMealMap[mealTime] = MealRecord(
+              mealType: mealTime,
+              imagePath: representativeImage,
+              menuText: combinedMenuText,
+              hasRecord: true,
+              foods: allFoods.isNotEmpty ? allFoods : null, // 모든 음식 목록
+            );
+          }
         }
 
         if (mounted) {
           setState(() {
             _mealRecords = [
-              mealMap['아침']!,
-              mealMap['점심']!,
-              mealMap['간식']!,
-              mealMap['저녁']!,
+              finalMealMap['아침']!,
+              finalMealMap['점심']!,
+              finalMealMap['간식']!,
+              finalMealMap['저녁']!,
             ];
           });
-          debugPrint('✅ [ReportScreen] 식사 기록 로드 완료: ${meals.length}개');
+          debugPrint(
+            '✅ [ReportScreen] 식사 기록 로드 완료: ${meals.length}개 (아침: ${mealMap['아침']!.length}, 점심: ${mealMap['점심']!.length}, 간식: ${mealMap['간식']!.length}, 저녁: ${mealMap['저녁']!.length})',
+          );
         }
       }
     } catch (e) {
@@ -426,51 +504,61 @@ class _ReportScreenState extends State<ReportScreen> {
                 target = _nutritionTargets![nutrientKey] ?? 0;
               }
 
-              // 현재 섭취량은 DailyNutrientStatus에서 가져오기 (없으면 0)
-              double current = 0;
-              NutrientType? type;
-              switch (nutrientKey) {
-                case 'carb':
-                  type = NutrientType.carb;
-                  break;
-                case 'protein':
-                  type = NutrientType.protein;
-                  break;
-                case 'fat':
-                  type = NutrientType.fat;
-                  break;
-                case 'sodium':
-                  type = NutrientType.sodium;
-                  break;
-                case 'iron':
-                  type = NutrientType.iron;
-                  break;
-                case 'folate':
-                  type = NutrientType.folate;
-                  break;
-                case 'calcium':
-                  type = NutrientType.calcium;
-                  break;
-                case 'vitamin_d':
-                  type = NutrientType.vitaminD;
-                  break;
-                case 'omega3':
-                  type = NutrientType.omega3;
-                  break;
-                // DailyNutrientStatus에 없는 영양소는 current = 0으로 유지
-                case 'sugar':
-                case 'magnesium':
-                case 'vitamin_a':
-                case 'vitamin_b12':
-                case 'vitamin_c':
-                case 'dietary_fiber':
-                case 'potassium':
-                  current = 0; // 아직 DailyNutrientStatus에 없으므로 0
-                  break;
-              }
-              if (type != null) {
-                current = _todayStatus.consumed[type] ?? 0;
-              }
+          // 현재 섭취량은 DB에서 직접 가져오기 (세부 영양소 포함)
+          double current = 0;
+          NutrientType? type;
+          
+          // DB에서 직접 가져온 값 사용 (세부 영양소 포함)
+          // DB 키와 nutrientKey 매핑
+          String dbKey = nutrientKey;
+          if (nutrientKey == 'carb') {
+            dbKey = 'carbs';
+          } else if (nutrientKey == 'vitamin_b12') {
+            dbKey = 'vitamin_b'; // DB에는 vitamin_b로 저장됨
+          }
+          
+          if (_dailyNutritionFromDB != null && _dailyNutritionFromDB!.containsKey(dbKey)) {
+            current = _dailyNutritionFromDB![dbKey] ?? 0.0;
+          } else if (_dailyNutritionFromDB != null && _dailyNutritionFromDB!.containsKey(nutrientKey)) {
+            current = _dailyNutritionFromDB![nutrientKey] ?? 0.0;
+          } else {
+            // DB에 없으면 DailyNutrientStatus에서 가져오기
+            switch (nutrientKey) {
+              case 'carb':
+                type = NutrientType.carb;
+                break;
+              case 'protein':
+                type = NutrientType.protein;
+                break;
+              case 'fat':
+                type = NutrientType.fat;
+                break;
+              case 'sodium':
+                type = NutrientType.sodium;
+                break;
+              case 'iron':
+                type = NutrientType.iron;
+                break;
+              case 'folate':
+                type = NutrientType.folate;
+                break;
+              case 'calcium':
+                type = NutrientType.calcium;
+                break;
+              case 'vitamin_d':
+                type = NutrientType.vitaminD;
+                break;
+              case 'omega3':
+                type = NutrientType.omega3;
+                break;
+              default:
+                current = 0;
+                break;
+            }
+            if (type != null) {
+              current = _todayStatus.consumed[type] ?? 0;
+            }
+          }
 
               // 권장량 달성율 계산 (0~200%)
               final percent = target > 0 ? ((current / target) * 100).clamp(0.0, 200.0) : 0.0;
@@ -508,6 +596,7 @@ class _ReportScreenState extends State<ReportScreen> {
       if (user == null) {
         debugPrint('⚠️ [ReportScreen] 사용자 로그인 정보가 없습니다.');
         _todayStatus = createDummyTodayStatus();
+        _dailyNutritionFromDB = {}; // 빈 맵으로 초기화
         _buildNutrientSlotsFromStatus();
         setState(() {
           _hasNutrientData = true;
@@ -527,6 +616,11 @@ class _ReportScreenState extends State<ReportScreen> {
 
       if (dailyNutrition['success'] == true) {
         final totalNutrition = dailyNutrition['total_nutrition'] as Map<String, dynamic>;
+        
+        // DB에서 가져온 모든 영양소 데이터 저장 (세부 영양소 포함)
+        _dailyNutritionFromDB = Map<String, double>.from(
+          totalNutrition.map((key, value) => MapEntry(key, (value as num?)?.toDouble() ?? 0.0)),
+        );
 
         // DB에서 가져온 섭취량을 NutrientType Map으로 변환
         // 모든 영양소를 포함하되, DB에 없는 것은 0.0으로 설정
@@ -589,7 +683,11 @@ class _ReportScreenState extends State<ReportScreen> {
       } else {
         // 데이터가 없으면 더미 데이터 사용
         _todayStatus = createDummyTodayStatus();
+<<<<<<< HEAD
         _dailyNutritionFromDb = null; // DB 데이터 없음
+=======
+        _dailyNutritionFromDB = {}; // 빈 맵으로 초기화
+>>>>>>> 13e75079617176146b7ada850cbf563359092501
         debugPrint('⚠️ [ReportScreen] 해당 날짜에 식사 기록이 없습니다.');
 
         // 식사 기록도 초기화
@@ -609,6 +707,7 @@ class _ReportScreenState extends State<ReportScreen> {
       debugPrint('⚠️ [ReportScreen] 영양소 데이터 로드 실패: $e');
       // 에러 발생 시 더미 데이터 사용
       _todayStatus = createDummyTodayStatus();
+      _dailyNutritionFromDB = {}; // 빈 맵으로 초기화
     }
 
     // _nutritionTargets가 로드되었는지 확인
@@ -1411,14 +1510,38 @@ class _ReportScreenState extends State<ReportScreen> {
                   (meal) => Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        meal.mealType,
-                        style: const TextStyle(
-                          color: Color(0xFF1D1B20),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.15,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            meal.mealType,
+                            style: const TextStyle(
+                              color: Color(0xFF1D1B20),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.15,
+                            ),
+                          ),
+                          if (meal.hasRecord)
+                            Material(
+                              color: Colors.transparent,
+                              child: IconButton(
+                                // TODO: [AI] [DB] 편집 시 기존 분석 결과 수정 또는 재분석 기능
+                                onPressed: () => _navigateToMealRecord(meal.mealType),
+                                icon: const Icon(
+                                  Icons.edit,
+                                  color: Color(0xFF1D1B20),
+                                  size: 20,
+                                ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 32,
+                                  minHeight: 32,
+                                ),
+                                tooltip: '편집',
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       _buildMealCard(meal),
@@ -1453,124 +1576,103 @@ class _ReportScreenState extends State<ReportScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: ColorPalette.bg300),
       ),
-      child: Stack(
+      child: Row(
         children: [
-          Row(
-            children: [
-              // TODO: [DB] 저장된 사진은 서버 URL 또는 로컬 경로에서 가져오기
-              // Image.asset 대신 Image.network 또는 Image.file 사용
-              if (meal.hasRecord && meal.imagePath != null)
-                Container(
-                  width: 80,
-                  height: 100,
-                  margin: const EdgeInsets.only(right: 16),
-                  decoration: BoxDecoration(
-                    color: ColorPalette.bg200,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: ColorPalette.bg300),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: _buildMealImage(meal.imagePath!),
-                  ),
-                ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 분석된 음식 목록 표시 (사진 옆에)
-                    if (meal.hasRecord && meal.foods != null && meal.foods!.isNotEmpty)
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: meal.foods!.map((food) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: ColorPalette.primary100.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: ColorPalette.primary100.withOpacity(0.3),
-                                width: 1,
-                              ),
-                            ),
-                            child: Text(
-                              food,
-                              style: const TextStyle(
-                                color: Color(0xFF1D1B20),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 0.1,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      )
-                    else if (meal.hasRecord && meal.menuText != null)
-                      Text(
-                        meal.menuText!,
-                        style: const TextStyle(
-                          color: Color(0xFF1D1B20),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                          letterSpacing: 0.25,
-                          height: 1.4,
-                        ),
-                      )
-                    else
-                      Bounceable(
-                        onTap: () => _navigateToMealRecord(meal.mealType),
-                        child: Row(
-                          children: const [
-                            Icon(
-                              Icons.add_circle,
-                              size: 20,
-                              color: ColorPalette.text100,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              '기록하기',
-                              style: TextStyle(
-                                color: ColorPalette.text100,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w400,
-                                letterSpacing: 0.25,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    // TODO: [AI] 분석 결과 추가 정보 표시 영역
-                    // if (meal.analysisResult != null) ...[
-                    //   const SizedBox(height: 8),
-                    //   Text(
-                    //     '칼로리: ${meal.analysisResult!['calories']}kcal',
-                    //     style: TextStyle(...),
-                    //   ),
-                    //   // 영양소 정보 표시
-                    // ],
-                  ],
-                ),
+          // TODO: [DB] 저장된 사진은 서버 URL 또는 로컬 경로에서 가져오기
+          // Image.asset 대신 Image.network 또는 Image.file 사용
+          if (meal.hasRecord && meal.imagePath != null)
+            Container(
+              width: 80,
+              height: 100,
+              margin: const EdgeInsets.only(right: 16),
+              decoration: BoxDecoration(
+                color: ColorPalette.bg200,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: ColorPalette.bg300),
               ),
-            ],
-          ),
-          // 편집 아이콘을 오른쪽 상단에 배치
-          if (meal.hasRecord)
-            Positioned(
-              top: -16,
-              right: -16,
-              child: IconButton(
-                // TODO: [AI] [DB] 편집 시 기존 분석 결과 수정 또는 재분석 기능
-                onPressed: () => _navigateToMealRecord(meal.mealType),
-                icon: const Icon(
-                  Icons.edit,
-                  color: Color(0xFF1D1B20),
-                  size: 20,
-                ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: _buildMealImage(meal.imagePath!),
               ),
             ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 분석된 음식 목록 표시 (사진 옆에)
+                if (meal.hasRecord && meal.foods != null && meal.foods!.isNotEmpty)
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: meal.foods!.map((food) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: ColorPalette.primary100.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: ColorPalette.primary100.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          food,
+                          style: const TextStyle(
+                            color: Color(0xFF1D1B20),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.1,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  )
+                else if (meal.hasRecord && meal.menuText != null)
+                  Text(
+                    meal.menuText!,
+                    style: const TextStyle(
+                      color: Color(0xFF1D1B20),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      letterSpacing: 0.25,
+                      height: 1.4,
+                    ),
+                  )
+                else
+                  Bounceable(
+                    onTap: () => _navigateToMealRecord(meal.mealType),
+                    child: Row(
+                      children: const [
+                        Icon(
+                          Icons.add_circle,
+                          size: 20,
+                          color: ColorPalette.text100,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          '기록하기',
+                          style: TextStyle(
+                            color: ColorPalette.text100,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            letterSpacing: 0.25,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                // TODO: [AI] 분석 결과 추가 정보 표시 영역
+                // if (meal.analysisResult != null) ...[
+                //   const SizedBox(height: 8),
+                //   Text(
+                //     '칼로리: ${meal.analysisResult!['calories']}kcal',
+                //     style: TextStyle(...),
+                //   ),
+                //   // 영양소 정보 표시
+                // ],
+              ],
+            ),
+          ),
         ],
       ),
     );

@@ -3,9 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 import '../widget/bottom_bar_widget.dart';
 import '../widget/home/header_section.dart';
 import '../widget/home/nutrient_grid.dart';
@@ -18,6 +18,7 @@ import 'report_pages.dart';
 import 'recipe_pages.dart';
 import '../model/user_model.dart';
 import '../api/member_api_service.dart';
+import '../api/meal_api_service.dart';
 import '../model/supplement_effects.dart';
 import '../model/nutrient_type.dart';
 import '../utils/responsive_helper.dart';
@@ -45,6 +46,16 @@ class _HomeScreenState extends State<HomeScreen> {
     // 기본값으로 초기화
     _nutrientProgress = Map.from(_baseNutrientProgress);
     _loadInitialData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 화면이 다시 나타날 때 영양소 데이터 새로고침
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && _userData != null) {
+      _loadTodayNutritionData(user.uid, _userData!.pregnancyWeek);
+    }
   }
 
   Future<void> _loadInitialData() async {
@@ -97,6 +108,12 @@ class _HomeScreenState extends State<HomeScreen> {
           _isLoading = false;
         });
         debugPrint('홈 화면 데이터 로드 완료: _isMomCareMode=$isMomCareMode, _userData=${userData.nickname}');
+
+        // 오늘 날짜의 영양소 데이터 로드
+        if (user != null) {
+          await _loadTodayNutritionData(user.uid, userPregnancyWeek);
+        }
+
         // report_pages에서 계산된 값으로 업데이트
         _updateNutrientProgress();
       }
@@ -124,17 +141,131 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime get _dueDate => _userData?.dueDate ?? DateTime(2026, 7, 1);
   int get _pregnancyWeek => _userData?.pregnancyWeek ?? 20;
 
+  // 오늘 날짜의 영양소 데이터를 직접 로드
+  Map<String, double>? _homeNutritionTargets; // 영양소 권장량
+  Map<NutrientType, double> _homeNutrientProgress = {}; // 영양소 섭취 비율
+  double _homeCurrentCalorie = 0.0;
+  double _homeTargetCalorie = 2000.0;
+
+  /// 오늘 날짜의 영양소 데이터 로드
+  Future<void> _loadTodayNutritionData(String memberId, int? pregnancyWeek) async {
+    try {
+      // 오늘 날짜를 YYYY-MM-DD 형식으로 변환
+      final today = DateTime.now();
+      final dateStr = DateFormat('yyyy-MM-dd').format(today);
+
+      // 영양소 권장량 로드 (임신 주차가 있으면)
+      if (pregnancyWeek != null) {
+        try {
+          // 임신 분기 계산 (1-13: 1분기, 14-27: 2분기, 28-40: 3분기)
+          int trimester;
+          if (pregnancyWeek >= 1 && pregnancyWeek <= 13) {
+            trimester = 1;
+          } else if (pregnancyWeek >= 14 && pregnancyWeek <= 27) {
+            trimester = 2;
+          } else if (pregnancyWeek >= 28 && pregnancyWeek <= 40) {
+            trimester = 3;
+          } else {
+            trimester = 2; // 기본값
+          }
+
+          final nutritionTarget = await MemberApiService.instance.getNutritionTarget(trimester);
+          _homeNutritionTargets = Map<String, double>.from(
+            nutritionTarget.map((key, value) => MapEntry(key, (value as num).toDouble())),
+          );
+          _homeTargetCalorie = _homeNutritionTargets?['calories'] ?? 2000.0;
+          debugPrint('✅ [HomeScreen] 영양소 권장량 로드 완료: ${_homeNutritionTargets?.keys.toList()}');
+        } catch (e) {
+          debugPrint('⚠️ [HomeScreen] 영양소 권장량 로드 실패: $e');
+        }
+      }
+
+      // DB에서 오늘 날짜의 영양소 데이터 가져오기
+      final mealApiService = MealApiService.instance;
+      final dailyNutrition = await mealApiService.getDailyNutrition(
+        memberId: memberId,
+        date: dateStr,
+      );
+
+      if (dailyNutrition['success'] == true) {
+        final totalNutrition = dailyNutrition['total_nutrition'] as Map<String, dynamic>;
+
+        // 칼로리 업데이트
+        _homeCurrentCalorie = (totalNutrition['calories'] as num?)?.toDouble() ?? 0.0;
+
+        // 영양소 비율 계산
+        if (_homeNutritionTargets != null) {
+          _homeNutrientProgress = {
+            NutrientType.iron: _calculatePercent(totalNutrition['iron'], _homeNutritionTargets!['iron']),
+            NutrientType.vitaminD: _calculatePercent(totalNutrition['vitamin_d'], _homeNutritionTargets!['vitamin_d']),
+            NutrientType.folate: _calculatePercent(totalNutrition['folate'], _homeNutritionTargets!['folate']),
+            NutrientType.omega3: _calculatePercent(totalNutrition['omega3'], _homeNutritionTargets!['omega3']),
+            NutrientType.calcium: _calculatePercent(totalNutrition['calcium'], _homeNutritionTargets!['calcium']),
+            NutrientType.vitaminB: _calculatePercent(
+              totalNutrition['vitamin_b12'],
+              _homeNutritionTargets!['vitamin_b12'],
+            ),
+          };
+        }
+
+        // ReportScreen의 static 변수 업데이트 (리포트 화면과 동기화)
+        ReportScreen.updateNutritionData(
+          currentCalorie: _homeCurrentCalorie,
+          targetCalorie: _homeTargetCalorie,
+          nutrientProgress: _homeNutrientProgress,
+        );
+
+        debugPrint('✅ [HomeScreen] 오늘 영양소 데이터 로드 완료: ${_homeCurrentCalorie}kcal');
+
+        if (mounted) {
+          setState(() {
+            _nutrientProgress = Map.from(_homeNutrientProgress);
+          });
+        }
+      } else {
+        debugPrint('⚠️ [HomeScreen] 오늘 날짜에 식사 기록이 없습니다.');
+        // 데이터가 없으면 0으로 초기화
+        _homeCurrentCalorie = 0.0;
+        _homeNutrientProgress = {
+          NutrientType.iron: 0.0,
+          NutrientType.vitaminD: 0.0,
+          NutrientType.folate: 0.0,
+          NutrientType.omega3: 0.0,
+          NutrientType.calcium: 0.0,
+          NutrientType.vitaminB: 0.0,
+        };
+        if (mounted) {
+          setState(() {
+            _nutrientProgress = Map.from(_homeNutrientProgress);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [HomeScreen] 영양소 데이터 로드 실패: $e');
+    }
+  }
+
+  /// 영양소 비율 계산 (0~200%)
+  double _calculatePercent(dynamic current, double? target) {
+    if (target == null || target == 0) return 0.0;
+    final currentValue = (current as num?)?.toDouble() ?? 0.0;
+    return ((currentValue / target) * 100).clamp(0.0, 200.0);
+  }
+
   // TODO: [DB] 금일 칼로리 섭취량 및 목표량 GET
-  // report_pages.dart에서 계산된 값 사용
-  double get _currentCalorie => ReportScreen.getCurrentCalorie();
-  double get _targetCalorie => ReportScreen.getTargetCalorie();
+  // 홈 화면에서 직접 로드한 값 사용
+  double get _currentCalorie => _homeCurrentCalorie;
+  double get _targetCalorie => _homeTargetCalorie;
 
   // TODO: [DB] 금일 영양소 섭취 현황 데이터 로드
-  // 기본 영양소 섭취량 (0.0 ~ 100.0 퍼센트) - 리포트 페이지/음식 섭취 등으로 채워진 기본값 (영양제 제외)
-  // report_pages.dart에서 계산된 비율 값을 가져와서 사용
+  // 홈 화면에서 직접 로드한 값 사용
   Map<NutrientType, double> get _baseNutrientProgress {
+    // 홈 화면에서 로드한 값이 있으면 사용, 없으면 리포트 화면 값 사용
+    if (_homeNutrientProgress.isNotEmpty) {
+      return _homeNutrientProgress;
+    }
+    // 리포트 화면 값이 있으면 사용 (폴백)
     final reportProgress = ReportScreen.getNutrientProgress();
-    // report_pages에서 계산된 값이 있으면 사용, 없으면 기본값
     return {
       NutrientType.iron: reportProgress[NutrientType.iron] ?? 0.0,
       NutrientType.vitaminD: reportProgress[NutrientType.vitaminD] ?? 0.0,
@@ -1544,6 +1675,8 @@ class _BabyImageWidget extends StatelessWidget {
       return 'assets/image/happy_baby.png';
     } else if (currentCalorie <= 600) {
       return 'assets/image/cry_baby.png';
+    } else if (currentCalorie >= 2500) {
+      return 'assets/image/full_baby.png';
     } else {
       return 'assets/image/baby.png';
     }

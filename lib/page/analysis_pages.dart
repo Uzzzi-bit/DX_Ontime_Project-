@@ -456,6 +456,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             _buildImagePreview(),
             const SizedBox(height: 24),
             const Text(
+              textAlign: TextAlign.center,
               'AI가 사용자의 식단을 분석하고 있습니다.',
               style: TextStyle(
                 fontSize: 18,
