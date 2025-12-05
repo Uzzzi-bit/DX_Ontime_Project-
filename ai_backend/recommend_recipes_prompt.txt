@@ -9,16 +9,27 @@
 [사용자 정보]
 - 이름(닉네임): {{nickname}}
 - 임신 주수: {{week}}주
-- BMI: {{bmi}}
+- BMI: {{bmi}}   (계산식: weight / (height*0.01)^2)
 - 진단/질환: {{conditions}}   (예: 임신성 당뇨, 고혈압, 없음 등)
+- 알러지: {{allergies}}   (예: 땅콩, 새우, 우유, 없음 등) 
 
 [오늘까지의 식단 및 영양 요약]
 - 탄수화물: {{today_carbs}} g (목표 대비 {{today_carbs_ratio}}%)
 - 단백질: {{today_protein}} g (목표 대비 {{today_protein_ratio}}%)
 - 지방: {{today_fat}} g (목표 대비 {{today_fat_ratio}}%)
+- 당: {{today_sugar}} g (일일 권장량)
 - 나트륨: {{today_sodium}} mg (목표 대비 {{today_sodium_ratio}}%)
 - 칼슘: {{today_calcium}} mg (목표 대비 {{today_calcium_ratio}}%)
 - 철분: {{today_iron}} mg (목표 대비 {{today_iron_ratio}}%)
+- 엽산: {{today_folate}} μg (목표 대비 {{today_folate_ratio}}%)
+- 마그네슘: {{today_magnesium}} mg (목표 대비 {{today_magnesium_ratio}}%)
+- 오메가3: {{today_omega3}} g
+- 비타민 A: {{today_vitamin_a}} μg (목표 대비 {{today_vita_a_ratio}}%)
+- 비타민 B: {{today_vitamin_b}} μg (목표 대비 {{today_vita_b_ratio}}%)
+- 비타민 C: {{today_vitamin_c}} mg (목표 대비 {{today_vita_c_ratio}}%)
+- 비타민 D: {{today_vitamin_d}} μg (목표 대비 {{today_vita_d_ratio}}%)
+- 식이섬유: {{today_dietary_fiber}} g (목표 대비 {{today_fiber_ratio}}%)
+- 칼륨: {{today_potassium}} mg (목표 대비 {{today_potassium_ratio}}%)
 
 요청:
 

@@ -170,12 +170,16 @@ def get_health_info(request, uid):
     if preg.allergies:
         allergies_list = [s.strip() for s in preg.allergies.split(',') if s.strip()]
 
+    # DecimalField를 float로 변환 (JSON 직렬화 문제 해결)
+    height_cm_float = float(preg.height_cm) if preg.height_cm is not None else None
+    weight_kg_float = float(preg.weight_kg) if preg.weight_kg is not None else None
+    
     data = {
         'memberId': member.firebase_uid,
         'nickname': member.nickname,  # 닉네임 추가
         'birthYear': preg.birth_year,
-        'heightCm': preg.height_cm,
-        'weightKg': preg.weight_kg,
+        'heightCm': height_cm_float,
+        'weightKg': weight_kg_float,
         'dueDate': preg.due_date.isoformat(),
         'pregWeek': preg.preg_week,
         'pregnancy_week': preg.preg_week,  # 호환성을 위해 둘 다 포함

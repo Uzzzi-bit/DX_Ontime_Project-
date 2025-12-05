@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // images 컬렉션: 인증된 사용자는 자신의 이미지만 읽고 쓸 수 있음
+    match /images/{imageId} {
+      allow read: if request.auth != null && 
+                     (resource == null || resource.data.member_id == request.auth.uid);
+      allow create: if request.auth != null && 
+                       request.resource.data.member_id == request.auth.uid;
+      allow update: if request.auth != null && 
+                       resource.data.member_id == request.auth.uid;
+      allow delete: if request.auth != null && 
+                       resource.data.member_id == request.auth.uid;
+    }
+    
+    // 개발 중에는 모든 인증된 사용자가 images 컬렉션에 접근 가능하도록 (임시)
+    // 프로덕션에서는 위의 규칙만 사용하고 아래는 제거하세요
+    match /images/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 다른 컬렉션들도 필요에 따라 추가
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+

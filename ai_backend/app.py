@@ -2,8 +2,10 @@ import os
 import json
 from typing import Optional, List, Dict
 
-from fastapi import FastAPI, File, UploadFile, Form
+from fastapi import FastAPI, File, UploadFile, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import google.generativeai as genai
 import base64
@@ -89,19 +91,43 @@ class RecipesRequest(BaseModel):
     week: int = 20
     bmi: float = 22.0
     conditions: Optional[str] = "없음"
+    allergies: Optional[List[str]] = []  # 알러지 리스트 추가
 
+    # 기본 영양소
+    today_calories: float = 0
+    today_calories_ratio: float = 0
     today_carbs: float = 0
     today_carbs_ratio: float = 0
     today_protein: float = 0
     today_protein_ratio: float = 0
     today_fat: float = 0
     today_fat_ratio: float = 0
+    today_sugar: float = 0
+    today_sugar_ratio: float = 0  # 프롬프트에는 없지만 Flutter에서 전송함
     today_sodium: float = 0
     today_sodium_ratio: float = 0
     today_calcium: float = 0
     today_calcium_ratio: float = 0
     today_iron: float = 0
     today_iron_ratio: float = 0
+    today_folate: float = 0
+    today_folate_ratio: float = 0
+    today_magnesium: float = 0
+    today_magnesium_ratio: float = 0
+    today_omega3: float = 0
+    today_omega3_ratio: float = 0  # 프롬프트에는 없지만 Flutter에서 전송함
+    today_vitamin_a: float = 0
+    today_vita_a_ratio: float = 0
+    today_vitamin_b: float = 0  # vitamin_b12를 vitamin_b로 매핑
+    today_vita_b_ratio: float = 0
+    today_vitamin_c: float = 0
+    today_vita_c_ratio: float = 0
+    today_vitamin_d: float = 0
+    today_vita_d_ratio: float = 0
+    today_dietary_fiber: float = 0
+    today_fiber_ratio: float = 0
+    today_potassium: float = 0
+    today_potassium_ratio: float = 0
 
 
 class CanEatResponse(BaseModel):
@@ -151,6 +177,20 @@ app.add_middleware(
 )
 
 
+# Validation 에러 핸들러 추가
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    body = await request.body()
+    print(f"❌ [AI Backend] Validation 에러:")
+    print(f"  - 요청 경로: {request.url}")
+    print(f"  - 에러: {exc.errors()}")
+    print(f"  - 요청 본문: {body.decode('utf-8')[:500] if body else 'None'}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": body.decode('utf-8')[:500] if body else 'None'},
+    )
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -182,7 +222,23 @@ async def can_eat(req: CanEatRequest):
 
 @app.post("/api/recommend-recipes")
 async def recommend_recipes(req: RecipesRequest):
-    prompt = render_template(
+    try:
+        # 알러지 리스트를 문자열로 변환 (콤마로 구분)
+        allergies_str = ", ".join(req.allergies) if req.allergies else "없음"
+        
+        print(f"🔍 [AI Backend] 요청 수신:")
+        print(f"  - nickname: {req.nickname}")
+        print(f"  - week: {req.week}")
+        print(f"  - bmi: {req.bmi}")
+        print(f"  - conditions: {req.conditions}")
+        print(f"  - allergies: {allergies_str}")
+        print(f"  - today_calories: {req.today_calories}")
+        print(f"  - today_carbs: {req.today_carbs}")
+        print(f"  - today_sugar: {req.today_sugar}, today_sugar_ratio: {req.today_sugar_ratio}")
+        print(f"  - today_omega3: {req.today_omega3}, today_omega3_ratio: {req.today_omega3_ratio}")
+        
+        # 프롬프트에 모든 영양소 데이터 전달
+        prompt = render_template(
         RECIPES_TEMPLATE,
         RULES_JSON=RULES_JSON,
         FOOD_KB_MD=FOOD_KB_MD,
@@ -190,30 +246,105 @@ async def recommend_recipes(req: RecipesRequest):
         week=req.week,
         bmi=req.bmi,
         conditions=req.conditions or "없음",
+        allergies=allergies_str,
+        # 기본 영양소
         today_carbs=req.today_carbs,
         today_carbs_ratio=req.today_carbs_ratio,
         today_protein=req.today_protein,
         today_protein_ratio=req.today_protein_ratio,
         today_fat=req.today_fat,
         today_fat_ratio=req.today_fat_ratio,
+        today_sugar=req.today_sugar,
+        today_sugar_ratio=req.today_sugar_ratio,  # 프롬프트에는 없지만 전달 (에러 방지)
         today_sodium=req.today_sodium,
         today_sodium_ratio=req.today_sodium_ratio,
         today_calcium=req.today_calcium,
         today_calcium_ratio=req.today_calcium_ratio,
         today_iron=req.today_iron,
         today_iron_ratio=req.today_iron_ratio,
+        today_folate=req.today_folate,
+        today_folate_ratio=req.today_folate_ratio,
+        today_magnesium=req.today_magnesium,
+        today_magnesium_ratio=req.today_magnesium_ratio,
+        today_omega3=req.today_omega3,
+        today_omega3_ratio=req.today_omega3_ratio,  # 프롬프트에는 없지만 전달 (에러 방지)
+        today_vitamin_a=req.today_vitamin_a,
+        today_vita_a_ratio=req.today_vita_a_ratio,
+        today_vitamin_b=req.today_vitamin_b,
+        today_vita_b_ratio=req.today_vita_b_ratio,
+        today_vitamin_c=req.today_vitamin_c,
+        today_vita_c_ratio=req.today_vita_c_ratio,
+        today_vitamin_d=req.today_vitamin_d,
+        today_vita_d_ratio=req.today_vita_d_ratio,
+        today_dietary_fiber=req.today_dietary_fiber,
+        today_fiber_ratio=req.today_fiber_ratio,
+        today_potassium=req.today_potassium,
+        today_potassium_ratio=req.today_potassium_ratio,
     )
 
-    model = genai.GenerativeModel(MODEL_ID)
-    gemini_resp = model.generate_content(prompt)
-    raw = gemini_resp.text.strip()
+        model = genai.GenerativeModel(MODEL_ID)
+        gemini_resp = model.generate_content(prompt)
+        raw = gemini_resp.text.strip()
 
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        raise ValueError(f"모델 JSON 파싱 실패: {raw}")
+        # 디버그: Gemini 응답 확인
+        print(f"🔍 [AI Backend] Gemini 응답 (처음 500자): {raw[:500]}")
+        if len(raw) > 500:
+            print(f"🔍 [AI Backend] Gemini 응답 (나머지): ...{raw[-200:]}")
 
-    return data
+        # 마크다운 코드 블록 제거 (```json ... ``` 형식)
+        if raw.startswith("```json"):
+            raw = raw[7:]  # "```json" 제거
+        elif raw.startswith("```"):
+            raw = raw[3:]  # "```" 제거
+
+        if raw.endswith("```"):
+            raw = raw[:-3]  # 끝의 "```" 제거
+
+        raw = raw.strip()
+
+        try:
+            data = json.loads(raw)
+            recipes_count = len(data.get('recipes', []))
+            banner_msg = data.get('bannerMessage', '')
+            print(f"✅ [AI Backend] JSON 파싱 성공:")
+            print(f"  - recipes 개수: {recipes_count}")
+            print(f"  - bannerMessage: {banner_msg[:100] if banner_msg else 'None'}")
+            
+            # 레시피가 3개인지 확인
+            if recipes_count != 3:
+                print(f"⚠️ [AI Backend] 레시피 개수가 3개가 아닙니다: {recipes_count}개")
+            
+            # 각 레시피의 필수 필드 확인
+            for i, recipe in enumerate(data.get('recipes', [])):
+                if not isinstance(recipe, dict):
+                    print(f"❌ [AI Backend] 레시피 {i+1}이 dict가 아닙니다: {type(recipe)}")
+                    continue
+                required_fields = ['title', 'fullTitle', 'ingredients', 'cookingSteps', 'calories']
+                missing_fields = [f for f in required_fields if f not in recipe]
+                if missing_fields:
+                    print(f"⚠️ [AI Backend] 레시피 {i+1}에 필수 필드 누락: {missing_fields}")
+                else:
+                    print(f"✅ [AI Backend] 레시피 {i+1} 필수 필드 확인 완료: {recipe.get('title', 'N/A')}")
+            
+            return data
+        except json.JSONDecodeError as e:
+            print(f"❌ [AI Backend] JSON 파싱 실패:")
+            print(f"  - 에러: {e}")
+            print(f"  - 원본 응답: {raw[:1000]}")
+            raise ValueError(f"모델 JSON 파싱 실패: {e}\n원본 응답: {raw[:500]}")
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"❌ [AI Backend] recommend_recipes 에러:")
+        print(f"  - 에러 타입: {type(e).__name__}")
+        print(f"  - 에러 메시지: {str(e)}")
+        print(f"  - 스택 트레이스:\n{error_trace}")
+        # FastAPI 에러 응답
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=500,
+            detail=f"서버 내부 오류: {str(e)}"
+        )
 
 
 @app.post("/api/chat", response_model=ChatResponse)

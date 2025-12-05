@@ -77,6 +77,10 @@ class _ReportScreenState extends State<ReportScreen> {
   // TODO: [DB] 사용자 이름은 데이터베이스에서 조회
   String _userName = '사용자';
   int? _pregnancyWeek;
+  double? _userHeightCm; // BMI 계산용
+  double? _userWeightKg; // BMI 계산용
+  String _userConditions = '없음'; // 진단/질환 정보
+  List<String> _userAllergies = []; // 알러지 리스트
 
   late DateTime _selectedDate;
   late DateTime _selectedWeekDate; // 주간 달력에서 선택된 날짜
@@ -88,6 +92,7 @@ class _ReportScreenState extends State<ReportScreen> {
   List<NutrientSlot> _nutrientSlots = []; // 빈 리스트로 초기화
   bool _hasNutrientData = true; // 기존 필드는 그대로 사용하되, 이제 실제 상태에 맞게 바꾸도록 준비
   Map<String, double>? _nutritionTargets; // API에서 가져온 영양소 권장량
+  Map<String, dynamic>? _dailyNutritionFromDb; // DB에서 가져온 일별 영양소 데이터 (추가 영양소 포함)
 
   // 홈 화면에서 사용할 영양소 비율 (static으로 공유)
   static final Map<NutrientType, double> _nutrientProgressMap = {};
@@ -111,9 +116,9 @@ class _ReportScreenState extends State<ReportScreen> {
     _todayStatus = createDummyTodayStatus();
     // _buildNutrientSlotsFromStatus()는 _loadUserInfoAndNutritionTargets() 완료 후 호출됨
 
-    // 사용자 정보 및 영양소 권장량 로드 후 AI 추천 레시피 호출
+    // 사용자 정보 및 영양소 권장량 로드 후 일별 영양소 데이터 로드
+    // (AI 레시피는 _reloadDailyNutrientsForSelectedDate 내부에서 자동 호출됨)
     _loadUserInfoAndNutritionTargets().then((_) {
-      // 영양소 권장량 로드 완료 후 AI 추천 레시피 호출
       _reloadDailyNutrientsForSelectedDate();
     });
 
@@ -227,6 +232,55 @@ class _ReportScreenState extends State<ReportScreen> {
 
         // preg_week를 직접 사용 (DB에서 가져온 값)
         _pregnancyWeek = healthInfo['pregWeek'] as int? ?? healthInfo['pregnancy_week'] as int?;
+
+        // BMI 계산을 위한 체중/신장 정보 저장
+        // Django의 DecimalField는 num, String, 또는 Decimal 객체로 올 수 있음
+        final heightCmRaw = healthInfo['heightCm'];
+        final weightKgRaw = healthInfo['weightKg'];
+
+        double? heightCm;
+        double? weightKg;
+
+        // heightCm 변환 (num, String, Decimal 모두 처리)
+        if (heightCmRaw != null) {
+          if (heightCmRaw is num) {
+            heightCm = heightCmRaw.toDouble();
+          } else if (heightCmRaw is String) {
+            heightCm = double.tryParse(heightCmRaw);
+          } else {
+            // Decimal 객체인 경우 toString() 후 파싱
+            heightCm = double.tryParse(heightCmRaw.toString());
+          }
+        }
+
+        // weightKg 변환 (num, String, Decimal 모두 처리)
+        if (weightKgRaw != null) {
+          if (weightKgRaw is num) {
+            weightKg = weightKgRaw.toDouble();
+          } else if (weightKgRaw is String) {
+            weightKg = double.tryParse(weightKgRaw);
+          } else {
+            // Decimal 객체인 경우 toString() 후 파싱
+            weightKg = double.tryParse(weightKgRaw.toString());
+          }
+        }
+
+        final hasGdm = healthInfo['hasGestationalDiabetes'] as bool? ?? false;
+        final allergiesList =
+            (healthInfo['allergies'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? <String>[];
+
+        // 디버그: 가져온 건강 정보 확인
+        debugPrint('🔍 [ReportScreen] 건강 정보 로드:');
+        debugPrint('  - heightCm (raw): $heightCmRaw, (parsed): $heightCm');
+        debugPrint('  - weightKg (raw): $weightKgRaw, (parsed): $weightKg');
+        debugPrint('  - hasGestationalDiabetes: $hasGdm');
+        debugPrint('  - allergies: $allergiesList');
+
+        // 클래스 변수에 저장 (AI 레시피 추천 시 사용)
+        _userHeightCm = heightCm;
+        _userWeightKg = weightKg;
+        _userConditions = hasGdm ? '임신성 당뇨' : '없음';
+        _userAllergies = allergiesList;
       } catch (e) {
         debugPrint('⚠️ [ReportScreen] 건강 정보 로드 실패: $e');
       }
@@ -475,6 +529,7 @@ class _ReportScreenState extends State<ReportScreen> {
         final totalNutrition = dailyNutrition['total_nutrition'] as Map<String, dynamic>;
 
         // DB에서 가져온 섭취량을 NutrientType Map으로 변환
+        // 모든 영양소를 포함하되, DB에 없는 것은 0.0으로 설정
         final consumed = <NutrientType, double>{
           NutrientType.energy: (totalNutrition['calories'] as num?)?.toDouble() ?? 0.0,
           NutrientType.carb: (totalNutrition['carbs'] as num?)?.toDouble() ?? 0.0,
@@ -487,6 +542,10 @@ class _ReportScreenState extends State<ReportScreen> {
           NutrientType.vitaminD: (totalNutrition['vitamin_d'] as num?)?.toDouble() ?? 0.0,
           NutrientType.omega3: (totalNutrition['omega3'] as num?)?.toDouble() ?? 0.0,
         };
+
+        // DB에서 가져온 추가 영양소도 저장 (AI 레시피 추천 시 사용)
+        // 이 값들은 나중에 nutrientsMap 생성 시 사용됨
+        _dailyNutritionFromDb = totalNutrition;
 
         // 권장량은 _nutritionTargets에서 가져오기 (없으면 기본값 사용)
         final recommended = <NutrientType, double>{};
@@ -520,9 +579,17 @@ class _ReportScreenState extends State<ReportScreen> {
 
         // 식사 기록 목록도 함께 불러오기
         await _loadMealRecords(user.uid, dateStr);
+
+        // 영양소 데이터가 변경되었으므로 AI 레시피 추천 호출
+        _buildNutrientSlotsFromStatus();
+        setState(() {
+          _hasNutrientData = true;
+        });
+        await _fetchAiRecommendedRecipes();
       } else {
         // 데이터가 없으면 더미 데이터 사용
         _todayStatus = createDummyTodayStatus();
+        _dailyNutritionFromDb = null; // DB 데이터 없음
         debugPrint('⚠️ [ReportScreen] 해당 날짜에 식사 기록이 없습니다.');
 
         // 식사 기록도 초기화
@@ -530,6 +597,13 @@ class _ReportScreenState extends State<ReportScreen> {
         if (user != null) {
           await _loadMealRecords(user.uid, dateStr);
         }
+
+        // 더미 데이터로도 AI 레시피 추천 시도
+        _buildNutrientSlotsFromStatus();
+        setState(() {
+          _hasNutrientData = true;
+        });
+        await _fetchAiRecommendedRecipes();
       }
     } catch (e) {
       debugPrint('⚠️ [ReportScreen] 영양소 데이터 로드 실패: $e');
@@ -552,39 +626,107 @@ class _ReportScreenState extends State<ReportScreen> {
       _hasNutrientData = true; // TODO: 실제 데이터 없으면 false 처리
     });
 
-    // 🔽 AI 추천 식단 호출 (백엔드 없어도 try/catch 때문에 앱이 깨지지 않아야 함)
-    // _nutrientSlots에서 모든 영양소 데이터 추출하여 Map으로 변환
+    // 🔽 영양소 데이터가 변경되었으므로 AI 레시피 추천 호출
+    _fetchAiRecommendedRecipes();
+  }
+
+  /// AI 레시피 추천 API 호출 함수 (영양소 데이터 변경 시마다 호출)
+  Future<void> _fetchAiRecommendedRecipes() async {
+    // 영양소 권장량이 없으면 건너뛰기
+    if (_nutritionTargets == null || _nutritionTargets!.isEmpty) {
+      debugPrint('⚠️ [ReportScreen] 영양소 권장량이 없어 AI 레시피 추천을 건너뜁니다.');
+      return;
+    }
+
+    // 모든 영양소 데이터를 _todayStatus와 _nutritionTargets에서 직접 추출
     final nutrientsMap = <String, Map<String, double>>{};
 
-    // 영양소 이름(한글)을 영문 키로 매핑
-    final nutrientKeyMap = {
-      '칼로리': 'calories',
-      '탄수화물': 'carbs',
-      '단백질': 'protein',
-      '지방': 'fat',
-      '나트륨': 'sodium',
-      '철분': 'iron',
-      '엽산': 'folate',
-      '칼슘': 'calcium',
-      '비타민D': 'vitamin_d',
-      '오메가3': 'omega3',
-      '당': 'sugar',
-      '마그네슘': 'magnesium',
-      '비타민A': 'vitamin_a',
-      '비타민B12': 'vitamin_b12',
-      '비타민C': 'vitamin_c',
-      '식이섬유': 'dietary_fiber',
-      '칼륨': 'potassium',
+    // 프롬프트에서 필요한 모든 영양소 목록 (섭취량이 0이어도 포함)
+    final allNutrients = [
+      'calories',
+      'carbs',
+      'protein',
+      'fat',
+      'sugar',
+      'sodium',
+      'calcium',
+      'iron',
+      'folate',
+      'magnesium',
+      'omega3',
+      'vitamin_a',
+      'vitamin_b12', // 프롬프트는 vitamin_b지만 DB는 vitamin_b12
+      'vitamin_c',
+      'vitamin_d',
+      'dietary_fiber',
+      'potassium',
+    ];
+
+    // NutrientType과 API 키 매핑
+    final nutrientTypeToKey = {
+      NutrientType.energy: 'calories',
+      NutrientType.carb: 'carbs',
+      NutrientType.protein: 'protein',
+      NutrientType.fat: 'fat',
+      NutrientType.sodium: 'sodium',
+      NutrientType.iron: 'iron',
+      NutrientType.folate: 'folate',
+      NutrientType.calcium: 'calcium',
+      NutrientType.vitaminD: 'vitamin_d',
+      NutrientType.omega3: 'omega3',
+      NutrientType.vitaminB: 'vitamin_b12', // vitaminB를 vitamin_b12로 매핑
     };
 
-    for (final slot in _nutrientSlots) {
-      final key = nutrientKeyMap[slot.name];
-      if (key != null) {
-        nutrientsMap[key] = {
-          'current': slot.current,
-          'ratio': slot.percent,
-        };
+    // _todayStatus.consumed에서 섭취량 가져오기
+    final consumed = _todayStatus.consumed;
+    final recommended = _todayStatus.recommended;
+
+    // 모든 영양소에 대해 데이터 생성 (섭취량이 0이어도 포함)
+    for (final nutrientKey in allNutrients) {
+      double current = 0.0;
+      double target = 0.0;
+      double ratio = 0.0;
+
+      // NutrientType에서 찾기
+      NutrientType? nutrientType;
+      for (final entry in nutrientTypeToKey.entries) {
+        if (entry.value == nutrientKey) {
+          nutrientType = entry.key;
+          break;
+        }
       }
+
+      if (nutrientType != null) {
+        // _todayStatus에서 가져오기
+        current = consumed[nutrientType] ?? 0.0;
+        target = recommended[nutrientType] ?? 0.0;
+      } else {
+        // NutrientType에 없는 영양소는 _nutritionTargets와 _dailyNutritionFromDb에서 가져오기
+        if (_nutritionTargets != null) {
+          // DB 키 이름 매핑 (DB는 snake_case, API는 camelCase)
+          final dbKey = nutrientKey == 'vitamin_b12' ? 'vitamin_b12' : nutrientKey;
+          target = _nutritionTargets![dbKey] ?? 0.0;
+
+          // 섭취량은 DB에서 가져온 dailyNutrition에서 찾기
+          if (_dailyNutritionFromDb != null) {
+            final dbValue = _dailyNutritionFromDb![dbKey];
+            if (dbValue != null) {
+              current = (dbValue as num).toDouble();
+            }
+          }
+        }
+      }
+
+      // 비율 계산 (목표 대비)
+      if (target > 0) {
+        ratio = (current / target) * 100.0;
+      }
+
+      // 모든 영양소를 맵에 추가 (섭취량이 0이어도 포함)
+      nutrientsMap[nutrientKey] = {
+        'current': current,
+        'ratio': ratio,
+      };
     }
 
     // 디버그: 추출된 영양소 데이터 확인
@@ -593,23 +735,46 @@ class _ReportScreenState extends State<ReportScreen> {
       debugPrint('  - $key: current=${value['current']}, ratio=${value['ratio']}%');
     });
 
-    final aiResp = await fetchAiRecommendedRecipes(
-      nickname: _userName,
-      week: _pregnancyWeek ?? 12,
-      bmi: 22.0, // TODO: 실제 BMI로 교체
-      conditions: '없음', // TODO: 실제 진단/질환 정보로 교체
-      // report_pages.dart에서 계산된 모든 영양소 값 전달
-      nutrients: nutrientsMap,
-    );
-    if (!mounted) return;
-    setState(() {
-      if (aiResp.bannerMessage.isNotEmpty) {
-        _bannerMessageFromAi = aiResp.bannerMessage;
-      }
-      if (aiResp.recipes.isNotEmpty) {
-        _aiRecipes = aiResp.recipes;
-      }
-    });
+    // BMI 계산 및 건강 정보 준비
+    final weight = _userWeightKg ?? 60.0; // 기본값 60kg
+    final height = _userHeightCm ?? 160.0; // 기본값 160cm
+    final conditions = _userConditions;
+    final allergies = _userAllergies;
+
+    // 디버그: AI 레시피 추천에 사용되는 값 확인
+    debugPrint('🔍 [ReportScreen] AI 레시피 추천 - 사용자 정보:');
+    debugPrint('  - weight: $weight kg (저장된 값: $_userWeightKg)');
+    debugPrint('  - height: $height cm (저장된 값: $_userHeightCm)');
+    debugPrint('  - conditions: $conditions');
+    debugPrint('  - allergies: $allergies');
+
+    try {
+      final aiResp = await fetchAiRecommendedRecipes(
+        nickname: _userName,
+        week: _pregnancyWeek ?? 12,
+        weight: weight,
+        height: height,
+        conditions: conditions,
+        allergies: allergies,
+        // report_pages.dart에서 계산된 모든 영양소 값 전달
+        nutrients: nutrientsMap,
+      );
+      if (!mounted) return;
+      setState(() {
+        if (aiResp.bannerMessage.isNotEmpty) {
+          _bannerMessageFromAi = aiResp.bannerMessage;
+        }
+        if (aiResp.recipes.isNotEmpty) {
+          _aiRecipes = aiResp.recipes;
+          debugPrint('✅ [ReportScreen] AI 레시피 ${_aiRecipes.length}개 수신 완료');
+        } else {
+          debugPrint('⚠️ [ReportScreen] AI 레시피가 비어있습니다.');
+        }
+      });
+    } catch (e) {
+      debugPrint('❌ [ReportScreen] AI 레시피 추천 실패: $e');
+      // 에러 발생 시에도 앱이 깨지지 않도록 빈 리스트 유지
+    }
   }
 
   List<DateTime> _getWeekDates(DateTime date) {

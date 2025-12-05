@@ -131,7 +131,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
           email: user.email,
         );
         debugPrint('🔍 [RecipeScreen] register_member 응답: $memberInfo');
-        
+
         nickname = memberInfo['nickname'] as String?;
         debugPrint('✅ [RecipeScreen] register_member에서 닉네임: $nickname');
       } catch (e) {
@@ -146,7 +146,9 @@ class _RecipeScreenState extends State<RecipeScreen> {
 
           // nickname 필드 확인 (다양한 가능한 필드명 체크)
           nickname =
-              healthInfo['nickname'] as String? ?? healthInfo['user_nickname'] as String? ?? healthInfo['name'] as String?;
+              healthInfo['nickname'] as String? ??
+              healthInfo['user_nickname'] as String? ??
+              healthInfo['name'] as String?;
 
           debugPrint('🔍 [RecipeScreen] 건강정보에서 추출된 닉네임: $nickname');
         } catch (e) {
@@ -403,7 +405,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                   // 닉네임 길이에 따라 폰트 크기 동적 조정
                   final nameLength = _userName.length;
                   double fontSize = 20;
-                  
+
                   // 닉네임이 길면 폰트 크기 조정
                   if (nameLength > 8) {
                     fontSize = 18;
@@ -414,7 +416,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                   if (nameLength > 16) {
                     fontSize = 14;
                   }
-                  
+
                   return Text(
                     _getRecommendationMessage(),
                     textAlign: TextAlign.center,
