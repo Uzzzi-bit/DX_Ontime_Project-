@@ -592,7 +592,8 @@ class _ReportScreenState extends State<ReportScreen> {
   /// 선택된 날짜에 대한 일별 영양소 데이터를 다시 로드합니다.
   ///
   /// DB에서 선택된 날짜의 식사 기록 및 영양소 데이터를 불러옵니다.
-  Future<void> _reloadDailyNutrientsForSelectedDate() async {
+  /// [shouldFetchRecipes]가 true이면 meal 데이터 추가로 인한 호출로 간주하여 API 호출
+  Future<void> _reloadDailyNutrientsForSelectedDate({bool shouldFetchRecipes = false}) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -600,9 +601,11 @@ class _ReportScreenState extends State<ReportScreen> {
         _todayStatus = createDummyTodayStatus();
         _dailyNutritionFromDb = {}; // 빈 맵으로 초기화
         _buildNutrientSlotsFromStatus();
-        setState(() {
-          _hasNutrientData = true;
-        });
+        if (mounted) {
+          setState(() {
+            _hasNutrientData = true;
+          });
+        }
         return;
       }
 
@@ -675,12 +678,20 @@ class _ReportScreenState extends State<ReportScreen> {
         // 식사 기록 목록도 함께 불러오기
         await _loadMealRecords(user.uid, dateStr);
 
-        // 영양소 데이터가 변경되었으므로 AI 레시피 추천 호출
+        // 영양소 데이터 표시 업데이트
         _buildNutrientSlotsFromStatus();
-        setState(() {
-          _hasNutrientData = true;
-        });
-        await _fetchAiRecommendedRecipes();
+        if (mounted) {
+          setState(() {
+            _hasNutrientData = true;
+          });
+        }
+
+        // AI 레시피 추천 호출 조건 확인 (meal 데이터 추가 시에만 호출)
+        if (shouldFetchRecipes) {
+          // meal 데이터 추가 시
+          debugPrint('🍽️ [ReportScreen] Meal 데이터 추가 감지 - AI 레시피 추천 API 호출');
+          await _fetchAiRecommendedRecipes();
+        }
       } else {
         // 데이터가 없으면 더미 데이터 사용
         _todayStatus = createDummyTodayStatus();
@@ -693,12 +704,20 @@ class _ReportScreenState extends State<ReportScreen> {
           await _loadMealRecords(user.uid, dateStr);
         }
 
-        // 더미 데이터로도 AI 레시피 추천 시도
+        // 영양소 데이터 표시 업데이트
         _buildNutrientSlotsFromStatus();
-        setState(() {
-          _hasNutrientData = true;
-        });
-        await _fetchAiRecommendedRecipes();
+        if (mounted) {
+          setState(() {
+            _hasNutrientData = true;
+          });
+        }
+
+        // AI 레시피 추천 호출 조건 확인 (meal 데이터 추가 시에만 호출)
+        if (shouldFetchRecipes) {
+          // meal 데이터 추가 시
+          debugPrint('🍽️ [ReportScreen] Meal 데이터 추가 감지 (데이터 없음) - AI 레시피 추천 API 호출');
+          await _fetchAiRecommendedRecipes();
+        }
       }
     } catch (e) {
       debugPrint('⚠️ [ReportScreen] 영양소 데이터 로드 실패: $e');
@@ -710,23 +729,24 @@ class _ReportScreenState extends State<ReportScreen> {
     // _nutritionTargets가 로드되었는지 확인
     if (_nutritionTargets == null || _nutritionTargets!.isEmpty) {
       debugPrint('⚠️ [ReportScreen] 영양소 권장량이 아직 로드되지 않았습니다. AI 레시피 추천을 건너뜁니다.');
-      setState(() {
-        _hasNutrientData = true;
-      });
+      if (mounted) {
+        setState(() {
+          _hasNutrientData = true;
+        });
+      }
       return;
     }
 
     _buildNutrientSlotsFromStatus();
 
-    setState(() {
-      _hasNutrientData = true; // TODO: 실제 데이터 없으면 false 처리
-    });
-
-    // 🔽 영양소 데이터가 변경되었으므로 AI 레시피 추천 호출
-    _fetchAiRecommendedRecipes();
+    if (mounted) {
+      setState(() {
+        _hasNutrientData = true; // TODO: 실제 데이터 없으면 false 처리
+      });
+    }
   }
 
-  /// AI 레시피 추천 API 호출 함수 (영양소 데이터 변경 시마다 호출)
+  /// AI 레시피 추천 API 호출 함수 (meal 데이터 추가 시 호출)
   Future<void> _fetchAiRecommendedRecipes() async {
     // 영양소 권장량이 없으면 건너뛰기
     if (_nutritionTargets == null || _nutritionTargets!.isEmpty) {
@@ -1041,8 +1061,8 @@ class _ReportScreenState extends State<ReportScreen> {
           selectedDate: _selectedWeekDate,
           onAnalysisComplete: (Map<String, dynamic> result) async {
             // AnalysisScreen에서 분석 완료 후 콜백
-            // DB에서 최신 영양소 데이터 다시 불러오기
-            await _reloadDailyNutrientsForSelectedDate();
+            // DB에서 최신 영양소 데이터 다시 불러오기 (meal 데이터 추가로 인한 호출)
+            await _reloadDailyNutrientsForSelectedDate(shouldFetchRecipes: true);
             // result: { imageUrl, menuText, mealType, selectedDate }
             final imageUrl = result['imageUrl'] as String?;
             final menuText = result['menuText'] as String?;
