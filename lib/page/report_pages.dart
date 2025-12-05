@@ -1084,112 +1084,111 @@ class _ReportScreenState extends State<ReportScreen> {
               ),
             ),
             const SizedBox(height: 30),
-            // 영양소 분석 슬롯 (오늘 날짜일 때만 표시)
-            if (_hasNutrientData && _isToday(_selectedWeekDate))
-              SizedBox(
-                height: 200,
-                child: GridView.builder(
-                  scrollDirection: Axis.vertical,
-                  physics: const AlwaysScrollableScrollPhysics(), // 스크롤 가능하게
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 1.3,
-                  ),
-                  itemCount: _nutrientSlots.length,
-                  itemBuilder: (context, index) {
-                    final slot = _nutrientSlots[index];
-                    return Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: ColorPalette.primary100.withOpacity(0.2),
-                        border: Border.all(color: ColorPalette.primary100),
-                        borderRadius: BorderRadius.circular(12),
+            // 영양소 분석 슬롯
+            if (_isToday(_selectedWeekDate))
+              // 오늘 날짜인 경우
+              (_hasNutrientData != false)
+                  ? GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(), // 자체 스크롤 비활성화
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: 1.3,
                       ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            slot.name,
-                            style: const TextStyle(
-                              color: ColorPalette.text100,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
+                      itemCount: _nutrientSlots.length,
+                      itemBuilder: (context, index) {
+                        final slot = _nutrientSlots[index];
+                        return Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: ColorPalette.primary100.withOpacity(0.2),
+                            border: Border.all(color: ColorPalette.primary100),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            slot.name == '오메가3'
-                                ? '${slot.current.toStringAsFixed(2)}${slot.unit}/${slot.target.toStringAsFixed(2)}${slot.unit}'
-                                : '${slot.current.toInt()}${slot.unit}/${slot.target.toInt()}${slot.unit}',
-                            style: const TextStyle(
-                              color: ColorPalette.text100,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          // 작은 프로그레스 바 (권장량 달성율)
-                          Container(
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: ColorPalette.bg200,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                            child: FractionallySizedBox(
-                              alignment: Alignment.centerLeft,
-                              widthFactor: (slot.percent / 100).clamp(0.0, 1.0),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: ColorPalette.primary200,
-                                  borderRadius: BorderRadius.circular(2),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                slot.name,
+                                style: const TextStyle(
+                                  color: ColorPalette.text100,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                slot.name == '오메가3'
+                                    ? '${slot.current.toStringAsFixed(2)}${slot.unit}/${slot.target.toStringAsFixed(2)}${slot.unit}'
+                                    : '${slot.current.toInt()}${slot.unit}/${slot.target.toInt()}${slot.unit}',
+                                style: const TextStyle(
+                                  color: ColorPalette.text100,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            ),
+                              const SizedBox(height: 4),
+                              // 작은 프로그레스 바 (권장량 달성율)
+                              Container(
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: ColorPalette.bg200,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                                child: FractionallySizedBox(
+                                  alignment: Alignment.centerLeft,
+                                  widthFactor: (slot.percent / 100).clamp(0.0, 1.0),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: ColorPalette.primary200,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${slot.percent.toInt()}%',
+                                style: const TextStyle(
+                                  color: Color(0xFF5BB5C8),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${slot.percent.toInt()}%',
-                            style: const TextStyle(
-                              color: Color(0xFF5BB5C8),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                            ),
+                        );
+                      },
+                    )
+                  : Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 40),
+                      child: const Center(
+                        child: Text(
+                          '오늘 섭취한 영양소가 없습니다.',
+                          style: TextStyle(
+                            color: ColorPalette.text200,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
                           ),
-                        ],
+                        ),
                       ),
-                    );
-                  },
-                ),
-              )
-            else if (!_isToday(_selectedWeekDate))
+                    )
+            else
+              // 오늘 날짜가 아닌 경우
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 40),
                 child: Center(
                   child: Text(
-                    '${_selectedWeekDate.month}월 ${_selectedWeekDate.day}일에는 아직 섭취한 영양소가 없습니다.',
+                    '${_selectedWeekDate.month}월 ${_selectedWeekDate.day}일에 섭취한 영양소가 없습니다.',
                     style: const TextStyle(
-                      color: ColorPalette.text200,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                ),
-              )
-            else
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 40),
-                child: const Center(
-                  child: Text(
-                    '오늘 아직 섭취한 영양소가 없습니다.',
-                    style: TextStyle(
                       color: ColorPalette.text200,
                       fontSize: 14,
                       fontWeight: FontWeight.w400,

@@ -53,16 +53,7 @@ class SupplementChecklist extends StatelessWidget {
                       color: Color(0xFFBCE7F0),
                       shape: BoxShape.circle,
                     ),
-                    child: const Center(
-                      child: Text(
-                        '+',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w300,
-                          color: Color(0xFF0F0F0F),
-                        ),
-                      ),
-                    ),
+                    child: const Icon(Icons.add, color: Color(0xFF000000), size: 13),
                   ),
                 ],
               ),

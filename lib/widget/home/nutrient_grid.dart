@@ -27,10 +27,10 @@ class NutrientGrid extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         // 전체 크기를 줄이기 위해 기준 너비를 280px로 축소
-        const double fixedMobileWidth = 280.0;
+        const double fixedMobileWidth = 260.0;
 
         // 간격과 바 길이 계산 (축소된 280px 기준)
-        final gap = 8.0; // 중앙 간격 8px로 축소 (12 -> 8)
+        final gap = 6.0; // 중앙 간격 8px로 축소 (12 -> 8)
         final columnWidth = (fixedMobileWidth - gap) / 2;
         final maxGaugeWidth = columnWidth * 0.35; // 게이지 바 길이 비율 축소 (0.38 -> 0.35)
 
@@ -46,7 +46,7 @@ class NutrientGrid extends StatelessWidget {
                 Expanded(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center, // 세로 가운데 정렬
                     children: leftItems.asMap().entries.map((entry) {
                       final index = entry.key;
@@ -151,7 +151,7 @@ class NutrientGrid extends StatelessWidget {
 
         // 2. 게이지 바 - 고정 너비로 설정하여 6개 모두 같은 길이 보장
         SizedBox(
-          width: ResponsiveHelper.width(context, 0.15), // 모든 게이지 바가 동일한 최대 너비 사용
+          width: ResponsiveHelper.width(context, 0.12), // 모든 게이지 바가 동일한 최대 너비 사용
           height: ResponsiveHelper.height(context, 0.030), // 높이 축소 (0.038 -> 0.030)
           child: ClipRRect(
             borderRadius: BorderRadius.circular(ResponsiveHelper.height(context, 0.025)), // 둥근 모서리 축소
