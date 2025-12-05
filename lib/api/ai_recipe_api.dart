@@ -108,7 +108,7 @@ Future<AiRecipeResponse> fetchAiRecommendedRecipes({
     if (resp.body.length < 2000) {
       print('📥 [AI Recipe API] 응답 본문 전체: ${resp.body}');
     }
-    
+
     final decoded = jsonDecode(resp.body) as Map<String, dynamic>;
     print('✅ [AI Recipe API] JSON 파싱 성공');
     print('  - decoded keys: ${decoded.keys.toList()}');

@@ -59,22 +59,128 @@ class RecipeData {
       return const [];
     }
 
+    final cookingSteps = toStringList(json['cookingSteps']);
+    final isOvenAvailable = json['isOvenAvailable'] as bool? ?? false;
+    final ovenMode = json['ovenMode'] as String?;
+    final ovenTimeMinutes = (json['ovenTimeMinutes'] as num?)?.toInt();
+
+    // AI가 제공한 오븐 정보가 있으면 ovenSettings 생성
+    OvenSettings? ovenSettings;
+    if (isOvenAvailable && ovenMode != null && ovenTimeMinutes != null) {
+      // cookingSteps에서 온도 정보 추출 시도
+      final stepsText = cookingSteps.join(' ');
+      final tempReg = RegExp(r'(\d{1,3})(도|℃)');
+      final tempMatch = tempReg.firstMatch(stepsText);
+      final temperature = tempMatch?.group(0) ?? '180도';
+
+      // 오븐 모드 정규화
+      String normalizedMode = ovenMode;
+      final modeMap = {
+        '오븐': '오븐',
+        '전자레인지': '전자레인지',
+        '해동': '해동',
+        '에어프라이': '에어 프라이',
+        '스팀전자레인지': '스팀 전자레인지',
+        '에어수비드': '에어수비드',
+      };
+      if (modeMap.containsKey(ovenMode)) {
+        normalizedMode = modeMap[ovenMode]!;
+      }
+
+      ovenSettings = OvenSettings(
+        mode: normalizedMode,
+        temperature: temperature,
+        time: '${ovenTimeMinutes}분',
+      );
+    } else if (isOvenAvailable && cookingSteps.isNotEmpty) {
+      // AI가 오븐 정보를 제공하지 않았지만 isOvenAvailable이 true면
+      // cookingSteps에서 파싱 시도
+      ovenSettings = _parseOvenSettingsFromSteps(cookingSteps);
+    }
+
     return RecipeData(
       title: json['title'] as String? ?? '',
       fullTitle: json['fullTitle'] as String? ?? '',
       imagePath: json['imagePath'] as String? ?? '',
       ingredients: toStringList(json['ingredients']),
-      cookingSteps: toStringList(json['cookingSteps']),
+      cookingSteps: cookingSteps,
       tip: json['tip'] as String? ?? '',
-      isOvenAvailable: json['isOvenAvailable'] as bool? ?? false,
-      ovenMode: json['ovenMode'] as String?,
-      ovenTimeMinutes: (json['ovenTimeMinutes'] as num?)?.toInt(),
-      // 일단 AI 응답에 대해서는 ovenSettings는 null로 두고,
-      // 필요하다면 나중에 cookingSteps에서 별도 파싱해서 채울 수 있도록 남겨둔다.
-      ovenSettings: null,
+      isOvenAvailable: isOvenAvailable,
+      ovenMode: ovenMode,
+      ovenTimeMinutes: ovenTimeMinutes,
+      ovenSettings: ovenSettings,
       calories: (json['calories'] as num?)?.toInt() ?? 0,
       tags: toStringList(json['tags']),
     );
+  }
+
+  /// cookingSteps에서 오븐 설정을 파싱하는 헬퍼 함수
+  static OvenSettings? _parseOvenSettingsFromSteps(List<String> steps) {
+    String fullText = steps.join(' ');
+    final modeReg = RegExp(r'(전자레인지|오븐|에어프라이어?|해동|스팀\s*전자레인지|에어수비드|광파오븐)');
+    final modeMatches = modeReg.allMatches(fullText);
+
+    for (final modeMatch in modeMatches) {
+      final mode = modeMatch.group(0)!;
+      final modeStart = modeMatch.start;
+      final searchStart = (modeStart - 20).clamp(0, fullText.length);
+      final searchEnd = (modeStart + 100).clamp(0, fullText.length);
+      final contextText = fullText.substring(searchStart, searchEnd);
+
+      final tempReg = RegExp(r'(\d{1,3})(도|℃)');
+      final tempMatch = tempReg.firstMatch(contextText);
+
+      String? timeStr;
+      if (tempMatch != null) {
+        final tempEnd = tempMatch.end;
+        final timeContext = contextText.substring(tempEnd);
+        final timeReg = RegExp(r'(\d{1,3})분');
+        final timeMatch = timeReg.firstMatch(timeContext);
+        if (timeMatch != null) {
+          timeStr = timeMatch.group(0);
+        }
+      } else {
+        final timeReg = RegExp(r'(\d{1,3})분');
+        final timeMatch = timeReg.firstMatch(contextText);
+        if (timeMatch != null) {
+          timeStr = timeMatch.group(0);
+        }
+      }
+
+      if (timeStr != null) {
+        // 모드 이름 정규화
+        String normalizeMode(String mode) {
+          String normalized = mode.replaceAll(RegExp(r'\s+'), '');
+          final modeMap = {
+            '에어프라이어': '에어 프라이',
+            '에어프라이': '에어 프라이',
+            '스팀전자레인지': '스팀 전자레인지',
+            '전자레인지': '전자레인지',
+            '오븐': '오븐',
+            '해동': '해동',
+            '에어수비드': '에어수비드',
+            '광파오븐': '전자레인지',
+          };
+          if (modeMap.containsKey(normalized)) {
+            return modeMap[normalized]!;
+          }
+          for (final entry in modeMap.entries) {
+            if (normalized.contains(entry.key) || entry.key.contains(normalized)) {
+              return entry.value;
+            }
+          }
+          return mode;
+        }
+
+        String normalizedMode = normalizeMode(mode);
+        return OvenSettings(
+          mode: normalizedMode,
+          temperature: tempMatch?.group(0) ?? '180도',
+          time: timeStr,
+        );
+      }
+    }
+    return null;
   }
 }
 
@@ -95,9 +201,23 @@ class RecipeScreen extends StatefulWidget {
   static List<RecipeData> getRecommendedRecipes() {
     return _RecipeScreenState._getRecipes();
   }
+
+  // 최신 AI 레시피를 저장하는 정적 변수 (전역 상태)
+  static List<RecipeData>? _latestAiRecipes;
+
+  // 최신 AI 레시피를 설정하는 정적 메서드
+  static void setLatestAiRecipes(List<RecipeData> recipes) {
+    _latestAiRecipes = recipes;
+    debugPrint('✅ [RecipeScreen] 최신 AI 레시피 저장: ${recipes.length}개');
+  }
+
+  // 최신 AI 레시피를 가져오는 정적 메서드
+  static List<RecipeData>? getLatestAiRecipes() {
+    return _latestAiRecipes;
+  }
 }
 
-class _RecipeScreenState extends State<RecipeScreen> {
+class _RecipeScreenState extends State<RecipeScreen> with WidgetsBindingObserver {
   late int _selectedMenuIndex;
   late List<RecipeData> _recipes;
   String _userName = '사용자'; // 기본값
@@ -105,12 +225,87 @@ class _RecipeScreenState extends State<RecipeScreen> {
   @override
   void initState() {
     super.initState();
+    // 생명주기 관찰자 등록
+    WidgetsBinding.instance.addObserver(this);
     // 초기 메뉴 인덱스가 전달되면 사용, 없으면 0 (첫 번째 메뉴)
     _selectedMenuIndex = widget.initialMenuIndex ?? 0;
-    // AI에서 레시피가 넘어오면 그걸 사용, 아니면 기존 목 데이터를 사용
-    _recipes = widget.initialRecipes ?? RecipeScreen.getRecommendedRecipes();
+    // AI에서 레시피가 넘어오면 그걸 사용, 아니면 전역 상태에서 가져오기, 없으면 기존 목 데이터 사용
+    _recipes = widget.initialRecipes ?? RecipeScreen.getLatestAiRecipes() ?? RecipeScreen.getRecommendedRecipes();
+    debugPrint('✅ [RecipeScreen] 초기화: 레시피 ${_recipes.length}개 로드');
+    if (_recipes.isNotEmpty) {
+      debugPrint('  - 첫 번째 레시피: ${_recipes[0].title}');
+    }
     // 사용자 닉네임 로드
     _loadUserNickname();
+  }
+
+  @override
+  void dispose() {
+    // 생명주기 관찰자 해제
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // 앱이 포그라운드로 돌아올 때 최신 레시피 확인
+    if (state == AppLifecycleState.resumed) {
+      _checkForLatestRecipes();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 화면이 활성화될 때마다 최신 AI 레시피 확인
+    _checkForLatestRecipes();
+  }
+
+  /// 최신 AI 레시피를 확인하고 업데이트하는 헬퍼 메서드
+  void _checkForLatestRecipes() {
+    final latestRecipes = RecipeScreen.getLatestAiRecipes();
+    if (latestRecipes != null && latestRecipes.isNotEmpty) {
+      // 최신 레시피가 있고 현재 레시피와 다르면 업데이트
+      bool needsUpdate = false;
+      if (_recipes.length != latestRecipes.length) {
+        needsUpdate = true;
+      } else if (_recipes.isNotEmpty && latestRecipes.isNotEmpty) {
+        // 첫 번째 레시피의 제목이나 다른 속성을 비교
+        if (_recipes[0].title != latestRecipes[0].title || _recipes[0].fullTitle != latestRecipes[0].fullTitle) {
+          needsUpdate = true;
+        }
+      }
+
+      if (needsUpdate) {
+        debugPrint('🔄 [RecipeScreen] 최신 AI 레시피 감지: ${latestRecipes.length}개');
+        if (mounted) {
+          setState(() {
+            _recipes = latestRecipes;
+            // 선택된 메뉴 인덱스가 범위를 벗어나면 0으로 초기화
+            if (_selectedMenuIndex >= _recipes.length) {
+              _selectedMenuIndex = 0;
+            }
+          });
+        }
+      }
+    }
+  }
+
+  @override
+  void didUpdateWidget(RecipeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 새로운 레시피가 전달되면 업데이트
+    if (widget.initialRecipes != null && widget.initialRecipes != oldWidget.initialRecipes) {
+      debugPrint('🔄 [RecipeScreen] 새로운 AI 레시피 업데이트: ${widget.initialRecipes!.length}개');
+      setState(() {
+        _recipes = widget.initialRecipes!;
+        // 선택된 메뉴 인덱스가 범위를 벗어나면 0으로 초기화
+        if (_selectedMenuIndex >= _recipes.length) {
+          _selectedMenuIndex = 0;
+        }
+      });
+    }
   }
 
   /// 사용자 닉네임을 API에서 가져옵니다.

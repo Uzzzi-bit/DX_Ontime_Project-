@@ -104,11 +104,7 @@ class _ReportScreenState extends State<ReportScreen> {
   List<NutrientSlot> _nutrientSlots = []; // 빈 리스트로 초기화
   bool _hasNutrientData = true; // 기존 필드는 그대로 사용하되, 이제 실제 상태에 맞게 바꾸도록 준비
   Map<String, double>? _nutritionTargets; // API에서 가져온 영양소 권장량
-<<<<<<< HEAD
   Map<String, dynamic>? _dailyNutritionFromDb; // DB에서 가져온 일별 영양소 데이터 (추가 영양소 포함)
-=======
-  Map<String, double>? _dailyNutritionFromDB; // DB에서 가져온 일일 영양소 데이터 (세부 영양소 포함)
->>>>>>> 13e75079617176146b7ada850cbf563359092501
 
   // 홈 화면에서 사용할 영양소 비율 (static으로 공유)
   static final Map<NutrientType, double> _nutrientProgressMap = {};
@@ -130,7 +126,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
     // TODO: [SERVER][DB] 나중에 API 연동으로 교체
     _todayStatus = createDummyTodayStatus();
-    _dailyNutritionFromDB = {}; // 빈 맵으로 초기화
+    _dailyNutritionFromDb = {}; // 빈 맵으로 초기화
     // _buildNutrientSlotsFromStatus()는 _loadUserInfoAndNutritionTargets() 완료 후 호출됨
 
     // 사용자 정보 및 영양소 권장량 로드 후 일별 영양소 데이터 로드
@@ -504,61 +500,67 @@ class _ReportScreenState extends State<ReportScreen> {
                 target = _nutritionTargets![nutrientKey] ?? 0;
               }
 
-          // 현재 섭취량은 DB에서 직접 가져오기 (세부 영양소 포함)
-          double current = 0;
-          NutrientType? type;
-          
-          // DB에서 직접 가져온 값 사용 (세부 영양소 포함)
-          // DB 키와 nutrientKey 매핑
-          String dbKey = nutrientKey;
-          if (nutrientKey == 'carb') {
-            dbKey = 'carbs';
-          } else if (nutrientKey == 'vitamin_b12') {
-            dbKey = 'vitamin_b'; // DB에는 vitamin_b로 저장됨
-          }
-          
-          if (_dailyNutritionFromDB != null && _dailyNutritionFromDB!.containsKey(dbKey)) {
-            current = _dailyNutritionFromDB![dbKey] ?? 0.0;
-          } else if (_dailyNutritionFromDB != null && _dailyNutritionFromDB!.containsKey(nutrientKey)) {
-            current = _dailyNutritionFromDB![nutrientKey] ?? 0.0;
-          } else {
-            // DB에 없으면 DailyNutrientStatus에서 가져오기
-            switch (nutrientKey) {
-              case 'carb':
-                type = NutrientType.carb;
-                break;
-              case 'protein':
-                type = NutrientType.protein;
-                break;
-              case 'fat':
-                type = NutrientType.fat;
-                break;
-              case 'sodium':
-                type = NutrientType.sodium;
-                break;
-              case 'iron':
-                type = NutrientType.iron;
-                break;
-              case 'folate':
-                type = NutrientType.folate;
-                break;
-              case 'calcium':
-                type = NutrientType.calcium;
-                break;
-              case 'vitamin_d':
-                type = NutrientType.vitaminD;
-                break;
-              case 'omega3':
-                type = NutrientType.omega3;
-                break;
-              default:
-                current = 0;
-                break;
-            }
-            if (type != null) {
-              current = _todayStatus.consumed[type] ?? 0;
-            }
-          }
+              // 현재 섭취량은 DB에서 직접 가져오기 (세부 영양소 포함)
+              double current = 0;
+              NutrientType? type;
+
+              // DB에서 직접 가져온 값 사용 (세부 영양소 포함)
+              // DB 키와 nutrientKey 매핑
+              String dbKey = nutrientKey;
+              if (nutrientKey == 'carb') {
+                dbKey = 'carbs';
+              } else if (nutrientKey == 'vitamin_b12') {
+                dbKey = 'vitamin_b'; // DB에는 vitamin_b로 저장됨
+              }
+
+              if (_dailyNutritionFromDb != null && _dailyNutritionFromDb!.containsKey(dbKey)) {
+                final dbValue = _dailyNutritionFromDb![dbKey];
+                if (dbValue != null) {
+                  current = (dbValue as num).toDouble();
+                }
+              } else if (_dailyNutritionFromDb != null && _dailyNutritionFromDb!.containsKey(nutrientKey)) {
+                final dbValue = _dailyNutritionFromDb![nutrientKey];
+                if (dbValue != null) {
+                  current = (dbValue as num).toDouble();
+                }
+              } else {
+                // DB에 없으면 DailyNutrientStatus에서 가져오기
+                switch (nutrientKey) {
+                  case 'carb':
+                    type = NutrientType.carb;
+                    break;
+                  case 'protein':
+                    type = NutrientType.protein;
+                    break;
+                  case 'fat':
+                    type = NutrientType.fat;
+                    break;
+                  case 'sodium':
+                    type = NutrientType.sodium;
+                    break;
+                  case 'iron':
+                    type = NutrientType.iron;
+                    break;
+                  case 'folate':
+                    type = NutrientType.folate;
+                    break;
+                  case 'calcium':
+                    type = NutrientType.calcium;
+                    break;
+                  case 'vitamin_d':
+                    type = NutrientType.vitaminD;
+                    break;
+                  case 'omega3':
+                    type = NutrientType.omega3;
+                    break;
+                  default:
+                    current = 0;
+                    break;
+                }
+                if (type != null) {
+                  current = _todayStatus.consumed[type] ?? 0;
+                }
+              }
 
               // 권장량 달성율 계산 (0~200%)
               final percent = target > 0 ? ((current / target) * 100).clamp(0.0, 200.0) : 0.0;
@@ -596,7 +598,7 @@ class _ReportScreenState extends State<ReportScreen> {
       if (user == null) {
         debugPrint('⚠️ [ReportScreen] 사용자 로그인 정보가 없습니다.');
         _todayStatus = createDummyTodayStatus();
-        _dailyNutritionFromDB = {}; // 빈 맵으로 초기화
+        _dailyNutritionFromDb = {}; // 빈 맵으로 초기화
         _buildNutrientSlotsFromStatus();
         setState(() {
           _hasNutrientData = true;
@@ -616,11 +618,10 @@ class _ReportScreenState extends State<ReportScreen> {
 
       if (dailyNutrition['success'] == true) {
         final totalNutrition = dailyNutrition['total_nutrition'] as Map<String, dynamic>;
-        
+
         // DB에서 가져온 모든 영양소 데이터 저장 (세부 영양소 포함)
-        _dailyNutritionFromDB = Map<String, double>.from(
-          totalNutrition.map((key, value) => MapEntry(key, (value as num?)?.toDouble() ?? 0.0)),
-        );
+        // Map<String, dynamic>으로 저장 (타입 변환은 사용 시점에 수행)
+        _dailyNutritionFromDb = Map<String, dynamic>.from(totalNutrition);
 
         // DB에서 가져온 섭취량을 NutrientType Map으로 변환
         // 모든 영양소를 포함하되, DB에 없는 것은 0.0으로 설정
@@ -683,11 +684,7 @@ class _ReportScreenState extends State<ReportScreen> {
       } else {
         // 데이터가 없으면 더미 데이터 사용
         _todayStatus = createDummyTodayStatus();
-<<<<<<< HEAD
         _dailyNutritionFromDb = null; // DB 데이터 없음
-=======
-        _dailyNutritionFromDB = {}; // 빈 맵으로 초기화
->>>>>>> 13e75079617176146b7ada850cbf563359092501
         debugPrint('⚠️ [ReportScreen] 해당 날짜에 식사 기록이 없습니다.');
 
         // 식사 기록도 초기화
@@ -707,7 +704,7 @@ class _ReportScreenState extends State<ReportScreen> {
       debugPrint('⚠️ [ReportScreen] 영양소 데이터 로드 실패: $e');
       // 에러 발생 시 더미 데이터 사용
       _todayStatus = createDummyTodayStatus();
-      _dailyNutritionFromDB = {}; // 빈 맵으로 초기화
+      _dailyNutritionFromDb = {}; // 빈 맵으로 초기화
     }
 
     // _nutritionTargets가 로드되었는지 확인
@@ -865,6 +862,8 @@ class _ReportScreenState extends State<ReportScreen> {
         }
         if (aiResp.recipes.isNotEmpty) {
           _aiRecipes = aiResp.recipes;
+          // 전역 상태에 최신 AI 레시피 저장 (RecipeScreen이 자동으로 업데이트됨)
+          RecipeScreen.setLatestAiRecipes(_aiRecipes);
           debugPrint('✅ [ReportScreen] AI 레시피 ${_aiRecipes.length}개 수신 완료');
         } else {
           debugPrint('⚠️ [ReportScreen] AI 레시피가 비어있습니다.');
