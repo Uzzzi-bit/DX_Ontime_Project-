@@ -387,9 +387,21 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             children: [
               _buildStepContent(),
               const SizedBox(height: 24),
-              if (_currentStep != _AnalysisStep.nutrientAnalysis) _buildFoodInputSection(),
-              if (_currentStep != _AnalysisStep.nutrientAnalysis) const SizedBox(height: 12),
-              if (_currentStep != _AnalysisStep.nutrientAnalysis) _buildFoodList(),
+              if (_currentStep != _AnalysisStep.nutrientAnalysis) ...[
+                _buildFoodInputSection(),
+                const SizedBox(height: 16),
+                if (_currentStep == _AnalysisStep.reviewFoods) ...[
+                  const Text(
+                    '분석된 음식 목록',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                _buildFoodList(),
+              ],
               const SizedBox(height: 24),
               Bounceable(
                 onTap: () {
@@ -435,20 +447,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           ],
         );
       case _AnalysisStep.reviewFoods:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildImagePreview(),
-            const SizedBox(height: 16),
-            const Text(
-              '분석된 음식 목록',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        );
+        return _buildImagePreview();
       case _AnalysisStep.nutrientAnalysis:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -806,6 +805,10 @@ class _ConfirmDialog extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(context, false),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: ColorPalette.primary300,
+                      side: const BorderSide(color: ColorPalette.primary300),
+                    ),
                     child: const Text('취소'),
                   ),
                 ),
