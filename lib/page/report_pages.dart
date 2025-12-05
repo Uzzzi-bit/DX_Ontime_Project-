@@ -157,43 +157,82 @@ class _ReportScreenState extends State<ReportScreen> {
       if (result['success'] == true) {
         final meals = result['meals'] as List;
 
-        // 식사 타입별로 초기화
-        final mealMap = <String, MealRecord>{
-          '아침': MealRecord(mealType: '아침', hasRecord: false),
-          '점심': MealRecord(mealType: '점심', hasRecord: false),
-          '간식': MealRecord(mealType: '간식', hasRecord: false),
-          '저녁': MealRecord(mealType: '저녁', hasRecord: false),
+        // 식사 타입별로 초기화 (여러 식사 기록을 합치기 위해 리스트로 관리)
+        final mealMap = <String, List<Map<String, dynamic>>>{
+          '아침': [],
+          '점심': [],
+          '간식': [],
+          '저녁': [],
         };
 
-        // DB에서 불러온 meals로 업데이트
+        // DB에서 불러온 meals를 타입별로 그룹화
         for (final mealData in meals) {
           final mealTime = mealData['meal_time'] as String;
-          final memo = mealData['memo'] as String? ?? '';
-          final imageUrl = mealData['image_url'] as String?;
-          final foods = mealData['foods'] as List? ?? [];
+          if (mealMap.containsKey(mealTime)) {
+            mealMap[mealTime]!.add(mealData);
+          }
+        }
 
-          // foods를 List<String>으로 변환
-          final foodsList = foods.map((f) => f.toString()).toList();
+        // 각 식사 타입별로 모든 기록을 합쳐서 하나의 MealRecord로 만들기
+        final finalMealMap = <String, MealRecord>{};
+        for (final entry in mealMap.entries) {
+          final mealTime = entry.key;
+          final mealList = entry.value;
 
-          mealMap[mealTime] = MealRecord(
-            mealType: mealTime,
-            imagePath: imageUrl,
-            menuText: foodsList.isNotEmpty ? foodsList.join(', ') : (memo.isNotEmpty ? memo : null),
-            hasRecord: true,
-            foods: foodsList.isNotEmpty ? foodsList : null, // 분석된 음식 목록
-          );
+          if (mealList.isEmpty) {
+            // 기록이 없으면 기본값
+            finalMealMap[mealTime] = MealRecord(mealType: mealTime, hasRecord: false);
+          } else {
+            // 여러 식사 기록을 합치기
+            final allFoods = <String>[];
+            final allImages = <String>[];
+            final allMemos = <String>[];
+
+            for (final mealData in mealList) {
+              final foods = mealData['foods'] as List? ?? [];
+              final imageUrl = mealData['image_url'] as String?;
+              final memo = mealData['memo'] as String? ?? '';
+
+              // foods를 List<String>으로 변환하여 추가
+              final foodsList = foods.map((f) => f.toString()).toList();
+              allFoods.addAll(foodsList);
+
+              if (imageUrl != null && imageUrl.isNotEmpty) {
+                allImages.add(imageUrl);
+              }
+              if (memo.isNotEmpty) {
+                allMemos.add(memo);
+              }
+            }
+
+            // 첫 번째 이미지를 대표 이미지로 사용 (여러 개가 있으면 첫 번째 것)
+            final representativeImage = allImages.isNotEmpty ? allImages.first : null;
+
+            // 모든 음식 목록을 합쳐서 표시
+            final combinedMenuText = allFoods.isNotEmpty
+                ? allFoods.join(', ')
+                : (allMemos.isNotEmpty ? allMemos.join(', ') : null);
+
+            finalMealMap[mealTime] = MealRecord(
+              mealType: mealTime,
+              imagePath: representativeImage,
+              menuText: combinedMenuText,
+              hasRecord: true,
+              foods: allFoods.isNotEmpty ? allFoods : null, // 모든 음식 목록
+            );
+          }
         }
 
         if (mounted) {
           setState(() {
             _mealRecords = [
-              mealMap['아침']!,
-              mealMap['점심']!,
-              mealMap['간식']!,
-              mealMap['저녁']!,
+              finalMealMap['아침']!,
+              finalMealMap['점심']!,
+              finalMealMap['간식']!,
+              finalMealMap['저녁']!,
             ];
           });
-          debugPrint('✅ [ReportScreen] 식사 기록 로드 완료: ${meals.length}개');
+          debugPrint('✅ [ReportScreen] 식사 기록 로드 완료: ${meals.length}개 (아침: ${mealMap['아침']!.length}, 점심: ${mealMap['점심']!.length}, 간식: ${mealMap['간식']!.length}, 저녁: ${mealMap['저녁']!.length})');
         }
       }
     } catch (e) {
