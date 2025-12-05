@@ -1339,14 +1339,38 @@ class _ReportScreenState extends State<ReportScreen> {
                   (meal) => Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        meal.mealType,
-                        style: const TextStyle(
-                          color: Color(0xFF1D1B20),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.15,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            meal.mealType,
+                            style: const TextStyle(
+                              color: Color(0xFF1D1B20),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.15,
+                            ),
+                          ),
+                          if (meal.hasRecord)
+                            Material(
+                              color: Colors.transparent,
+                              child: IconButton(
+                                // TODO: [AI] [DB] 편집 시 기존 분석 결과 수정 또는 재분석 기능
+                                onPressed: () => _navigateToMealRecord(meal.mealType),
+                                icon: const Icon(
+                                  Icons.edit,
+                                  color: Color(0xFF1D1B20),
+                                  size: 20,
+                                ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 32,
+                                  minHeight: 32,
+                                ),
+                                tooltip: '편집',
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       _buildMealCard(meal),
@@ -1381,132 +1405,103 @@ class _ReportScreenState extends State<ReportScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: ColorPalette.bg300),
       ),
-      child: Stack(
-        clipBehavior: Clip.none, // 웹에서도 아이콘이 잘리지 않도록
+      child: Row(
         children: [
-          Row(
-            children: [
-              // TODO: [DB] 저장된 사진은 서버 URL 또는 로컬 경로에서 가져오기
-              // Image.asset 대신 Image.network 또는 Image.file 사용
-              if (meal.hasRecord && meal.imagePath != null)
-                Container(
-                  width: 80,
-                  height: 100,
-                  margin: const EdgeInsets.only(right: 16),
-                  decoration: BoxDecoration(
-                    color: ColorPalette.bg200,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: ColorPalette.bg300),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: _buildMealImage(meal.imagePath!),
-                  ),
-                ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 분석된 음식 목록 표시 (사진 옆에)
-                    if (meal.hasRecord && meal.foods != null && meal.foods!.isNotEmpty)
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: meal.foods!.map((food) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: ColorPalette.primary100.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: ColorPalette.primary100.withOpacity(0.3),
-                                width: 1,
-                              ),
-                            ),
-                            child: Text(
-                              food,
-                              style: const TextStyle(
-                                color: Color(0xFF1D1B20),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 0.1,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      )
-                    else if (meal.hasRecord && meal.menuText != null)
-                      Text(
-                        meal.menuText!,
-                        style: const TextStyle(
-                          color: Color(0xFF1D1B20),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                          letterSpacing: 0.25,
-                          height: 1.4,
-                        ),
-                      )
-                    else
-                      Bounceable(
-                        onTap: () => _navigateToMealRecord(meal.mealType),
-                        child: Row(
-                          children: const [
-                            Icon(
-                              Icons.add_circle,
-                              size: 20,
-                              color: ColorPalette.text100,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              '기록하기',
-                              style: TextStyle(
-                                color: ColorPalette.text100,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w400,
-                                letterSpacing: 0.25,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    // TODO: [AI] 분석 결과 추가 정보 표시 영역
-                    // if (meal.analysisResult != null) ...[
-                    //   const SizedBox(height: 8),
-                    //   Text(
-                    //     '칼로리: ${meal.analysisResult!['calories']}kcal',
-                    //     style: TextStyle(...),
-                    //   ),
-                    //   // 영양소 정보 표시
-                    // ],
-                  ],
-                ),
+          // TODO: [DB] 저장된 사진은 서버 URL 또는 로컬 경로에서 가져오기
+          // Image.asset 대신 Image.network 또는 Image.file 사용
+          if (meal.hasRecord && meal.imagePath != null)
+            Container(
+              width: 80,
+              height: 100,
+              margin: const EdgeInsets.only(right: 16),
+              decoration: BoxDecoration(
+                color: ColorPalette.bg200,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: ColorPalette.bg300),
               ),
-            ],
-          ),
-          // 편집 아이콘을 오른쪽 상단에 배치 (웹에서도 보이도록 Material로 감싸기)
-          if (meal.hasRecord)
-            Positioned(
-              top: -8,
-              right: -8,
-              child: Material(
-                color: Colors.transparent,
-                child: IconButton(
-                  // TODO: [AI] [DB] 편집 시 기존 분석 결과 수정 또는 재분석 기능
-                  onPressed: () => _navigateToMealRecord(meal.mealType),
-                  icon: const Icon(
-                    Icons.edit,
-                    color: Color(0xFF1D1B20),
-                    size: 20,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 32,
-                    minHeight: 32,
-                  ),
-                  tooltip: '편집',
-                ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: _buildMealImage(meal.imagePath!),
               ),
             ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 분석된 음식 목록 표시 (사진 옆에)
+                if (meal.hasRecord && meal.foods != null && meal.foods!.isNotEmpty)
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: meal.foods!.map((food) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: ColorPalette.primary100.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: ColorPalette.primary100.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          food,
+                          style: const TextStyle(
+                            color: Color(0xFF1D1B20),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.1,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  )
+                else if (meal.hasRecord && meal.menuText != null)
+                  Text(
+                    meal.menuText!,
+                    style: const TextStyle(
+                      color: Color(0xFF1D1B20),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      letterSpacing: 0.25,
+                      height: 1.4,
+                    ),
+                  )
+                else
+                  Bounceable(
+                    onTap: () => _navigateToMealRecord(meal.mealType),
+                    child: Row(
+                      children: const [
+                        Icon(
+                          Icons.add_circle,
+                          size: 20,
+                          color: ColorPalette.text100,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          '기록하기',
+                          style: TextStyle(
+                            color: ColorPalette.text100,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            letterSpacing: 0.25,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                // TODO: [AI] 분석 결과 추가 정보 표시 영역
+                // if (meal.analysisResult != null) ...[
+                //   const SizedBox(height: 8),
+                //   Text(
+                //     '칼로리: ${meal.analysisResult!['calories']}kcal',
+                //     style: TextStyle(...),
+                //   ),
+                //   // 영양소 정보 표시
+                // ],
+              ],
+            ),
+          ),
         ],
       ),
     );
