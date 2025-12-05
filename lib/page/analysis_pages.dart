@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -17,12 +16,14 @@ class AnalysisScreen extends StatefulWidget {
   final String? mealType; // 식사 타입: '아침', '점심', '간식', '저녁'
   final DateTime? selectedDate; // 선택된 날짜
   final Function(Map<String, dynamic>)? onAnalysisComplete; // 분석 완료 콜백
+  final List<String>? existingFoods; // 편집 모드일 때 기존 음식 목록
 
   const AnalysisScreen({
     super.key,
     this.mealType,
     this.selectedDate,
     this.onAnalysisComplete,
+    this.existingFoods,
   });
 
   @override
@@ -40,12 +41,21 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   int? _savedImageId; // Django DB에 저장된 이미지 ID
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.existingFoods != null && widget.existingFoods!.isNotEmpty) {
+      _foodItems.addAll(widget.existingFoods!);
+      _currentStep = _AnalysisStep.reviewFoods;
+      debugPrint('✅ [AnalysisScreen] 편집 모드: 기존 음식 ${_foodItems.length}개 로드');
+    }
+  }
+
+  @override
   void dispose() {
     _foodController.dispose();
     super.dispose();
   }
 
-  // [AI] [DB] 사진 선택 및 AI 이미지 분석
   Future<void> _handleImageSelection(ImageSource source) async {
     try {
       final picked = await _picker.pickImage(source: source);
@@ -57,11 +67,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         _currentStep = _AnalysisStep.analyzingImage;
       });
 
-      // Firebase Storage에 이미지 업로드
       try {
         final storageService = StorageService();
-
-        // 1. Firebase Storage에 이미지 업로드
         final imageUrl = await storageService.uploadImage(
           imageFile: imageFile,
           folder: 'meal_images',
@@ -71,7 +78,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           _uploadedImageUrl = imageUrl;
         });
 
-        // 2. Django DB에 이미지 정보 저장하여 image_id 얻기
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
           try {
@@ -82,15 +88,12 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               imageType: 'meal',
               source: 'meal_form',
             );
-            // image_id 저장 (나중에 meal 저장 시 사용)
             _savedImageId = imageData['id'] as int?;
             debugPrint('✅ [AnalysisScreen] 이미지 DB 저장 완료: image_id=$_savedImageId');
           } catch (e) {
             debugPrint('⚠️ [AnalysisScreen] 이미지 DB 저장 실패: $e');
-            // 이미지 DB 저장 실패해도 계속 진행
           }
 
-          // 3. YOLO로 이미지 분석
           await _analyzeImageWithYOLO(imageFile, user.uid);
         } else {
           throw Exception('로그인이 필요합니다');
@@ -116,7 +119,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     }
   }
 
-  // YOLO로 이미지 분석
   Future<void> _analyzeImageWithYOLO(File imageFile, String memberId) async {
     try {
       debugPrint('🔄 [AnalysisScreen] YOLO 이미지 분석 시작');
@@ -138,7 +140,9 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
           setState(() {
             _currentStep = _AnalysisStep.reviewFoods;
-            _foodItems.clear();
+            if (widget.existingFoods == null || widget.existingFoods!.isEmpty) {
+              _foodItems.clear();
+            }
             if (foods.isNotEmpty) {
               _foodItems.addAll(
                 foods.map((f) => f['name'] as String).toList(),
@@ -146,7 +150,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             }
           });
         } else {
-          // YOLO 분석 실패해도 사용자가 수동으로 음식을 입력할 수 있도록 reviewFoods 단계로 진행
           final errorMsg = result['error'] as String? ?? '알 수 없는 오류';
           debugPrint('⚠️ [AnalysisScreen] 분석 실패: $errorMsg');
 
@@ -159,7 +162,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             );
             setState(() {
               _currentStep = _AnalysisStep.reviewFoods;
-              // 기존 음식 리스트는 유지 (사용자가 수동으로 추가 가능)
             });
           }
         }
@@ -168,7 +170,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       debugPrint('❌ [AnalysisScreen] 이미지 분석 중 예외 발생: $e');
       debugPrint('   스택 트레이스: $stackTrace');
 
-      // YOLO 분석 실패해도 사용자가 수동으로 음식을 입력할 수 있도록 reviewFoods 단계로 진행
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -178,38 +179,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         );
         setState(() {
           _currentStep = _AnalysisStep.reviewFoods;
-          // 기존 음식 리스트는 유지 (사용자가 수동으로 추가 가능)
         });
       }
     }
   }
-
-  // TODO: [AI] AI 이미지 분석 함수 구현
-  // Future<void> _analyzeImageWithAI(File imageFile) async {
-  //   try {
-  //     // 1. 이미지를 서버에 업로드
-  //     // final imageUrl = await api.uploadImageForAnalysis(imageFile);
-  //
-  //     // 2. AI 서버에 분석 요청
-  //     // final analysisResult = await api.analyzeMealImage(
-  //     //   imageFile: imageFile,
-  //     //   // 또는 imageUrl: imageUrl,
-  //     // );
-  //
-  //     // 3. 분석 결과 처리
-  //     // setState(() {
-  //     //   _currentStep = _AnalysisStep.reviewFoods;
-  //     //   _foodItems.clear();
-  //     //   _foodItems.addAll(analysisResult.foods.map((f) => f.name));
-  //     // });
-  //   } catch (e) {
-  //     // 에러 처리
-  //     if (!mounted) return;
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(content: Text('이미지 분석 중 오류가 발생했습니다: $e')),
-  //     );
-  //   }
-  // }
 
   void _handleAddFood() {
     final text = _foodController.text.trim();
@@ -255,7 +228,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     }
   }
 
-  // [AI] [DB] 영양소 분석 및 데이터베이스 저장
   Future<void> _startNutrientAnalysis() async {
     setState(() {
       _currentStep = _AnalysisStep.nutrientAnalysis;
@@ -267,25 +239,38 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         throw Exception('로그인이 필요합니다');
       }
 
-      // 1. 이미지 ID 가져오기 (이미 저장된 경우)
       final imageId = _savedImageId;
 
-      // 2. 식사 타입 및 날짜 설정
-      final mealTime = widget.mealType ?? '중식';
+      // 프론트엔드 형식("아침/점심/저녁/간식")을 백엔드 형식("조식/중식/석식/야식")으로 변환
+      String mealTime = widget.mealType ?? '점심';
+      final mealTimeMapping = {
+        '아침': '조식',
+        '점심': '중식',
+        '저녁': '석식',
+        '간식': '야식',
+      };
+      mealTime = mealTimeMapping[mealTime] ?? mealTime;
+
       final mealDate = widget.selectedDate ?? DateTime.now();
       final mealDateStr = DateFormat('yyyy-MM-dd').format(mealDate);
 
-      // 3. YOLO 분석 결과를 음식 리스트로 변환
       final foods = _foodItems
           .map(
             (name) => {
               'name': name,
-              'confidence': 0.9, // YOLO 분석에서 가져온 값 사용 가능
+              'confidence': 0.9,
             },
           )
           .toList();
 
-      // 4. 식사 기록 저장 (영양소 분석 포함)
+      debugPrint('🔄 [AnalysisScreen] 식사 기록 저장 시작');
+      debugPrint('   memberId: ${user.uid}');
+      debugPrint('   mealTime: $mealTime (원본: ${widget.mealType})');
+      debugPrint('   mealDate: $mealDateStr');
+      debugPrint('   imageId: $imageId');
+      debugPrint('   foods 개수: ${foods.length}');
+      debugPrint('   foods 목록: ${_foodItems.join(", ")}');
+
       final mealApiService = MealApiService.instance;
       final result = await mealApiService.saveMeal(
         memberId: user.uid,
@@ -296,14 +281,18 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         foods: foods,
       );
 
+      debugPrint('✅ [AnalysisScreen] 식사 기록 저장 성공');
+      debugPrint('   meal_id: ${result['meal_id']}');
+      debugPrint('   total_nutrition: ${result['total_nutrition']}');
+
       if (mounted) {
-        // 분석 완료 콜백 호출
         if (widget.onAnalysisComplete != null) {
           widget.onAnalysisComplete!({
             'imageUrl': _uploadedImageUrl,
             'menuText': _foodItems.join(', '),
-            'mealType': mealTime,
+            'mealType': widget.mealType ?? '점심',
             'selectedDate': mealDate,
+            'foods': _foodItems,
             'total_nutrition': result['total_nutrition'],
           });
         }
@@ -313,10 +302,15 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         );
         Navigator.pop(context);
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('❌ [AnalysisScreen] 식사 기록 저장 실패: $e');
+      debugPrint('   스택 트레이스: $stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('분석 중 오류가 발생했습니다: $e')),
+          SnackBar(
+            content: Text('분석 중 오류가 발생했습니다: $e'),
+            duration: const Duration(seconds: 5),
+          ),
         );
         setState(() {
           _currentStep = _AnalysisStep.reviewFoods;
@@ -324,48 +318,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       }
     }
   }
-
-  // TODO: [AI] [DB] 영양소 분석 및 저장 함수 구현
-  // Future<void> _analyzeNutrientsAndSave() async {
-  //   try {
-  //     // 1. 최종 음식 목록을 AI 서버에 전송하여 영양소 분석
-  //     // final nutrientAnalysis = await api.analyzeNutrients(
-  //     //   foods: _foodItems,
-  //     //   mealType: widget.mealType, // report_pages에서 전달받은 mealType
-  //     //   date: widget.selectedDate, // report_pages에서 전달받은 date
-  //     // );
-  //
-  //     // 2. 분석된 사진을 서버에 업로드
-  //     // final imageUrl = await api.uploadMealImage(_selectedImage!);
-  //
-  //     // 3. 데이터베이스에 저장
-  //     // await api.saveMealRecord(
-  //     //   mealType: widget.mealType,
-  //     //   date: widget.selectedDate,
-  //     //   imageUrl: imageUrl,
-  //     //   analysisResult: nutrientAnalysis,
-  //     //   menuText: _foodItems.join(', '),
-  //     // );
-  //
-  //     // 4. 리포트 화면에 결과 전달 (콜백 또는 상태 관리)
-  //     // if (widget.onAnalysisComplete != null) {
-  //     //   widget.onAnalysisComplete!({
-  //     //     'imageUrl': imageUrl,
-  //     //     'analysisResult': nutrientAnalysis,
-  //     //     'menuText': _foodItems.join(', '),
-  //     //   });
-  //     // }
-  //
-  //     // 5. 리포트 화면으로 돌아가기
-  //     // Navigator.pop(context);
-  //   } catch (e) {
-  //     // 에러 처리
-  //     if (!mounted) return;
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(content: Text('분석 중 오류가 발생했습니다: $e')),
-  //     );
-  //   }
-  // }
 
   @override
   Widget build(BuildContext context) {
@@ -385,11 +337,27 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (_currentStep != _AnalysisStep.nutrientAnalysis) ...[
+                _buildCaptureControls(),
+                const SizedBox(height: 20),
+              ],
               _buildStepContent(),
               const SizedBox(height: 24),
-              if (_currentStep != _AnalysisStep.nutrientAnalysis) _buildFoodInputSection(),
-              if (_currentStep != _AnalysisStep.nutrientAnalysis) const SizedBox(height: 12),
-              if (_currentStep != _AnalysisStep.nutrientAnalysis) _buildFoodList(),
+              if (_currentStep != _AnalysisStep.nutrientAnalysis) ...[
+                _buildFoodInputSection(),
+                const SizedBox(height: 16),
+                if (_currentStep == _AnalysisStep.reviewFoods) ...[
+                  const Text(
+                    '분석된 음식 목록',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                _buildFoodList(),
+              ],
               const SizedBox(height: 24),
               Bounceable(
                 onTap: () {
@@ -409,14 +377,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   Widget _buildStepContent() {
     switch (_currentStep) {
       case _AnalysisStep.capture:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildCaptureControls(),
-            const SizedBox(height: 20),
-            _buildImagePreview(),
-          ],
-        );
+        return _buildImagePreview();
       case _AnalysisStep.analyzingImage:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,20 +396,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           ],
         );
       case _AnalysisStep.reviewFoods:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildImagePreview(),
-            const SizedBox(height: 16),
-            const Text(
-              '분석된 음식 목록',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        );
+        return _buildImagePreview();
       case _AnalysisStep.nutrientAnalysis:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,

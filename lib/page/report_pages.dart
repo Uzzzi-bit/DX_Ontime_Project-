@@ -495,9 +495,14 @@ class _ReportScreenState extends State<ReportScreen> {
         allNutrients
             .map((nutrientKey) {
               // 권장량은 PostgreSQL DB에서 조회한 값만 사용 (필수)
+              // MemberNutritionTarget 모델: carb → DB 컬럼명은 'carbs', vitamin_b12 → DB 컬럼명은 'vitamin_b12'
               double target = 0;
-              if (_nutritionTargets != null && _nutritionTargets!.containsKey(nutrientKey)) {
-                target = _nutritionTargets![nutrientKey] ?? 0;
+              String targetKey = nutrientKey;
+              if (nutrientKey == 'carb') {
+                targetKey = 'carbs'; // MemberNutritionTarget의 실제 DB 컬럼명
+              }
+              if (_nutritionTargets != null && _nutritionTargets!.containsKey(targetKey)) {
+                target = _nutritionTargets![targetKey] ?? 0;
               }
 
               // 현재 섭취량은 DB에서 직접 가져오기 (세부 영양소 포함)
@@ -819,13 +824,25 @@ class _ReportScreenState extends State<ReportScreen> {
       } else {
         // NutrientType에 없는 영양소는 _nutritionTargets와 _dailyNutritionFromDb에서 가져오기
         if (_nutritionTargets != null) {
-          // DB 키 이름 매핑 (DB는 snake_case, API는 camelCase)
-          final dbKey = nutrientKey == 'vitamin_b12' ? 'vitamin_b12' : nutrientKey;
-          target = _nutritionTargets![dbKey] ?? 0.0;
+          // DB 키 이름 매핑
+          // - _nutritionTargets는 MemberNutritionTarget에서 가져온 것이므로 vitamin_b12 사용
+          // - _dailyNutritionFromDb는 NutritionAnalysis 집계 결과이므로 vitamin_b 사용
+          String targetKey = nutrientKey;
+          String consumedKey = nutrientKey;
 
-          // 섭취량은 DB에서 가져온 dailyNutrition에서 찾기
+          if (nutrientKey == 'vitamin_b12') {
+            targetKey = 'vitamin_b12'; // MemberNutritionTarget 컬럼명
+            consumedKey = 'vitamin_b'; // NutritionAnalysis 컬럼명 (집계 결과)
+          } else if (nutrientKey == 'carb') {
+            targetKey = 'carbs'; // MemberNutritionTarget 실제 DB 컬럼명
+            consumedKey = 'carbs'; // NutritionAnalysis 컬럼명
+          }
+
+          target = _nutritionTargets![targetKey] ?? 0.0;
+
+          // 섭취량은 DB에서 가져온 dailyNutrition에서 찾기 (NutritionAnalysis 집계 결과)
           if (_dailyNutritionFromDb != null) {
-            final dbValue = _dailyNutritionFromDb![dbKey];
+            final dbValue = _dailyNutritionFromDb![consumedKey];
             if (dbValue != null) {
               current = (dbValue as num).toDouble();
             }
@@ -1053,12 +1070,22 @@ class _ReportScreenState extends State<ReportScreen> {
   //    - 네트워크 오류 처리
   //    - 사용자에게 적절한 에러 메시지 표시
   void _navigateToMealRecord(String mealType) {
+    // 현재 선택된 날짜의 해당 식사 타입 기록 찾기
+    final currentMeal = _mealRecords.firstWhere(
+      (m) => m.mealType == mealType,
+      orElse: () => MealRecord(mealType: mealType, hasRecord: false),
+    );
+
+    // 기존에 기록된 음식 목록 가져오기
+    final existingFoods = currentMeal.foods ?? [];
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => AnalysisScreen(
           mealType: mealType,
           selectedDate: _selectedWeekDate,
+          existingFoods: existingFoods.isNotEmpty ? existingFoods : null, // 기존 음식 목록 전달
           onAnalysisComplete: (Map<String, dynamic> result) async {
             // AnalysisScreen에서 분석 완료 후 콜백
             // DB에서 최신 영양소 데이터 다시 불러오기 (meal 데이터 추가로 인한 호출)

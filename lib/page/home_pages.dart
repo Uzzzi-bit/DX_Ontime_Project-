@@ -58,6 +58,24 @@ class _HomeScreenState extends State<HomeScreen> {
     if (user != null && _userData != null) {
       _loadTodayNutritionData(user.uid, _userData!.pregnancyWeek);
     }
+    // 최신 AI 레시피 확인 및 업데이트
+    _checkForLatestRecipes();
+  }
+
+  /// 최신 AI 레시피를 확인하고 화면을 업데이트하는 메서드
+  void _checkForLatestRecipes() {
+    final latestRecipes = RecipeScreen.getLatestAiRecipes();
+    if (latestRecipes != null && latestRecipes.isNotEmpty) {
+      // 최신 레시피가 있으면 화면 업데이트 (setState 호출)
+      if (mounted) {
+        setState(() {
+          // _recommendedMeals getter가 다시 호출되도록 상태 업데이트
+          // 실제로는 getter이므로 상태 변수를 추가할 필요는 없지만,
+          // setState를 호출하여 build 메서드를 다시 실행시킴
+        });
+        debugPrint('🔄 [HomeScreen] 최신 AI 레시피 확인: ${latestRecipes.length}개');
+      }
+    }
   }
 
   Future<void> _loadInitialData() async {
@@ -114,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
         // 오늘 날짜의 영양소 데이터 로드
         if (user != null) {
           await _loadTodayNutritionData(user.uid, userPregnancyWeek);
-          
+
           // 임산부 모드가 켜져 있고 최초 진입이면 레시피 API 호출
           final hasCalledApi = prefs.getBool(_hasCalledInitialRecipeApiKey) ?? false;
           if (isMomCareMode && !hasCalledApi) {
@@ -265,7 +283,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchInitialAiRecipes(String memberId, int? pregnancyWeek) async {
     try {
       debugPrint('🆕 [HomeScreen] 최초 진입 - AI 레시피 추천 API 호출');
-      
+
       // 사용자 건강 정보 가져오기
       final healthInfo = await MemberApiService.instance.getHealthInfo(memberId);
       final nickname = healthInfo['nickname'] as String? ?? _userName;
@@ -274,24 +292,38 @@ class _HomeScreenState extends State<HomeScreen> {
       final hasGestationalDiabetes = healthInfo['has_gestational_diabetes'] as bool? ?? false;
       final allergiesList = healthInfo['allergies'] as List<dynamic>? ?? [];
       final allergies = allergiesList.map((e) => e.toString()).toList();
-      
+
       final conditions = hasGestationalDiabetes ? '임신성 당뇨' : '없음';
-      
+
       // 영양소 데이터 준비 (오늘은 아직 섭취하지 않았으므로 모두 0)
       final nutrientsMap = <String, Map<String, double>>{};
       final allNutrients = [
-        'calories', 'carbs', 'protein', 'fat', 'sugar', 'sodium', 'calcium', 'iron',
-        'folate', 'magnesium', 'omega3', 'vitamin_a', 'vitamin_b12', 'vitamin_c',
-        'vitamin_d', 'dietary_fiber', 'potassium',
+        'calories',
+        'carbs',
+        'protein',
+        'fat',
+        'sugar',
+        'sodium',
+        'calcium',
+        'iron',
+        'folate',
+        'magnesium',
+        'omega3',
+        'vitamin_a',
+        'vitamin_b12',
+        'vitamin_c',
+        'vitamin_d',
+        'dietary_fiber',
+        'potassium',
       ];
-      
+
       for (final nutrientKey in allNutrients) {
         nutrientsMap[nutrientKey] = {
           'current': 0.0,
           'ratio': 0.0,
         };
       }
-      
+
       // AI 레시피 추천 API 호출
       final aiResp = await fetchAiRecommendedRecipes(
         nickname: nickname,
@@ -302,7 +334,7 @@ class _HomeScreenState extends State<HomeScreen> {
         allergies: allergies,
         nutrients: nutrientsMap,
       );
-      
+
       if (mounted) {
         // 전역 상태에 최신 AI 레시피 저장
         RecipeScreen.setLatestAiRecipes(aiResp.recipes);
@@ -387,8 +419,8 @@ class _HomeScreenState extends State<HomeScreen> {
   //    - 방법 3: report_pages.dart에서 변경 후 Navigator.pop() 시 콜백으로 홈 화면 업데이트
   List<_RecommendedMeal> get _recommendedMeals {
     try {
-      // recipe_pages.dart에서 레시피 가져오기 (더미 데이터)
-      final recipes = RecipeScreen.getRecommendedRecipes();
+      // 최신 AI 레시피를 먼저 확인하고, 없으면 목 데이터 사용
+      final recipes = RecipeScreen.getLatestAiRecipes() ?? RecipeScreen.getRecommendedRecipes();
 
       // 레시피가 비어있으면 빈 리스트 반환
       if (recipes.isEmpty) {
