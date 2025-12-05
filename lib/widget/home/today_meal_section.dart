@@ -143,7 +143,7 @@ class _MealCard extends StatelessWidget {
             Padding(
               padding: EdgeInsets.symmetric(horizontal: ResponsiveHelper.width(context, 0.021)),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
                     padding: EdgeInsets.symmetric(
