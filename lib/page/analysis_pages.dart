@@ -346,7 +346,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               if (_currentStep != _AnalysisStep.nutrientAnalysis) ...[
                 _buildFoodInputSection(),
                 const SizedBox(height: 16),
-                if (_currentStep == _AnalysisStep.reviewFoods) ...[
+                if (_currentStep == _AnalysisStep.reviewFoods && _foodItems.isNotEmpty) ...[
                   const Text(
                     '분석된 음식 목록',
                     style: TextStyle(
@@ -573,7 +573,13 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   }
 
   Widget _buildFoodList() {
+    debugPrint('🔍 [AnalysisScreen] _buildFoodList 호출');
+    debugPrint('   _foodItems 개수: ${_foodItems.length}');
+    debugPrint('   _foodItems 내용: $_foodItems');
+    debugPrint('   _currentStep: $_currentStep');
+
     if (_foodItems.isEmpty) {
+      debugPrint('   ⚠️ 음식 목록이 비어있음');
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 32),
@@ -589,6 +595,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         ),
       );
     }
+
+    debugPrint('   ✅ 음식 목록 표시: ${_foodItems.length}개');
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -754,6 +762,10 @@ class _ConfirmDialog extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(context, false),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: ColorPalette.primary300,
+                      side: const BorderSide(color: ColorPalette.primary300),
+                    ),
                     child: const Text('취소'),
                   ),
                 ),
