@@ -1261,6 +1261,7 @@ class _ReportScreenState extends State<ReportScreen> {
         border: Border.all(color: ColorPalette.bg300),
       ),
       child: Stack(
+        clipBehavior: Clip.none, // 웹에서도 아이콘이 잘리지 않도록
         children: [
           Row(
             children: [
@@ -1361,21 +1362,28 @@ class _ReportScreenState extends State<ReportScreen> {
               ),
             ],
           ),
-          // 편집 아이콘을 오른쪽 상단에 배치
+          // 편집 아이콘을 오른쪽 상단에 배치 (웹에서도 보이도록 Material로 감싸기)
           if (meal.hasRecord)
             Positioned(
-              top: -16,
-              right: -16,
-              child: IconButton(
-                // TODO: [AI] [DB] 편집 시 기존 분석 결과 수정 또는 재분석 기능
-                onPressed: () => _navigateToMealRecord(meal.mealType),
-                icon: const Icon(
-                  Icons.edit,
-                  color: Color(0xFF1D1B20),
-                  size: 20,
+              top: -8,
+              right: -8,
+              child: Material(
+                color: Colors.transparent,
+                child: IconButton(
+                  // TODO: [AI] [DB] 편집 시 기존 분석 결과 수정 또는 재분석 기능
+                  onPressed: () => _navigateToMealRecord(meal.mealType),
+                  icon: const Icon(
+                    Icons.edit,
+                    color: Color(0xFF1D1B20),
+                    size: 20,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                  tooltip: '편집',
                 ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
               ),
             ),
         ],
