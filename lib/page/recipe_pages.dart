@@ -51,67 +51,119 @@ class RecipeData {
 
   /// AI 백엔드에서 내려준 JSON을 RecipeData 객체로 변환하는 생성자
   factory RecipeData.fromJson(Map<String, dynamic> json) {
-    // List<String>으로 안전하게 변환하는 헬퍼
-    List<String> toStringList(dynamic value) {
-      if (value is List) {
-        return value.map((e) => e.toString()).toList();
-      }
-      return const [];
-    }
-
-    final cookingSteps = toStringList(json['cookingSteps']);
-    final isOvenAvailable = json['isOvenAvailable'] as bool? ?? false;
-    final ovenMode = json['ovenMode'] as String?;
-    final ovenTimeMinutes = (json['ovenTimeMinutes'] as num?)?.toInt();
-
-    // AI가 제공한 오븐 정보가 있으면 ovenSettings 생성
-    OvenSettings? ovenSettings;
-    if (isOvenAvailable && ovenMode != null && ovenTimeMinutes != null) {
-      // cookingSteps에서 온도 정보 추출 시도
-      final stepsText = cookingSteps.join(' ');
-      final tempReg = RegExp(r'(\d{1,3})(도|℃)');
-      final tempMatch = tempReg.firstMatch(stepsText);
-      final temperature = tempMatch?.group(0) ?? '180도';
-
-      // 오븐 모드 정규화
-      String normalizedMode = ovenMode;
-      final modeMap = {
-        '오븐': '오븐',
-        '전자레인지': '전자레인지',
-        '해동': '해동',
-        '에어프라이': '에어 프라이',
-        '스팀전자레인지': '스팀 전자레인지',
-        '에어수비드': '에어수비드',
-      };
-      if (modeMap.containsKey(ovenMode)) {
-        normalizedMode = modeMap[ovenMode]!;
+    try {
+      // List<String>으로 안전하게 변환하는 헬퍼
+      List<String> toStringList(dynamic value) {
+        if (value == null) return const [];
+        if (value is List) {
+          return value.map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty).toList();
+        }
+        return const [];
       }
 
-      ovenSettings = OvenSettings(
-        mode: normalizedMode,
-        temperature: temperature,
-        time: '${ovenTimeMinutes}분',
+      // 필수 필드 확인 및 기본값 설정
+      final title = json['title'] as String? ?? '';
+      final fullTitle = json['fullTitle'] as String? ?? json['title'] as String? ?? '';
+      final imagePath = json['imagePath'] as String? ?? '';
+      final ingredients = toStringList(json['ingredients']);
+      final cookingSteps = toStringList(json['cookingSteps']);
+      final tip = json['tip'] as String? ?? '';
+      final isOvenAvailable = json['isOvenAvailable'] as bool? ?? false;
+      final ovenMode = json['ovenMode'] as String?;
+      final ovenTimeMinutes = (json['ovenTimeMinutes'] as num?)?.toInt();
+      final calories = (json['calories'] as num?)?.toInt() ?? 0;
+      final tags = toStringList(json['tags']);
+
+      // AI가 제공한 오븐 정보가 있으면 ovenSettings 생성
+      OvenSettings? ovenSettings;
+      if (isOvenAvailable && ovenMode != null && ovenTimeMinutes != null) {
+        // cookingSteps에서 온도 정보 추출 시도
+        final stepsText = cookingSteps.join(' ');
+        final tempReg = RegExp(r'(\d{1,3})(도|℃)');
+        final tempMatch = tempReg.firstMatch(stepsText);
+        final temperature = tempMatch?.group(0) ?? '180도';
+
+        // 오븐 모드 정규화
+        String normalizedMode = ovenMode;
+        final modeMap = {
+          '오븐': '오븐',
+          '전자레인지': '전자레인지',
+          '해동': '해동',
+          '에어프라이': '에어 프라이',
+          '스팀전자레인지': '스팀 전자레인지',
+          '에어수비드': '에어수비드',
+        };
+        if (modeMap.containsKey(ovenMode)) {
+          normalizedMode = modeMap[ovenMode]!;
+        }
+
+        ovenSettings = OvenSettings(
+          mode: normalizedMode,
+          temperature: temperature,
+          time: '${ovenTimeMinutes}분',
+        );
+      } else if (isOvenAvailable && cookingSteps.isNotEmpty) {
+        // AI가 오븐 정보를 제공하지 않았지만 isOvenAvailable이 true면
+        // cookingSteps에서 파싱 시도
+        ovenSettings = _parseOvenSettingsFromSteps(cookingSteps);
+      }
+
+      return RecipeData(
+        title: title,
+        fullTitle: fullTitle,
+        imagePath: imagePath,
+        ingredients: ingredients,
+        cookingSteps: cookingSteps,
+        tip: tip,
+        isOvenAvailable: isOvenAvailable,
+        ovenMode: ovenMode,
+        ovenTimeMinutes: ovenTimeMinutes,
+        ovenSettings: ovenSettings,
+        calories: calories,
+        tags: _safeSublist(tags, 0, 3),
       );
-    } else if (isOvenAvailable && cookingSteps.isNotEmpty) {
-      // AI가 오븐 정보를 제공하지 않았지만 isOvenAvailable이 true면
-      // cookingSteps에서 파싱 시도
-      ovenSettings = _parseOvenSettingsFromSteps(cookingSteps);
-    }
+    } catch (e, stackTrace) {
+      // 파싱 에러 발생 시 상세 정보 로깅
+      debugPrint('❌ [RecipeData.fromJson] 파싱 에러 발생:');
+      debugPrint('  - 에러: $e');
+      debugPrint('  - JSON keys: ${json.keys.toList()}');
+      debugPrint('  - JSON 내용: $json');
+      debugPrint('  - 스택 트레이스: $stackTrace');
 
-    return RecipeData(
-      title: json['title'] as String? ?? '',
-      fullTitle: json['fullTitle'] as String? ?? '',
-      imagePath: json['imagePath'] as String? ?? '',
-      ingredients: toStringList(json['ingredients']),
-      cookingSteps: cookingSteps,
-      tip: json['tip'] as String? ?? '',
-      isOvenAvailable: isOvenAvailable,
-      ovenMode: ovenMode,
-      ovenTimeMinutes: ovenTimeMinutes,
-      ovenSettings: ovenSettings,
-      calories: (json['calories'] as num?)?.toInt() ?? 0,
-      tags: toStringList(json['tags']).sublist(0, 3),
-    );
+      // 에러 발생 시 최소한의 기본값으로 RecipeData 생성
+      return RecipeData(
+        title: json['title']?.toString() ?? '레시피',
+        fullTitle: json['fullTitle']?.toString() ?? json['title']?.toString() ?? '레시피',
+        imagePath: json['imagePath']?.toString() ?? '',
+        ingredients: json['ingredients'] is List
+            ? (json['ingredients'] as List).map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty).toList()
+            : const [],
+        cookingSteps: json['cookingSteps'] is List
+            ? (json['cookingSteps'] as List).map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty).toList()
+            : const [],
+        tip: json['tip']?.toString() ?? '',
+        isOvenAvailable: json['isOvenAvailable'] as bool? ?? false,
+        ovenMode: json['ovenMode']?.toString(),
+        ovenTimeMinutes: (json['ovenTimeMinutes'] as num?)?.toInt(),
+        ovenSettings: null,
+        calories: (json['calories'] as num?)?.toInt() ?? 0,
+        tags: json['tags'] is List
+            ? _safeSublist(
+                (json['tags'] as List).map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty).toList(),
+                0,
+                3,
+              )
+            : const [],
+      );
+    }
+  }
+
+  /// 리스트를 안전하게 sublist하는 헬퍼 함수
+  static List<String> _safeSublist(List<String> list, int start, int end) {
+    if (list.isEmpty) return const [];
+    final actualEnd = list.length < end ? list.length : end;
+    if (start >= actualEnd) return const [];
+    return list.sublist(start, actualEnd);
   }
 
   /// cookingSteps에서 오븐 설정을 파싱하는 헬퍼 함수
@@ -298,13 +350,15 @@ class _RecipeScreenState extends State<RecipeScreen> with WidgetsBindingObserver
     // 새로운 레시피가 전달되면 업데이트
     if (widget.initialRecipes != null && widget.initialRecipes != oldWidget.initialRecipes) {
       debugPrint('🔄 [RecipeScreen] 새로운 AI 레시피 업데이트: ${widget.initialRecipes!.length}개');
-      setState(() {
-        _recipes = widget.initialRecipes!;
-        // 선택된 메뉴 인덱스가 범위를 벗어나면 0으로 초기화
-        if (_selectedMenuIndex >= _recipes.length) {
-          _selectedMenuIndex = 0;
-        }
-      });
+      if (mounted) {
+        setState(() {
+          _recipes = widget.initialRecipes!;
+          // 선택된 메뉴 인덱스가 범위를 벗어나면 0으로 초기화
+          if (_selectedMenuIndex >= _recipes.length) {
+            _selectedMenuIndex = 0;
+          }
+        });
+      }
     }
   }
 
