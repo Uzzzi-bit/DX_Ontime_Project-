@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -23,6 +24,12 @@ import '../api/ai_recipe_api.dart';
 import '../model/supplement_effects.dart';
 import '../model/nutrient_type.dart';
 import '../utils/responsive_helper.dart';
+import '../service/storage_service.dart';
+import '../repository/image_repository.dart';
+import '../model/image_model.dart';
+import '../api/chat_api.dart';
+import '../api/ai_chat_api_service.dart';
+import '../api/image_api_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -33,7 +40,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _qaController = TextEditingController();
-  String? _selectedImagePath; // 선택된 이미지 경로 저장
+  XFile? _selectedImageFile; // 선택된 이미지 파일 저장
 
   // Mom Care Mode 상태
   bool _isMomCareMode = false;
@@ -41,6 +48,16 @@ class _HomeScreenState extends State<HomeScreen> {
   UserModel? _userData;
   static const String _momCareModeKey = 'isMomCareMode';
   static const String _hasCalledInitialRecipeApiKey = 'hasCalledInitialRecipeApi'; // 최초 진입 시 레시피 API 호출 여부
+
+  // DB 저장을 위한 변수들
+  String? _currentMemberId;
+  int? _currentSessionId;
+  int? _lastUploadedImagePk; // 마지막으로 업로드된 이미지의 Django DB image_pk
+
+  // 사용자 정보 (채팅 API 호출용)
+  String _userNickname = '사용자';
+  int _chatPregnancyWeek = 12; // 채팅 API 호출용 임신 주차 (getter와 충돌 방지)
+  String _conditions = '없음';
 
   @override
   void initState() {
@@ -673,51 +690,349 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _handleAskSubmit() {
+  Future<void> _handleAskSubmit() async {
     final query = _qaController.text.trim();
+
+    // 디버그: 이미지 파일 상태 확인
+    debugPrint('🔍 [HomeScreen] _handleAskSubmit 시작');
+    debugPrint('   query: "$query"');
+    debugPrint('   _selectedImageFile: ${_selectedImageFile?.path ?? "null"}');
+    debugPrint('   _selectedImageFile is null: ${_selectedImageFile == null}');
+
     // 텍스트나 이미지 중 하나라도 있어야 전송 가능
-    if (query.isEmpty && _selectedImagePath == null) return;
+    if (query.isEmpty && _selectedImageFile == null) return;
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ChatScreen(
-          initialText: query.isEmpty ? null : query,
-          initialImagePath: _selectedImagePath,
-        ),
-      ),
-    );
+    // 로딩 표시
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
-    // 전송 후 상태 초기화
-    setState(() {
-      _qaController.clear();
-      _selectedImagePath = null;
-    });
+    try {
+      // Firebase 사용자 정보 가져오기
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('로그인이 필요합니다.')),
+          );
+        }
+        return;
+      }
+
+      _currentMemberId = user.uid;
+
+      // 사용자 건강 정보 로드 (채팅 API 호출용)
+      await _loadUserHealthInfo();
+
+      // 세션 생성/로드
+      await _ensureSession();
+
+      // 이미지가 있으면 업로드 및 DB 저장
+      String? uploadedImageUrl;
+      debugPrint('🔍 [HomeScreen] 이미지 체크: _selectedImageFile != null = ${_selectedImageFile != null}');
+      if (_selectedImageFile != null) {
+        debugPrint('✅ [HomeScreen] 이미지 파일 발견: ${_selectedImageFile!.path}');
+
+        // 사용자에게 업로드 진행 중임을 알림
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('이미지 업로드 중입니다...'),
+            duration: Duration(seconds: 30), // 충분히 길게 (완료 시 직접 닫음)
+          ),
+        );
+
+        uploadedImageUrl = await _uploadImage(File(_selectedImageFile!.path));
+
+        // 업로드 완료/실패 후 스낵바 정리
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              uploadedImageUrl != null ? '이미지 업로드 완료' : '이미지 업로드에 실패했습니다',
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        // 이미지 메시지를 DB에 저장
+        if (_currentSessionId != null && _currentMemberId != null) {
+          await _saveMessageToDb(
+            type: 'user',
+            content: query.isEmpty ? '' : query,
+            imagePath: uploadedImageUrl ?? _selectedImageFile!.path,
+          );
+        }
+      } else if (query.isNotEmpty) {
+        // 텍스트만 있는 경우 DB에 저장
+        if (_currentSessionId != null && _currentMemberId != null) {
+          await _saveMessageToDb(
+            type: 'user',
+            content: query,
+          );
+        }
+      }
+
+      // AI API 호출
+      String aiResponse;
+      // 이미지 파일을 변수에 저장 (나중에 null이 될 수 있으므로)
+      final imageFileToSend = _selectedImageFile;
+      debugPrint('🔍 [HomeScreen] AI API 호출 전 이미지 체크: imageFileToSend != null = ${imageFileToSend != null}');
+      if (imageFileToSend != null) {
+        // 이미지가 있으면 이미지와 함께 전송
+        final queryText = query.isEmpty ? '이 음식 먹어도 되나요?' : query;
+        debugPrint('📤 [HomeScreen] 이미지와 텍스트 함께 전송: query="$queryText", imagePath="${imageFileToSend.path}"');
+        final result = await fetchChatResponse(
+          userMessage: queryText,
+          nickname: _userNickname,
+          week: _chatPregnancyWeek,
+          conditions: _conditions,
+          imageFile: imageFileToSend,
+        );
+        aiResponse = result.message;
+      } else {
+        // 텍스트만 전송
+        debugPrint('📤 [HomeScreen] 텍스트만 전송: query="$query" (이미지 파일 없음)');
+        final result = await fetchChatResponse(
+          userMessage: query,
+          nickname: _userNickname,
+          week: _chatPregnancyWeek,
+          conditions: _conditions,
+        );
+        aiResponse = result.message;
+      }
+
+      // AI 응답을 DB에 저장
+      if (_currentSessionId != null && _currentMemberId != null) {
+        await _saveMessageToDb(
+          type: 'ai',
+          content: aiResponse,
+        );
+      }
+
+      // 채팅 화면으로 이동 (이미 처리된 결과와 함께)
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              initialText: query.isEmpty ? null : query,
+              initialImagePath: uploadedImageUrl ?? _selectedImageFile?.path,
+              initialAiResponse: aiResponse, // 이미 처리된 AI 응답 전달
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ [HomeScreen] 이미지 전송 실패: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('전송 중 오류가 발생했습니다: $e'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } finally {
+      // 전송 후 상태 초기화
+      if (mounted) {
+        setState(() {
+          _qaController.clear();
+          _selectedImageFile = null;
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _handleImageSelected(XFile file) {
-    // 이미지 선택 시 바로 채팅 화면으로 이동
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ChatScreen(
-          initialText: _qaController.text.trim().isEmpty ? null : _qaController.text.trim(),
-          initialImagePath: file.path,
-        ),
-      ),
-    );
-
-    // 전송 후 상태 초기화
+    // 이미지 선택 시 _selectedImageFile에 저장하여 미리보기 표시
+    debugPrint('📷 [HomeScreen] _handleImageSelected 호출: ${file.path}');
     setState(() {
-      _qaController.clear();
-      _selectedImagePath = null;
+      _selectedImageFile = file;
     });
+    debugPrint('📷 [HomeScreen] 이미지 선택됨 및 저장 완료: ${_selectedImageFile?.path ?? "null"}');
   }
 
   void _removeSelectedImage() {
     setState(() {
-      _selectedImagePath = null;
+      _selectedImageFile = null;
     });
+  }
+
+  /// 사용자 건강 정보 로드 (채팅 API 호출용)
+  Future<void> _loadUserHealthInfo() async {
+    if (_currentMemberId == null) return;
+
+    try {
+      // 먼저 register_member API에서 닉네임 가져오기
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        try {
+          final memberInfo = await MemberApiService.instance.registerMember(
+            user.uid,
+            email: user.email,
+          );
+          _userNickname = memberInfo['nickname'] as String? ?? '사용자';
+          debugPrint('✅ [HomeScreen] register_member에서 닉네임: $_userNickname');
+        } catch (e) {
+          debugPrint('⚠️ [HomeScreen] register_member 호출 실패: $e');
+        }
+      }
+
+      debugPrint('🔄 [HomeScreen] 사용자 건강 정보 로드 중...');
+      try {
+        final healthInfo = await MemberApiService.instance.getHealthInfo(_currentMemberId!);
+
+        // 닉네임이 없으면 건강정보에서 가져오기
+        if (_userNickname == '사용자' || _userNickname.isEmpty) {
+          _userNickname = healthInfo['nickname'] as String? ?? '사용자';
+        }
+        _chatPregnancyWeek = healthInfo['pregnancy_week'] as int? ?? healthInfo['pregWeek'] as int? ?? 12;
+        _conditions = healthInfo['conditions'] as String? ?? '없음';
+
+        debugPrint('✅ [HomeScreen] 사용자 정보: nickname=$_userNickname, week=$_chatPregnancyWeek, conditions=$_conditions');
+      } catch (e) {
+        debugPrint('⚠️ [HomeScreen] 건강 정보 로드 실패 (닉네임은 이미 가져옴): $e');
+      }
+    } catch (e) {
+      debugPrint('⚠️ [HomeScreen] 사용자 정보 로드 실패 (기본값 사용): $e');
+    }
+  }
+
+  /// 세션 생성/로드
+  Future<void> _ensureSession() async {
+    if (_currentMemberId == null) return;
+
+    try {
+      // 이전 세션 로드 (활성 세션이 있으면 사용, 없으면 가장 최근 종료된 세션 사용)
+      final sessions = await AiChatApiService.instance.listSessions(_currentMemberId!);
+
+      if (sessions.isNotEmpty) {
+        // 가장 최근 세션 찾기 (활성 세션이 있으면 우선, 없으면 가장 최근 종료된 세션)
+        Map<String, dynamic>? activeSession;
+        Map<String, dynamic>? latestEndedSession;
+
+        for (final session in sessions) {
+          if (session['ended_at'] == null) {
+            activeSession = session;
+            break;
+          } else {
+            if (latestEndedSession == null) {
+              latestEndedSession = session;
+            }
+          }
+        }
+
+        final targetSession = activeSession ?? latestEndedSession;
+        if (targetSession != null) {
+          _currentSessionId = targetSession['session_id'] as int;
+          final isEnded = targetSession['ended_at'] != null;
+
+          if (isEnded) {
+            debugPrint('🔄 [HomeScreen] 세션 재활성화 중...');
+            await AiChatApiService.instance.reactivateSession(_currentSessionId!);
+            debugPrint('✅ [HomeScreen] 세션 재활성화 완료');
+          }
+        }
+      }
+
+      // 세션이 없으면 새로 생성
+      if (_currentSessionId == null) {
+        debugPrint('🔄 [HomeScreen] 새 세션 생성 중...');
+        final result = await AiChatApiService.instance.createSession(_currentMemberId!);
+        _currentSessionId = result['session_id'] as int;
+        debugPrint('✅ [HomeScreen] 세션 생성 완료: session_id=$_currentSessionId');
+      }
+    } catch (e) {
+      debugPrint('❌ [HomeScreen] 세션 생성/로드 실패: $e');
+    }
+  }
+
+  /// 이미지 업로드 (Firebase Storage + Django DB)
+  Future<String?> _uploadImage(File imageFile) async {
+    try {
+      final storageService = StorageService();
+      final imageRepository = ImageRepository();
+      final imageUrl = await storageService.uploadImage(
+        imageFile: imageFile,
+        folder: 'chat_images',
+      );
+      await imageRepository.saveImageWithUrl(
+        imageUrl: imageUrl,
+        imageType: ImageType.chat,
+        source: ImageSourceType.aiChat,
+      );
+
+      // Django DB에 저장된 이미지 ID 가져오기
+      try {
+        if (_currentMemberId != null) {
+          final imageApiService = ImageApiService.instance;
+          final djangoImageResult = await imageApiService.saveImage(
+            memberId: _currentMemberId!,
+            imageUrl: imageUrl,
+            imageType: 'chat',
+            source: 'ai_chat',
+          );
+
+          _lastUploadedImagePk = djangoImageResult['image_id'] as int? ?? djangoImageResult['id'] as int?;
+          debugPrint('✅ [HomeScreen] Django 이미지 저장 완료: image_pk=$_lastUploadedImagePk, imageUrl=$imageUrl');
+        } else {
+          debugPrint('⚠️ [HomeScreen] 사용자 ID가 없어 Django 이미지 저장을 건너뜁니다.');
+          _lastUploadedImagePk = null;
+        }
+      } catch (e) {
+        debugPrint('⚠️ [HomeScreen] Django 이미지 저장 실패 (Firestore는 성공): $e');
+        _lastUploadedImagePk = null;
+      }
+
+      debugPrint('✅ [HomeScreen] 이미지 업로드 완료: imagePk=$_lastUploadedImagePk, imageUrl=$imageUrl');
+      return imageUrl;
+    } catch (e) {
+      debugPrint('❌ [HomeScreen] 이미지 업로드 실패: $e');
+      _lastUploadedImagePk = null;
+      return null;
+    }
+  }
+
+  /// 메시지를 DB에 저장
+  Future<void> _saveMessageToDb({
+    required String type,
+    required String content,
+    String? imagePath,
+  }) async {
+    if (_currentSessionId == null || _currentMemberId == null) {
+      debugPrint('⚠️ [HomeScreen] 세션이나 사용자 ID가 없어 메시지를 저장할 수 없습니다.');
+      return;
+    }
+
+    try {
+      int? imagePk;
+      if (imagePath != null) {
+        imagePk = _lastUploadedImagePk;
+        debugPrint('💾 [HomeScreen] 메시지 저장: imagePath=$imagePath, imagePk=$imagePk');
+      }
+
+      final finalContent = (content.isEmpty && imagePk != null) ? '이미지' : content;
+
+      debugPrint(
+        '🔄 [HomeScreen] 메시지 DB 저장 중: type=$type, content=${finalContent.length > 50 ? finalContent.substring(0, 50) : finalContent}..., imagePk=$imagePk',
+      );
+      await AiChatApiService.instance.saveMessage(
+        sessionId: _currentSessionId!,
+        memberId: _currentMemberId!,
+        type: type,
+        content: finalContent,
+        imagePk: imagePk,
+      );
+      debugPrint('✅ [HomeScreen] 메시지 DB 저장 완료');
+
+      _lastUploadedImagePk = null;
+    } catch (e) {
+      debugPrint('❌ [HomeScreen] 메시지 DB 저장 실패: $e');
+    }
   }
 
   /// 플로팅 버튼 클릭 시 식사 타입 선택 다이얼로그 표시
@@ -1396,7 +1711,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             controller: _qaController,
                             onSubmit: _handleAskSubmit,
                             onImageSelected: _handleImageSelected,
-                            selectedImagePath: _selectedImagePath,
+                            selectedImageFile: _selectedImageFile,
                             onRemoveImage: _removeSelectedImage,
                           ),
                           SizedBox(height: ResponsiveHelper.height(context, 0.04)),

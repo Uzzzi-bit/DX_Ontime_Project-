@@ -31,11 +31,13 @@ class ChatMessage {
 class ChatScreen extends StatefulWidget {
   final String? initialText;
   final String? initialImagePath;
+  final String? initialAiResponse; // 홈 화면에서 이미 처리된 AI 응답
 
   const ChatScreen({
     super.key,
     this.initialText,
     this.initialImagePath,
+    this.initialAiResponse, // 홈 화면에서 이미 처리된 경우 전달
   });
 
   @override
@@ -141,42 +143,81 @@ class _ChatScreenState extends State<ChatScreen> {
           });
         }
 
-        // 초기 메시지를 DB에 저장
-        if (_currentSessionId != null && _currentMemberId != null) {
-          await _saveMessageToDb(
-            type: 'user',
-            content: widget.initialText ?? '',
-            imagePath: widget.initialImagePath,
-          );
-        }
-
-        // 초기 이미지가 있으면 업로드
-        if (widget.initialImagePath != null) {
-          final imgFile = File(widget.initialImagePath!);
-          final imageUrl = await _uploadImage(imgFile);
-          // 이미지 URL을 메시지에 업데이트
-          if (imageUrl != null && mounted) {
+        // 홈 화면에서 이미 처리된 경우 (AI 응답이 이미 있음)
+        if (widget.initialAiResponse != null) {
+          debugPrint('✅ [ChatScreen] 홈 화면에서 이미 처리된 메시지 - 사용자 메시지와 AI 응답 표시');
+          
+          // 이미지 URL이 로컬 경로면 업로드된 URL로 업데이트 (이미 홈에서 업로드됨)
+          if (widget.initialImagePath != null && !widget.initialImagePath!.startsWith('http')) {
+            debugPrint('ℹ️ [ChatScreen] 로컬 경로 감지 - 업로드된 URL로 업데이트 필요: ${widget.initialImagePath}');
+            // 이미 홈 화면에서 업로드되었으므로, URL이 전달되어야 함
+            // 혹시 로컬 경로가 전달된 경우를 대비해 확인만 함
+          } else if (widget.initialImagePath != null && widget.initialImagePath!.startsWith('http')) {
+            // 이미 업로드된 URL이 전달됨 - 메시지의 imagePath를 URL로 업데이트
+            if (mounted) {
+              setState(() {
+                if (_messages.isNotEmpty && _messages.last.isUser) {
+                  _messages[_messages.length - 1] = ChatMessage(
+                    isUser: true,
+                    text: _messages.last.text,
+                    imagePath: widget.initialImagePath, // 업로드된 URL 사용
+                    timestamp: _messages.last.timestamp,
+                  );
+                }
+              });
+            }
+          }
+          
+          // AI 응답 메시지 추가
+          if (mounted) {
             setState(() {
-              // 마지막 메시지(초기 메시지)의 imagePath를 URL로 업데이트
-              if (_messages.isNotEmpty && _messages.last.isUser) {
-                _messages[_messages.length - 1] = ChatMessage(
-                  isUser: true,
-                  text: _messages.last.text,
-                  imagePath: imageUrl, // 로컬 경로 대신 URL 사용
-                  timestamp: _messages.last.timestamp,
-                );
-              }
+              _messages.add(ChatMessage(
+                isUser: false,
+                text: widget.initialAiResponse!,
+              ));
             });
           }
+        } else {
+          // 홈 화면에서 처리되지 않은 경우 (기존 로직)
+          debugPrint('🔄 [ChatScreen] 홈 화면에서 처리되지 않음 - 여기서 처리 시작');
+          
+          // 초기 메시지를 DB에 저장
+          if (_currentSessionId != null && _currentMemberId != null) {
+            await _saveMessageToDb(
+              type: 'user',
+              content: widget.initialText ?? '',
+              imagePath: widget.initialImagePath,
+            );
+          }
 
-          // 이미지 분석 요청 (await로 기다림)
-          await _sendRequestToAI(
-            query: '이 음식 먹어도 되나요?',
-            imageFile: XFile(widget.initialImagePath!),
-          );
-        } else if (widget.initialText != null && widget.initialText!.isNotEmpty) {
-          // 텍스트만 있는 경우 (await로 기다림)
-          await _sendRequestToAI(query: widget.initialText!);
+          // 초기 이미지가 있으면 업로드
+          if (widget.initialImagePath != null) {
+            final imgFile = File(widget.initialImagePath!);
+            final imageUrl = await _uploadImage(imgFile);
+            // 이미지 URL을 메시지에 업데이트
+            if (imageUrl != null && mounted) {
+              setState(() {
+                // 마지막 메시지(초기 메시지)의 imagePath를 URL로 업데이트
+                if (_messages.isNotEmpty && _messages.last.isUser) {
+                  _messages[_messages.length - 1] = ChatMessage(
+                    isUser: true,
+                    text: _messages.last.text,
+                    imagePath: imageUrl, // 로컬 경로 대신 URL 사용
+                    timestamp: _messages.last.timestamp,
+                  );
+                }
+              });
+            }
+
+            // 이미지 분석 요청 (await로 기다림)
+            await _sendRequestToAI(
+              query: '이 음식 먹어도 되나요?',
+              imageFile: XFile(widget.initialImagePath!),
+            );
+          } else if (widget.initialText != null && widget.initialText!.isNotEmpty) {
+            // 텍스트만 있는 경우 (await로 기다림)
+            await _sendRequestToAI(query: widget.initialText!);
+          }
         }
       }
     } catch (e) {

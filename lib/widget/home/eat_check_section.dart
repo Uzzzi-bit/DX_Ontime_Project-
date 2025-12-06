@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:image_picker/image_picker.dart';
@@ -11,14 +12,14 @@ class EatCheckSection extends StatelessWidget {
     required this.controller,
     required this.onSubmit,
     required this.onImageSelected,
-    this.selectedImagePath,
+    this.selectedImageFile,
     this.onRemoveImage,
   });
 
   final TextEditingController controller;
   final VoidCallback onSubmit;
   final ValueChanged<XFile> onImageSelected;
-  final String? selectedImagePath;
+  final XFile? selectedImageFile;
   final VoidCallback? onRemoveImage;
 
   Widget _buildImagePreview(BuildContext context, String imagePath) {
@@ -53,8 +54,10 @@ class EatCheckSection extends StatelessWidget {
   }
 
   void _showImagePicker(BuildContext context) {
+    debugPrint('➕ [EatCheckSection] 이미지 선택 다이얼로그 표시');
+    final rootContext = context; // 다이얼로그 종료 후에도 유효한 상위 컨텍스트 보관
     showDialog(
-      context: context,
+      context: rootContext,
       builder: (context) => Dialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -68,26 +71,32 @@ class EatCheckSection extends StatelessWidget {
                 leading: const Icon(Icons.camera_alt),
                 title: const Text('카메라로 촬영'),
                 onTap: () async {
-                  Navigator.pop(context);
+                  debugPrint('➕ [EatCheckSection] 카메라 선택 탭');
+                  Navigator.pop(rootContext);
                   try {
                     final ImagePicker picker = ImagePicker();
+                    debugPrint('📷 [EatCheckSection] 카메라 이미지 선택 시작');
                     // 미리보기용으로는 품질을 낮추지 않고 원본을 사용 (전송 시 원본 화질 유지)
                     final XFile? image = await picker.pickImage(
                       source: ImageSource.camera,
                       // imageQuality를 설정하지 않아 원본 화질 유지
                     );
-                    if (image != null && context.mounted) {
+                    debugPrint('📷 [EatCheckSection] 카메라 이미지 선택 결과: ${image?.path ?? "null"}');
+                    if (image != null) {
+                      debugPrint('📷 [EatCheckSection] onImageSelected 호출: ${image.path}');
                       onImageSelected(image);
+                      debugPrint('📷 [EatCheckSection] onImageSelected 호출 완료');
+                    } else {
+                      debugPrint('⚠️ [EatCheckSection] 이미지가 null');
                     }
                   } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('카메라 오류: ${e.toString()}'),
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-                    }
+                    debugPrint('❌ [EatCheckSection] 카메라 오류: $e');
+                    ScaffoldMessenger.of(rootContext).showSnackBar(
+                      SnackBar(
+                        content: Text('카메라 오류: ${e.toString()}'),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
                   }
                 },
               ),
@@ -95,26 +104,32 @@ class EatCheckSection extends StatelessWidget {
                 leading: const Icon(Icons.photo_library),
                 title: const Text('앨범에서 선택'),
                 onTap: () async {
-                  Navigator.pop(context);
+                  debugPrint('➕ [EatCheckSection] 앨범 선택 탭');
+                  Navigator.pop(rootContext);
                   try {
                     final ImagePicker picker = ImagePicker();
+                    debugPrint('📷 [EatCheckSection] 앨범 이미지 선택 시작');
                     // 미리보기용으로는 품질을 낮추지 않고 원본을 사용 (전송 시 원본 화질 유지)
                     final XFile? image = await picker.pickImage(
                       source: ImageSource.gallery,
                       // imageQuality를 설정하지 않아 원본 화질 유지
                     );
-                    if (image != null && context.mounted) {
+                    debugPrint('📷 [EatCheckSection] 앨범 이미지 선택 결과: ${image?.path ?? "null"}');
+                    if (image != null) {
+                      debugPrint('📷 [EatCheckSection] onImageSelected 호출: ${image.path}');
                       onImageSelected(image);
+                      debugPrint('📷 [EatCheckSection] onImageSelected 호출 완료');
+                    } else {
+                      debugPrint('⚠️ [EatCheckSection] 이미지가 null');
                     }
                   } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('앨범 오류: ${e.toString()}'),
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-                    }
+                    debugPrint('❌ [EatCheckSection] 앨범 오류: $e');
+                    ScaffoldMessenger.of(rootContext).showSnackBar(
+                      SnackBar(
+                        content: Text('앨범 오류: ${e.toString()}'),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
                   }
                 },
               ),
@@ -151,7 +166,7 @@ class EatCheckSection extends StatelessWidget {
         ),
         SizedBox(height: ResponsiveHelper.height(context, 0.015)),
         // 선택된 이미지 미리보기
-        if (selectedImagePath != null) ...[
+        if (selectedImageFile != null) ...[
           Container(
             margin: EdgeInsets.only(bottom: ResponsiveHelper.height(context, 0.015)),
             child: Stack(
@@ -161,7 +176,7 @@ class EatCheckSection extends StatelessWidget {
                   child: SizedBox(
                     width: double.infinity,
                     height: ResponsiveHelper.height(context, 0.247),
-                    child: _buildImagePreview(context, selectedImagePath!),
+                    child: _buildImagePreview(context, selectedImageFile!.path),
                   ),
                 ),
                 // 삭제 버튼
@@ -200,9 +215,14 @@ class EatCheckSection extends StatelessWidget {
           child: Row(
             children: [
               Bounceable(
-                onTap: () {},
+                onTap: () {
+                  debugPrint('➕ [EatCheckSection] + 버튼 탭 (Bounceable)');
+                },
                 child: InkWell(
-                  onTap: () => _showImagePicker(context),
+                  onTap: () {
+                    debugPrint('➕ [EatCheckSection] + 버튼 탭 (InkWell) -> 이미지 피커 호출');
+                    _showImagePicker(context);
+                  },
                   borderRadius: BorderRadius.circular(ResponsiveHelper.width(context, 0.021)),
                   child: Container(
                     width: ResponsiveHelper.width(context, 0.075),
