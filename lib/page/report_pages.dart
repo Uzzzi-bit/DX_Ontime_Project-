@@ -8,6 +8,7 @@ import '../theme/color_palette.dart';
 import '../api/ai_recipe_api.dart';
 import '../api/member_api_service.dart';
 import '../api/meal_api_service.dart';
+import '../api/recommendation_api_service.dart';
 import 'recipe_pages.dart';
 import 'analysis_pages.dart';
 import '../model/nutrient_type.dart';
@@ -114,6 +115,9 @@ class _ReportScreenState extends State<ReportScreen> {
   // AI 추천 레시피 관련 상태 변수
   String? _bannerMessageFromAi; // AI가 보내준 배너 문장
   List<RecipeData> _aiRecipes = []; // AI 추천 레시피 3개
+  // 날짜별 레시피 및 배너 메시지 저장 (날짜를 키로 사용)
+  final Map<String, String> _dateBannerMessages = {};
+  final Map<String, List<RecipeData>> _dateAiRecipes = {};
 
   @override
   void initState() {
@@ -627,6 +631,9 @@ class _ReportScreenState extends State<ReportScreen> {
       // 선택된 날짜를 YYYY-MM-DD 형식으로 변환
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
 
+      // DB에서 해당 날짜의 레시피 불러오기 (영양소 데이터 로드 전에)
+      await _loadRecommendationsFromDb(user.uid, dateStr);
+
       // DB에서 해당 날짜의 영양소 데이터 가져오기
       final mealApiService = MealApiService.instance;
       final dailyNutrition = await mealApiService.getDailyNutrition(
@@ -640,6 +647,17 @@ class _ReportScreenState extends State<ReportScreen> {
         // DB에서 가져온 모든 영양소 데이터 저장 (세부 영양소 포함)
         // Map<String, dynamic>으로 저장 (타입 변환은 사용 시점에 수행)
         _dailyNutritionFromDb = Map<String, dynamic>.from(totalNutrition);
+
+        // 디버그: DB에서 가져온 영양소 데이터 확인
+        debugPrint('📊 [ReportScreen] DB에서 가져온 영양소 데이터:');
+        debugPrint('   calories: ${totalNutrition['calories']}');
+        debugPrint('   carbs: ${totalNutrition['carbs']}');
+        debugPrint('   protein: ${totalNutrition['protein']}');
+        debugPrint('   fat: ${totalNutrition['fat']}');
+        debugPrint('   iron: ${totalNutrition['iron']}');
+        debugPrint('   calcium: ${totalNutrition['calcium']}');
+        debugPrint('   omega3: ${totalNutrition['omega3']}');
+        debugPrint('   전체 데이터: $totalNutrition');
 
         // DB에서 가져온 섭취량을 NutrientType Map으로 변환
         // 모든 영양소를 포함하되, DB에 없는 것은 0.0으로 설정
@@ -880,6 +898,13 @@ class _ReportScreenState extends State<ReportScreen> {
     debugPrint('  - allergies: $allergies');
 
     try {
+      // 사용자 정보 확인
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        debugPrint('⚠️ [ReportScreen] 사용자 로그인 정보가 없습니다.');
+        return;
+      }
+
       final aiResp = await fetchAiRecommendedRecipes(
         nickname: _userName,
         week: _pregnancyWeek ?? 12,
@@ -891,15 +916,27 @@ class _ReportScreenState extends State<ReportScreen> {
         nutrients: nutrientsMap,
       );
       if (!mounted) return;
+      
+      // 현재 선택된 날짜
+      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+      
       setState(() {
         if (aiResp.bannerMessage.isNotEmpty) {
           _bannerMessageFromAi = aiResp.bannerMessage;
+          // 날짜별 배너 메시지 맵에 저장
+          _dateBannerMessages[dateStr] = aiResp.bannerMessage;
+          debugPrint('✅ [ReportScreen] AI 추천 식단 배너 메시지 저장: $dateStr');
         }
         if (aiResp.recipes.isNotEmpty) {
           _aiRecipes = aiResp.recipes;
+          // 날짜별 레시피 맵에 저장 (중요: 이전 레시피를 새로운 것으로 덮어쓰기)
+          _dateAiRecipes[dateStr] = _aiRecipes;
           // 전역 상태에 최신 AI 레시피 저장 (RecipeScreen이 자동으로 업데이트됨)
           RecipeScreen.setLatestAiRecipes(_aiRecipes);
-          debugPrint('✅ [ReportScreen] AI 레시피 ${_aiRecipes.length}개 수신 완료');
+          debugPrint('✅ [ReportScreen] AI 레시피 ${_aiRecipes.length}개 수신 완료 및 날짜별 맵에 저장: $dateStr');
+          
+          // DB에 레시피 저장 (비동기로 실행, 실패해도 화면은 업데이트)
+          _saveRecommendationsToDb(user.uid, dateStr, aiResp.bannerMessage, _aiRecipes);
         } else {
           debugPrint('⚠️ [ReportScreen] AI 레시피가 비어있습니다.');
         }
@@ -907,6 +944,67 @@ class _ReportScreenState extends State<ReportScreen> {
     } catch (e) {
       debugPrint('❌ [ReportScreen] AI 레시피 추천 실패: $e');
       // 에러 발생 시에도 앱이 깨지지 않도록 빈 리스트 유지
+    }
+  }
+
+  /// AI 추천 레시피를 DB에 저장
+  Future<void> _saveRecommendationsToDb(
+    String memberId,
+    String dateStr,
+    String bannerMessage,
+    List<RecipeData> recipes,
+  ) async {
+    try {
+      await RecommendationApiService.instance.saveRecommendations(
+        memberId: memberId,
+        recommendationDate: dateStr,
+        bannerMessage: bannerMessage,
+        recipes: recipes,
+      );
+      debugPrint('✅ [ReportScreen] 레시피 DB 저장 완료: $dateStr');
+    } catch (e) {
+      debugPrint('⚠️ [ReportScreen] 레시피 DB 저장 실패: $e');
+      // DB 저장 실패해도 화면은 업데이트되므로 에러만 로그
+    }
+  }
+
+  /// DB에서 해당 날짜의 레시피 불러오기
+  Future<void> _loadRecommendationsFromDb(String memberId, String dateStr) async {
+    try {
+      final result = await RecommendationApiService.instance.getRecommendations(
+        memberId: memberId,
+        date: dateStr,
+      );
+
+      if (result['success'] == true && result['recipes_count'] > 0) {
+        final recipesJson = result['recipes'] as List<dynamic>;
+        final recipes = recipesJson
+            .map((json) => RecipeData.fromJson(json as Map<String, dynamic>))
+            .where((recipe) => recipe.title.isNotEmpty) // 유효한 레시피만
+            .toList();
+
+        if (mounted && recipes.isNotEmpty) {
+          final bannerMessage = result['banner_message'] as String? ?? '';
+          setState(() {
+            _bannerMessageFromAi = bannerMessage;
+            _aiRecipes = recipes;
+            // 날짜별 레시피 맵에 저장 (DB에서 로드한 최신 데이터)
+            _dateAiRecipes[dateStr] = recipes;
+            // 날짜별 배너 메시지 맵에 저장
+            if (bannerMessage.isNotEmpty) {
+              _dateBannerMessages[dateStr] = bannerMessage;
+            }
+            RecipeScreen.setLatestAiRecipes(_aiRecipes);
+          });
+          debugPrint('✅ [ReportScreen] DB에서 레시피 로드 완료: $dateStr, 레시피 ${recipes.length}개 (날짜별 맵에 저장)');
+        }
+      } else {
+        debugPrint('⚠️ [ReportScreen] DB에 저장된 레시피 없음: $dateStr');
+        // 저장된 레시피가 없으면 기본값 유지
+      }
+    } catch (e) {
+      debugPrint('⚠️ [ReportScreen] DB에서 레시피 로드 실패: $e');
+      // 로드 실패해도 기본값 사용
     }
   }
 
@@ -1068,12 +1166,19 @@ class _ReportScreenState extends State<ReportScreen> {
   //    - 네트워크 오류 처리
   //    - 사용자에게 적절한 에러 메시지 표시
   void _navigateToMealRecord(String mealType) {
+    // 해당 식사 타입의 기존 음식 목록 가져오기
+    final existingMealRecord = _mealRecords.firstWhere(
+      (meal) => meal.mealType == mealType,
+      orElse: () => MealRecord(mealType: mealType, hasRecord: false),
+    );
+    
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => AnalysisScreen(
           mealType: mealType,
-          selectedDate: _selectedWeekDate,
+          selectedDate: _selectedDate, // 실제 선택된 날짜 사용
+          existingFoods: existingMealRecord.hasRecord ? (existingMealRecord.foods ?? []) : null,
           onAnalysisComplete: (Map<String, dynamic> result) async {
             // AnalysisScreen에서 분석 완료 후 콜백
             // DB에서 최신 영양소 데이터 다시 불러오기 (meal 데이터 추가로 인한 호출)
@@ -1263,7 +1368,9 @@ class _ReportScreenState extends State<ReportScreen> {
                 onPageChanged: (page) {
                   final weekStart = _getWeekStartDate(page);
                   setState(() {
+                    // PageView가 변경될 때는 주간 시작일로 설정하고, 첫 번째 날짜(월요일)를 선택
                     _selectedWeekDate = weekStart;
+                    _selectedDate = weekStart; // 주간 시작일을 선택된 날짜로 설정
                     _selectedMonth = weekStart.month;
                   });
                   _reloadDailyNutrientsForSelectedDate();
@@ -1294,8 +1401,11 @@ class _ReportScreenState extends State<ReportScreen> {
                           child: GestureDetector(
                             onTap: () {
                               setState(() {
+                                _selectedDate = date; // 실제 선택된 날짜 업데이트
                                 _selectedWeekDate = date;
                               });
+                              // 날짜 선택 시 해당 날짜의 데이터 로드
+                              _reloadDailyNutrientsForSelectedDate();
                             },
                             child: Container(
                               margin: const EdgeInsets.symmetric(horizontal: 2),

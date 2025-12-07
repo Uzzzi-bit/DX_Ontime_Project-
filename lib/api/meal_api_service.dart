@@ -186,5 +186,38 @@ class MealApiService {
       throw Exception('식사 기록 조회 중 오류: $e');
     }
   }
+
+  /// 특정 날짜와 식사 타입의 모든 meal 삭제
+  /// 
+  /// [memberId] 사용자 Firebase UID
+  /// [date] "2024-12-04" 형식의 날짜 문자열
+  /// [mealTime] "조식" | "중식" | "석식" | "야식"
+  /// 
+  /// 반환: {
+  ///   "success": true,
+  ///   "date": "2024-12-04",
+  ///   "meal_time": "중식",
+  ///   "deleted_count": 2
+  /// }
+  Future<Map<String, dynamic>> deleteMealsByDateAndType({
+    required String memberId,
+    required String date,
+    required String mealTime,
+  }) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$apiBaseUrl/api/meals/$memberId/$date/$mealTime/'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else {
+        throw Exception('식사 기록 삭제 실패: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('식사 기록 삭제 중 오류: $e');
+    }
+  }
 }
 

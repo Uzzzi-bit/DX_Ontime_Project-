@@ -30,6 +30,7 @@ import '../model/image_model.dart';
 import '../api/chat_api.dart';
 import '../api/ai_chat_api_service.dart';
 import '../api/image_api_service.dart';
+import '../api/recommendation_api_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -72,13 +73,18 @@ class _HomeScreenState extends State<HomeScreen> {
     super.didChangeDependencies();
     // 화면이 다시 나타날 때 맘케어 모드 상태 확인 및 새로고침
     _checkAndUpdateMomCareMode();
-    // 화면이 다시 나타날 때 영양소 데이터 새로고침
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null && _userData != null && _userData!.pregnancyWeek != null && _userData!.pregnancyWeek! > 0) {
-      _loadTodayNutritionData(user.uid, _userData!.pregnancyWeek);
-    }
-    // 최신 AI 레시피 확인 및 업데이트
-    _checkForLatestRecipes();
+        // 화면이 다시 나타날 때 영양소 데이터 새로고침
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null && _userData != null && _userData!.pregnancyWeek != null && _userData!.pregnancyWeek! > 0) {
+          _loadTodayNutritionData(user.uid, _userData!.pregnancyWeek);
+          // 오늘 날짜의 추천 레시피도 함께 로드
+          _loadTodayRecommendations(user.uid).then((_) {
+            // 로드 완료 후 목록 업데이트
+            if (mounted) {
+              _updateRecommendedMealsList();
+            }
+          });
+        }
   }
 
   /// 맘케어 모드 상태를 확인하고 업데이트
@@ -97,21 +103,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// 최신 AI 레시피를 확인하고 화면을 업데이트하는 메서드
-  void _checkForLatestRecipes() {
-    final latestRecipes = RecipeScreen.getLatestAiRecipes();
-    if (latestRecipes != null && latestRecipes.isNotEmpty) {
-      // 최신 레시피가 있으면 화면 업데이트 (setState 호출)
-      if (mounted) {
-        setState(() {
-          // _recommendedMeals getter가 다시 호출되도록 상태 업데이트
-          // 실제로는 getter이므로 상태 변수를 추가할 필요는 없지만,
-          // setState를 호출하여 build 메서드를 다시 실행시킴
-        });
-        debugPrint('🔄 [HomeScreen] 최신 AI 레시피 확인: ${latestRecipes.length}개');
-      }
-    }
-  }
 
   Future<void> _loadInitialData() async {
     setState(() {
@@ -192,6 +183,8 @@ class _HomeScreenState extends State<HomeScreen> {
         // 오늘 날짜의 영양소 데이터 로드
         if (user != null) {
           await _loadTodayNutritionData(user.uid, userPregnancyWeek);
+          // 오늘 날짜의 추천 레시피 로드
+          await _loadTodayRecommendations(user.uid);
 
           // 임산부 모드가 켜져 있고 최초 진입이면 레시피 API 호출
           final hasCalledApi = prefs.getBool(_hasCalledInitialRecipeApiKey) ?? false;
@@ -235,6 +228,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<NutrientType, double> _homeNutrientProgress = {}; // 영양소 섭취 비율
   double _homeCurrentCalorie = 0.0;
   double _homeTargetCalorie = 2000.0;
+  
+  // 오늘 날짜의 추천 레시피
+  List<RecipeData>? _todayRecipes;
+  
+  // 계산된 추천 레시피 목록 (화면 표시용)
+  List<_RecommendedMeal> _recommendedMealsList = [];
 
   /// 오늘 날짜의 영양소 데이터 로드
   Future<void> _loadTodayNutritionData(String memberId, int? pregnancyWeek) async {
@@ -331,6 +330,132 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       debugPrint('⚠️ [HomeScreen] 영양소 데이터 로드 실패: $e');
+    }
+  }
+
+  /// 오늘 날짜의 추천 레시피 로드
+  Future<void> _loadTodayRecommendations(String memberId) async {
+    try {
+      final today = DateTime.now();
+      final dateStr = DateFormat('yyyy-MM-dd').format(today);
+
+      debugPrint('🔄 [HomeScreen] 오늘 추천 레시피 로드 시작: $dateStr');
+
+      final recommendationApiService = RecommendationApiService.instance;
+      final result = await recommendationApiService.getRecommendations(
+        memberId: memberId,
+        date: dateStr,
+      );
+
+      debugPrint('📥 [HomeScreen] 추천 레시피 API 응답: success=${result['success']}, recipes_count=${result['recipes_count'] ?? 0}');
+
+      if (result['success'] == true && result['recipes'] != null) {
+        final recipesJson = result['recipes'] as List<dynamic>;
+        final loadedRecipes = recipesJson
+            .map((json) => RecipeData.fromJson(json as Map<String, dynamic>))
+            .toList();
+
+        debugPrint('✅ [HomeScreen] 추천 레시피 파싱 완료: ${loadedRecipes.length}개');
+        if (loadedRecipes.isNotEmpty) {
+          debugPrint('   레시피 1: ${loadedRecipes[0].title}');
+        }
+
+        if (mounted) {
+          setState(() {
+            _todayRecipes = loadedRecipes;
+            // 전역 상태에도 업데이트 (다른 화면에서 사용할 수 있도록)
+            RecipeScreen.setLatestAiRecipes(loadedRecipes);
+            // 추천 레시피 목록 재계산
+            _updateRecommendedMealsList();
+            debugPrint('✅ [HomeScreen] _todayRecipes 업데이트: ${_todayRecipes?.length ?? "null"}개');
+          });
+          debugPrint('✅ [HomeScreen] 오늘 추천 레시피 업데이트 완료 (setState 호출)');
+        }
+      } else {
+        debugPrint('⚠️ [HomeScreen] 오늘 날짜에 추천 레시피 없음');
+        if (mounted) {
+          setState(() {
+            _todayRecipes = null;
+            _updateRecommendedMealsList();
+          });
+        }
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ [HomeScreen] 추천 레시피 로드 실패: $e');
+      debugPrint('   스택 트레이스: $stackTrace');
+      if (mounted) {
+        setState(() {
+          _todayRecipes = null;
+          _updateRecommendedMealsList();
+        });
+      }
+    }
+  }
+
+  /// 추천 레시피 목록 업데이트
+  void _updateRecommendedMealsList() {
+    try {
+      // 오늘 날짜의 추천 레시피를 먼저 확인하고, 없으면 전역 상태, 그래도 없으면 목 데이터 사용
+      final recipes = _todayRecipes ?? 
+                      RecipeScreen.getLatestAiRecipes() ?? 
+                      RecipeScreen.getRecommendedRecipes();
+      
+      debugPrint('🔄 [HomeScreen] _updateRecommendedMealsList 호출');
+      debugPrint('   _todayRecipes: ${_todayRecipes?.length ?? "null"}개');
+      debugPrint('   전역 레시피: ${RecipeScreen.getLatestAiRecipes()?.length ?? "null"}개');
+      debugPrint('   최종 사용 레시피: ${recipes.length}개');
+      if (recipes.isNotEmpty) {
+        debugPrint('   첫 번째 레시피: ${recipes[0].title}');
+      }
+
+      // 레시피가 비어있으면 빈 리스트
+      if (recipes.isEmpty) {
+        debugPrint('⚠️ [HomeScreen] 경고: 레시피 리스트가 비어있습니다.');
+        _recommendedMealsList = [];
+        return;
+      }
+
+      // 레시피를 RecommendedMeal 형식으로 변환
+      final List<Color> backgroundColors = [
+        const Color(0xFFD2ECBF), // 연어스테이크 색상
+        const Color(0xFFFEF493), // 냉모밀 색상
+        const Color(0xFFBCE7F0), // 미역국 색상
+      ];
+
+      _recommendedMealsList = recipes.asMap().entries.map((entry) {
+        final index = entry.key;
+        final recipe = entry.value;
+        // 레시피 ID 매핑 (기존 매핑 유지)
+        String mealId;
+        switch (index) {
+          case 0:
+            mealId = 'salmon-steak'; // 간장 닭봉 구이
+            break;
+          case 1:
+            mealId = 'cold-noodles'; // 냉메밀
+            break;
+          case 2:
+            mealId = 'seaweed-soup'; // 미역국
+            break;
+          default:
+            mealId = 'salmon-steak';
+        }
+
+        return _RecommendedMeal(
+          id: mealId,
+          name: recipe.title,
+          imagePath: recipe.imagePath,
+          calories: recipe.calories,
+          tags: recipe.tags,
+          backgroundColor: backgroundColors[index % backgroundColors.length],
+        );
+      }).toList();
+      
+      debugPrint('✅ [HomeScreen] 추천 레시피 목록 업데이트 완료: ${_recommendedMealsList.length}개');
+    } catch (e, stackTrace) {
+      debugPrint('❌ [HomeScreen] _updateRecommendedMealsList 에러: $e');
+      debugPrint('   스택 트레이스: $stackTrace');
+      _recommendedMealsList = [];
     }
   }
 
@@ -479,58 +604,10 @@ class _HomeScreenState extends State<HomeScreen> {
   //    - 방법 1: 서버에서 푸시 알림으로 홈 화면에 업데이트 신호 전송
   //    - 방법 2: 홈 화면 진입 시 서버에서 최신 추천 식단 정보 GET
   //    - 방법 3: report_pages.dart에서 변경 후 Navigator.pop() 시 콜백으로 홈 화면 업데이트
+  // 추천 레시피 목록 (getter 대신 변수로 관리하여 화면 업데이트 확실히 반영)
   List<_RecommendedMeal> get _recommendedMeals {
-    try {
-      // 최신 AI 레시피를 먼저 확인하고, 없으면 목 데이터 사용
-      final recipes = RecipeScreen.getLatestAiRecipes() ?? RecipeScreen.getRecommendedRecipes();
-
-      // 레시피가 비어있으면 빈 리스트 반환
-      if (recipes.isEmpty) {
-        debugPrint('경고: 레시피 리스트가 비어있습니다.');
-        return [];
-      }
-
-      // 레시피를 RecommendedMeal 형식으로 변환
-      final List<Color> backgroundColors = [
-        const Color(0xFFD2ECBF), // 연어스테이크 색상
-        const Color(0xFFFEF493), // 냉모밀 색상
-        const Color(0xFFBCE7F0), // 미역국 색상
-      ];
-
-      return recipes.asMap().entries.map((entry) {
-        final index = entry.key;
-        final recipe = entry.value;
-        // 레시피 ID 매핑 (기존 매핑 유지)
-        String mealId;
-        switch (index) {
-          case 0:
-            mealId = 'salmon-steak'; // 간장 닭봉 구이
-            break;
-          case 1:
-            mealId = 'cold-noodles'; // 냉메밀
-            break;
-          case 2:
-            mealId = 'seaweed-soup'; // 미역국
-            break;
-          default:
-            mealId = 'salmon-steak';
-        }
-
-        return _RecommendedMeal(
-          id: mealId,
-          name: recipe.title,
-          imagePath: recipe.imagePath,
-          calories: recipe.calories,
-          tags: recipe.tags,
-          backgroundColor: backgroundColors[index % backgroundColors.length],
-        );
-      }).toList();
-    } catch (e, stackTrace) {
-      debugPrint('에러: _recommendedMeals getter에서 에러 발생: $e');
-      debugPrint('스택 트레이스: $stackTrace');
-      // 에러 발생 시 빈 리스트 반환 (빈 화면 대신 기본 데이터 표시)
-      return [];
-    }
+    // 이미 계산된 목록이 있으면 반환
+    return _recommendedMealsList;
   }
 
   final List<_ApplianceInfo> _appliances = const [
@@ -1107,8 +1184,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// 선택한 식사 타입으로 리포트 화면으로 이동하여 식단 분석 시작
-  void _navigateToMealAnalysis(String mealType) {
-    Navigator.push(
+  Future<void> _navigateToMealAnalysis(String mealType) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ReportScreen(
@@ -1116,6 +1193,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+    // 리포트 화면에서 돌아올 때 추천 레시피 새로고침
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && mounted) {
+      await _loadTodayRecommendations(user.uid);
+    }
   }
 
   /// report_pages에서 계산된 영양소 비율로 업데이트
@@ -1603,13 +1685,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                     Bounceable(
                                       onTap: () {},
                                       child: TextButton(
-                                        onPressed: () {
-                                          Navigator.push(
+                                        onPressed: () async {
+                                          await Navigator.push(
                                             context,
                                             MaterialPageRoute(
                                               builder: (context) => const ReportScreen(),
                                             ),
                                           );
+                                          // 리포트 화면에서 돌아올 때 추천 레시피 새로고침
+                                          final user = FirebaseAuth.instance.currentUser;
+                                          if (user != null && mounted) {
+                                            await _loadTodayRecommendations(user.uid);
+                                          }
                                         },
                                         style: TextButton.styleFrom(
                                           padding: EdgeInsets.symmetric(

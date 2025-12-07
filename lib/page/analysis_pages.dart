@@ -10,7 +10,7 @@ import '../service/storage_service.dart';
 import '../api/meal_api_service.dart';
 import '../api/image_api_service.dart';
 
-enum _AnalysisStep { capture, analyzingImage, reviewFoods, nutrientAnalysis }
+enum _AnalysisStep { capture, analyzingImage, reviewFoods, nutrientAnalysis, deleting }
 
 class AnalysisScreen extends StatefulWidget {
   final String? mealType; // 식사 타입: '아침', '점심', '간식', '저녁'
@@ -39,6 +39,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   File? _selectedImage;
   String? _uploadedImageUrl; // 업로드된 이미지의 Firebase Storage URL
   int? _savedImageId; // Django DB에 저장된 이미지 ID
+  List<String> _deletedFoods = []; // 삭제된 음식 목록 (저장 시 사용)
 
   @override
   void initState() {
@@ -222,13 +223,21 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       },
     );
     if (shouldDelete == true) {
+      final deletedFood = _foodItems[index];
       setState(() {
         _foodItems.removeAt(index);
+        // 삭제된 음식 이름 저장 (저장 시 사용)
+        if (!_deletedFoods.contains(deletedFood)) {
+          _deletedFoods.add(deletedFood);
+        }
       });
     }
   }
 
   Future<void> _startNutrientAnalysis() async {
+    // 삭제된 음식 이름 초기화 (새로운 저장 시작)
+    _deletedFoods.clear();
+    
     setState(() {
       _currentStep = _AnalysisStep.nutrientAnalysis;
     });
@@ -272,6 +281,95 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       debugPrint('   foods 목록: ${_foodItems.join(", ")}');
 
       final mealApiService = MealApiService.instance;
+      
+      // 편집 모드일 때 또는 음식 목록이 비어있을 때: 기존 meal 삭제 후 현재 화면의 음식 목록만 저장
+      // (사용자가 화면에서 삭제한 음식은 저장되지 않음)
+      final isEditMode = widget.existingFoods != null && widget.existingFoods!.isNotEmpty;
+      
+      if (isEditMode || _foodItems.isEmpty) {
+        debugPrint('🔄 [AnalysisScreen] 기존 meal 삭제 중... (편집 모드: $isEditMode, 음식 목록 비어있음: ${_foodItems.isEmpty})');
+        debugPrint('   화면의 음식 목록: ${_foodItems.join(", ")}');
+        if (isEditMode) {
+          debugPrint('   삭제된 음식: ${widget.existingFoods!.where((f) => !_foodItems.contains(f)).join(", ")}');
+        }
+        try {
+          await mealApiService.deleteMealsByDateAndType(
+            memberId: user.uid,
+            date: mealDateStr,
+            mealTime: mealTime,
+          );
+          debugPrint('✅ [AnalysisScreen] 기존 meal 삭제 완료');
+        } catch (e) {
+          debugPrint('⚠️ [AnalysisScreen] 기존 meal 삭제 실패 (계속 진행): $e');
+          // 삭제 실패해도 새 meal 저장은 계속 진행
+        }
+      }
+      
+      // 음식 목록이 비어있으면 저장하지 않고 DB에서 삭제만 함 (모두 삭제한 경우)
+      if (_foodItems.isEmpty) {
+        debugPrint('⚠️ [AnalysisScreen] 음식 목록이 비어있어 저장하지 않습니다. (기존 meal 삭제 완료)');
+        
+        // 삭제된 음식 이름 추적 (편집 모드일 때 기존 음식 목록과 비교)
+        final isEditMode = widget.existingFoods != null && widget.existingFoods!.isNotEmpty;
+        if (isEditMode && widget.existingFoods != null) {
+          // 기존 음식 목록에서 현재 음식 목록을 제외한 것 = 삭제된 음식
+          _deletedFoods = widget.existingFoods!.where((food) => !_foodItems.contains(food)).toList();
+        }
+        
+        // 삭제 중 화면으로 이동
+        setState(() {
+          _currentStep = _AnalysisStep.deleting;
+        });
+        
+        // 삭제 처리
+        try {
+          await mealApiService.deleteMealsByDateAndType(
+            memberId: user.uid,
+            date: mealDateStr,
+            mealTime: mealTime,
+          );
+          debugPrint('✅ [AnalysisScreen] 기존 meal 삭제 완료');
+          
+          // 1.5초 후 완료 처리
+          await Future.delayed(const Duration(milliseconds: 1500));
+          
+          if (mounted) {
+            // 콜백을 통해 리포트 화면에서 데이터 재로드
+            if (widget.onAnalysisComplete != null) {
+              widget.onAnalysisComplete!({
+                'imageUrl': _uploadedImageUrl,
+                'menuText': '',
+                'mealType': widget.mealType ?? '점심',
+                'selectedDate': mealDate,
+                'foods': <String>[],
+                'total_nutrition': <String, dynamic>{},
+              });
+            }
+            
+            // 삭제된 음식 이름을 메시지에 표시
+            final deletedFoodsText = _deletedFoods.isNotEmpty 
+                ? _deletedFoods.join(', ')
+                : '모든 음식';
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('$deletedFoodsText이(가) 삭제되었습니다.')),
+            );
+            Navigator.pop(context);
+          }
+        } catch (e) {
+          debugPrint('❌ [AnalysisScreen] meal 삭제 실패: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('삭제 중 오류가 발생했습니다: $e')),
+            );
+            setState(() {
+              _currentStep = _AnalysisStep.reviewFoods;
+            });
+          }
+        }
+        return;
+      }
+      
       final result = await mealApiService.saveMeal(
         memberId: user.uid,
         mealTime: mealTime,
@@ -337,18 +435,18 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (_currentStep != _AnalysisStep.nutrientAnalysis) ...[
+              if (_currentStep != _AnalysisStep.nutrientAnalysis && _currentStep != _AnalysisStep.deleting) ...[
                 _buildCaptureControls(),
                 const SizedBox(height: 20),
               ],
               _buildStepContent(),
               const SizedBox(height: 24),
-              if (_currentStep != _AnalysisStep.nutrientAnalysis) ...[
+              if (_currentStep != _AnalysisStep.nutrientAnalysis && _currentStep != _AnalysisStep.deleting) ...[
                 _buildFoodInputSection(),
                 const SizedBox(height: 16),
                 if (_currentStep == _AnalysisStep.reviewFoods && _foodItems.isNotEmpty) ...[
                   const Text(
-                    '분석된 음식 목록',
+                    '추가된 음식',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -359,14 +457,28 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 _buildFoodList(),
               ],
               const SizedBox(height: 24),
-              Bounceable(
-                onTap: () {
-                  if (_currentStep == _AnalysisStep.reviewFoods) {
-                    _startNutrientAnalysis();
-                  }
-                },
-                child: _buildActionButton(),
-              ),
+              if (_currentStep == _AnalysisStep.reviewFoods) ...[
+                // 분석하기 버튼과 저장하기 버튼을 나란히 배치
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildActionButton(),
+                    ),
+                    const SizedBox(width: 12),
+                    _buildSaveButton(),
+                  ],
+                ),
+              ] else ...[
+                // 분석하기 버튼 (이미지 분석 단계용)
+                Bounceable(
+                  onTap: () {
+                    if (_currentStep == _AnalysisStep.capture) {
+                      // 이미지 선택 유도
+                    }
+                  },
+                  child: _buildActionButton(),
+                ),
+              ],
             ],
           ),
         ),
@@ -432,6 +544,30 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
+            ),
+          ],
+        );
+      case _AnalysisStep.deleting:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildImagePreview(),
+            const SizedBox(height: 24),
+            Text(
+              textAlign: TextAlign.center,
+              _deletedFoods.isNotEmpty 
+                  ? '${_deletedFoods.join(', ')}을(를) 삭제 중입니다.'
+                  : '음식을 삭제 중입니다.',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            LinearProgressIndicator(
+              minHeight: 8,
+              backgroundColor: ColorPalette.bg200,
+              valueColor: const AlwaysStoppedAnimation(ColorPalette.primary200),
             ),
           ],
         );
@@ -638,18 +774,17 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   }
 
   Widget _buildActionButton() {
-    final isDisabled = _foodItems.isEmpty || _currentStep == _AnalysisStep.analyzingImage;
-    final buttonLabel = _currentStep == _AnalysisStep.nutrientAnalysis ? '분석 중...' : '분석하기';
+    final isDisabled = _currentStep == _AnalysisStep.analyzingImage || _currentStep == _AnalysisStep.nutrientAnalysis || _currentStep == _AnalysisStep.deleting;
+    final buttonLabel = _currentStep == _AnalysisStep.analyzingImage ? '분석 중...' : '분석하기';
 
     return SizedBox(
       width: double.infinity,
       child: FilledButton(
-        onPressed: isDisabled || _currentStep == _AnalysisStep.nutrientAnalysis
+        onPressed: isDisabled
             ? null
             : () {
-                if (_currentStep == _AnalysisStep.capture || _currentStep == _AnalysisStep.reviewFoods) {
-                  _startNutrientAnalysis();
-                }
+                // 분석하기 버튼: 원래 기능 유지 (저장까지 수행)
+                _startNutrientAnalysis();
               },
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -659,6 +794,36 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           buttonLabel,
           style: const TextStyle(
             fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSaveButton() {
+    // 편집 모드이거나 음식이 하나라도 있으면 활성화
+    final isEditMode = widget.existingFoods != null && widget.existingFoods!.isNotEmpty;
+    final isDisabled = _foodItems.isEmpty && !isEditMode; // 편집 모드가 아니고 음식 목록이 비어있으면 비활성화
+    final isSaving = _currentStep == _AnalysisStep.nutrientAnalysis;
+
+    return SizedBox(
+      width: 100, // 작은 버튼 크기
+      child: OutlinedButton(
+        onPressed: isDisabled || isSaving
+            ? null
+            : () {
+                _startNutrientAnalysis();
+              },
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          side: BorderSide(color: ColorPalette.primary200),
+          foregroundColor: ColorPalette.primary200,
+        ),
+        child: Text(
+          isSaving ? '저장 중...' : '저장하기',
+          style: const TextStyle(
+            fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
         ),
