@@ -1,6 +1,7 @@
 import os
 import json
 import sys
+import asyncio
 from typing import Optional, List, Dict, Any
 
 from fastapi import FastAPI, File, UploadFile, Form, Request
@@ -795,13 +796,18 @@ async def analyze_food_nutrition(req: AnalyzeFoodNutritionRequest):
     try:
         print(f"🔄 [analyze_food_nutrition] 영양소 분석 시작: {len(req.foods)}개 음식")
         
-        nutrition_results = []
-        
-        for food_item in req.foods:
+        # 각 음식 분석을 위한 비동기 함수 정의
+        async def analyze_single_food(food_item: Dict) -> FoodNutritionResult:
             food_name = food_item.get('name', '')
             if not food_name:
                 print(f"   ⚠️ 음식 이름이 없습니다: {food_item}")
-                continue
+                return FoodNutritionResult(
+                    food_name="알 수 없음",
+                    calories=0, carbs=0, protein=0, fat=0, sodium=0, iron=0, calcium=0,
+                    vitamin_c=0, sugar=0, folate=0, magnesium=0, omega3=0, vitamin_a=0,
+                    vitamin_b12=0, vitamin_d=0, dietary_fiber=0, potassium=0,
+                    serving_size_gram=200.0
+                )
             
             print(f"   📊 영양소 조회: '{food_name}'")
             
@@ -895,16 +901,16 @@ async def analyze_food_nutrition(req: AnalyzeFoodNutritionRequest):
                     serving_size_gram=estimated_serving_gram
                 )
                 
-                nutrition_results.append(result)
                 print(f"   ✅ '{food_name}' 영양소 분석 완료:")
                 print(f"      - 1인분 무게: {estimated_serving_gram}g")
                 print(f"      - 최종 영양소: calories={result.calories:.1f}kcal, protein={result.protein:.1f}g, carbs={result.carbs:.1f}g")
+                return result
             except Exception as e:
                 print(f"   ❌ '{food_name}' 영양소 조회 실패: {e}")
                 import traceback
                 traceback.print_exc()
-                # 실패해도 기본값으로 추가
-                nutrition_results.append(FoodNutritionResult(
+                # 실패해도 기본값으로 반환
+                return FoodNutritionResult(
                     food_name=food_name,
                     calories=0,
                     carbs=0,
@@ -924,7 +930,13 @@ async def analyze_food_nutrition(req: AnalyzeFoodNutritionRequest):
                     dietary_fiber=0,
                     potassium=0,
                     serving_size_gram=200.0  # 기본값
-                ))
+                )
+        
+        # 모든 음식을 병렬로 처리 (asyncio.gather 사용)
+        print(f"🚀 [analyze_food_nutrition] {len(req.foods)}개 음식을 병렬로 분석 시작")
+        tasks = [analyze_single_food(food_item) for food_item in req.foods]
+        nutrition_results = await asyncio.gather(*tasks)
+        nutrition_results = list(nutrition_results)  # tuple을 list로 변환
         
         print(f"✅ [analyze_food_nutrition] 전체 영양소 분석 완료: {len(nutrition_results)}개")
         return AnalyzeFoodNutritionResponse(

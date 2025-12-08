@@ -22,7 +22,8 @@ from members.ai_chat_views import (
     save_message,
     get_messages,
 )
-from members.meal_views import analyze_meal_image, save_meal, get_daily_nutrition, get_meals
+from members.meal_views import analyze_meal_image, save_meal, get_daily_nutrition, get_meals, delete_meals_by_date_and_type, update_meal_foods
+from members.recommendation_views import save_recommendations, get_recommendations
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -55,8 +56,15 @@ urlpatterns = [
     path('api/ai-chat/sessions/<int:session_id>/messages/', get_messages, name='ai-chat-get-messages'),
     
     # 식사 기록 API
+    # 더 구체적인 패턴을 먼저 배치해야 함 (Django는 순서대로 매칭)
     path('api/meals/analyze/', analyze_meal_image, name='meal-analyze'),
-    path('api/meals/', save_meal, name='meal-save'),
-    path('api/meals/<str:member_id>/<str:date_str>/', get_meals, name='meal-list'),
     path('api/meals/daily-nutrition/<str:member_id>/<str:date_str>/', get_daily_nutrition, name='meal-daily-nutrition'),
+    # PUT과 DELETE를 모두 처리하는 update_meal_foods를 먼저 배치 (PUT은 업데이트, DELETE는 삭제)
+    path('api/meals/<str:member_id>/<str:date_str>/<str:meal_time>/', update_meal_foods, name='meal-update-delete'),
+    path('api/meals/<str:member_id>/<str:date_str>/', get_meals, name='meal-list'),
+    path('api/meals/', save_meal, name='meal-save'),
+    
+    # 레시피 추천 API
+    path('api/recommendations/', save_recommendations, name='recommendation-save'),
+    path('api/recommendations/<str:member_id>/<str:date_str>/', get_recommendations, name='recommendation-get'),
 ]
