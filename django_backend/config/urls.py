@@ -24,7 +24,7 @@ from members.ai_chat_views import (
 )
 from members.meal_views import analyze_meal_image, save_meal, get_daily_nutrition, get_meals, delete_meals_by_date_and_type, update_meal_foods
 from members.recommendation_views import save_recommendations, get_recommendations
-from members.body_measurement_views import save_body_measurement, get_body_measurements, get_body_measurement_by_date
+from members.body_measurement_views import save_body_measurement, get_body_measurements, get_body_measurement_by_date, update_or_delete_body_measurement
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -71,6 +71,7 @@ urlpatterns = [
     
     # 신체 변화 측정 API
     path('api/body-measurements/', save_body_measurement, name='body-measurement-save'),
+    path('api/body-measurements/<int:measurement_id>/', update_or_delete_body_measurement, name='body-measurement-update-delete'),  # PUT: 업데이트, DELETE: 삭제
     path('api/body-measurements/<str:member_id>/', get_body_measurements, name='body-measurement-list'),
     path('api/body-measurements/<str:member_id>/<str:date_str>/', get_body_measurement_by_date, name='body-measurement-by-date'),
 ]

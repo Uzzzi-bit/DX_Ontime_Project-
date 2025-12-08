@@ -59,20 +59,18 @@ def save_body_measurement(request):
         if weight_kg is None and blood_sugar_fasting is None and blood_sugar_postprandial is None:
             return JsonResponse({'error': '최소 하나의 측정값(체중, 공복혈당, 식후혈당)을 입력해주세요.'}, status=400)
         
-        # 같은 날짜의 기존 기록이 있으면 업데이트, 없으면 생성
-        measurement, created = BodyMeasurement.objects.update_or_create(
+        # 같은 날짜에 여러 기록을 허용하므로 항상 새로 생성
+        # (메모에 아침/점심/저녁을 구분하여 저장)
+        measurement = BodyMeasurement.objects.create(
             member=member,
             measurement_date=measurement_date,
-            defaults={
-                'weight_kg': weight_kg,
-                'blood_sugar_fasting': blood_sugar_fasting,
-                'blood_sugar_postprandial': blood_sugar_postprandial,
-                'memo': memo,
-            }
+            weight_kg=weight_kg,
+            blood_sugar_fasting=blood_sugar_fasting,
+            blood_sugar_postprandial=blood_sugar_postprandial,
+            memo=memo,
         )
         
-        action = '생성' if created else '업데이트'
-        print(f'✅ [save_body_measurement] 신체 변화 기록 {action} 완료: member_id={member_id}, date={measurement_date_str}, weight={weight_kg}, fasting={blood_sugar_fasting}, postprandial={blood_sugar_postprandial}')
+        print(f'✅ [save_body_measurement] 신체 변화 기록 생성 완료: member_id={member_id}, date={measurement_date_str}, weight={weight_kg}, fasting={blood_sugar_fasting}, postprandial={blood_sugar_postprandial}, memo={memo}')
         
         return JsonResponse({
             'success': True,
@@ -206,6 +204,77 @@ def get_body_measurement_by_date(request, member_id: str, date_str: str):
     except Exception as e:
         import traceback
         print(f'❌ [get_body_measurement_by_date] 오류: {e}')
+        traceback.print_exc()
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["PUT", "DELETE"])
+def update_or_delete_body_measurement(request, measurement_id: int):
+    """
+    PUT /api/body-measurements/<measurement_id>/ - 신체 변화 측정 기록 업데이트
+    DELETE /api/body-measurements/<measurement_id>/ - 신체 변화 측정 기록 삭제
+    
+    PUT Body:
+    {
+        "weight_kg": 65.5,  # 선택
+        "blood_sugar_fasting": 95,  # 선택
+        "blood_sugar_postprandial": 140,  # 선택
+        "memo": "아침 측정"  # 선택
+    }
+    """
+    try:
+        # DELETE 요청 처리
+        if request.method == 'DELETE':
+            try:
+                measurement = BodyMeasurement.objects.get(id=measurement_id)
+            except BodyMeasurement.DoesNotExist:
+                return JsonResponse({'error': 'Measurement not found'}, status=404)
+            
+            measurement.delete()
+            
+            print(f'✅ [update_or_delete_body_measurement] 신체 변화 기록 삭제 완료: measurement_id={measurement_id}')
+            
+            return JsonResponse({
+                'success': True,
+                'message': '신체 변화 기록이 삭제되었습니다.',
+            }, status=200)
+        
+        # PUT 요청 처리
+        body = json.loads(request.body.decode('utf-8'))
+        
+        try:
+            measurement = BodyMeasurement.objects.get(id=measurement_id)
+        except BodyMeasurement.DoesNotExist:
+            return JsonResponse({'error': 'Measurement not found'}, status=404)
+        
+        # 업데이트할 필드만 변경
+        if 'weight_kg' in body:
+            measurement.weight_kg = body.get('weight_kg')
+        if 'blood_sugar_fasting' in body:
+            measurement.blood_sugar_fasting = body.get('blood_sugar_fasting')
+        if 'blood_sugar_postprandial' in body:
+            measurement.blood_sugar_postprandial = body.get('blood_sugar_postprandial')
+        if 'memo' in body:
+            measurement.memo = body.get('memo', '')
+        
+        measurement.save()
+        
+        print(f'✅ [update_or_delete_body_measurement] 신체 변화 기록 업데이트 완료: measurement_id={measurement_id}')
+        
+        return JsonResponse({
+            'success': True,
+            'measurement_id': measurement.id,
+            'measurement_date': measurement.measurement_date.strftime('%Y-%m-%d'),
+            'weight_kg': float(measurement.weight_kg) if measurement.weight_kg else None,
+            'blood_sugar_fasting': measurement.blood_sugar_fasting,
+            'blood_sugar_postprandial': measurement.blood_sugar_postprandial,
+            'memo': measurement.memo or '',
+        }, status=200)
+        
+    except Exception as e:
+        import traceback
+        print(f'❌ [update_or_delete_body_measurement] 오류: {e}')
         traceback.print_exc()
         return JsonResponse({'error': str(e)}, status=500)
 
