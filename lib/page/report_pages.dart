@@ -916,10 +916,10 @@ class _ReportScreenState extends State<ReportScreen> {
         nutrients: nutrientsMap,
       );
       if (!mounted) return;
-      
+
       // 현재 선택된 날짜
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
-      
+
       setState(() {
         if (aiResp.bannerMessage.isNotEmpty) {
           _bannerMessageFromAi = aiResp.bannerMessage;
@@ -934,7 +934,7 @@ class _ReportScreenState extends State<ReportScreen> {
           // 전역 상태에 최신 AI 레시피 저장 (RecipeScreen이 자동으로 업데이트됨)
           RecipeScreen.setLatestAiRecipes(_aiRecipes);
           debugPrint('✅ [ReportScreen] AI 레시피 ${_aiRecipes.length}개 수신 완료 및 날짜별 맵에 저장: $dateStr');
-          
+
           // DB에 레시피 저장 (비동기로 실행, 실패해도 화면은 업데이트)
           _saveRecommendationsToDb(user.uid, dateStr, aiResp.bannerMessage, _aiRecipes);
         } else {
@@ -1171,7 +1171,7 @@ class _ReportScreenState extends State<ReportScreen> {
       (meal) => meal.mealType == mealType,
       orElse: () => MealRecord(mealType: mealType, hasRecord: false),
     );
-    
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -1636,49 +1636,48 @@ class _ReportScreenState extends State<ReportScreen> {
             // 식사 기록 카드들 (오늘 날짜일 때만 데이터 표시)
             // 예시: final mealRecords = await api.getMealRecords(_selectedWeekDate);
             // 선택된 날짜의 식사 기록 표시 (오늘인지 여부와 관계없이)
-            ..._mealRecords
-                .map(
-                  (meal) => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            ..._mealRecords.map(
+              (meal) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            meal.mealType,
-                            style: const TextStyle(
-                              color: Color(0xFF1D1B20),
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.15,
-                            ),
-                          ),
-                          if (meal.hasRecord)
-                            Material(
-                              color: Colors.transparent,
-                              child: IconButton(
-                                // TODO: [AI] [DB] 편집 시 기존 분석 결과 수정 또는 재분석 기능
-                                onPressed: () => _navigateToMealRecord(meal.mealType),
-                                icon: const Icon(
-                                  Icons.edit,
-                                  color: Color(0xFF1D1B20),
-                                  size: 20,
-                                ),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(
-                                  minWidth: 32,
-                                  minHeight: 32,
-                                ),
-                                tooltip: '편집',
-                              ),
-                            ),
-                        ],
+                      Text(
+                        meal.mealType,
+                        style: const TextStyle(
+                          color: Color(0xFF1D1B20),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.15,
+                        ),
                       ),
-                      const SizedBox(height: 8),
-                      _buildMealCard(meal),
+                      if (meal.hasRecord)
+                        Material(
+                          color: Colors.transparent,
+                          child: IconButton(
+                            // TODO: [AI] [DB] 편집 시 기존 분석 결과 수정 또는 재분석 기능
+                            onPressed: () => _navigateToMealRecord(meal.mealType),
+                            icon: const Icon(
+                              Icons.edit,
+                              color: Color(0xFF1D1B20),
+                              size: 20,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                            tooltip: '편집',
+                          ),
+                        ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  _buildMealCard(meal),
+                ],
+              ),
+            ),
             const SizedBox(height: 100),
           ],
         ),
