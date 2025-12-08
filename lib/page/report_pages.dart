@@ -9,6 +9,8 @@ import '../api/ai_recipe_api.dart';
 import '../api/member_api_service.dart';
 import '../api/meal_api_service.dart';
 import '../api/recommendation_api_service.dart';
+import '../api/body_measurement_api_service.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'recipe_pages.dart';
 import 'analysis_pages.dart';
 import '../model/nutrient_type.dart';
@@ -119,6 +121,10 @@ class _ReportScreenState extends State<ReportScreen> {
   final Map<String, String> _dateBannerMessages = {};
   final Map<String, List<RecipeData>> _dateAiRecipes = {};
 
+  // 신체 변화 관련 상태 변수
+  List<Map<String, dynamic>> _bodyMeasurements = []; // 신체 변화 측정 기록 (주간/월간)
+  Map<String, dynamic>? _todayBodyMeasurement; // 선택된 날짜의 신체 변화 기록
+
   @override
   void initState() {
     super.initState();
@@ -137,6 +143,7 @@ class _ReportScreenState extends State<ReportScreen> {
     // (AI 레시피는 _reloadDailyNutrientsForSelectedDate 내부에서 자동 호출됨)
     _loadUserInfoAndNutritionTargets().then((_) {
       _reloadDailyNutrientsForSelectedDate();
+      _loadBodyMeasurements(); // 신체 변화 데이터 로드
     });
 
     // 홈 화면에서 식사 타입 선택 시 해당 식사 타입으로 분석 화면 이동
@@ -1406,6 +1413,7 @@ class _ReportScreenState extends State<ReportScreen> {
                               });
                               // 날짜 선택 시 해당 날짜의 데이터 로드
                               _reloadDailyNutrientsForSelectedDate();
+                              _loadBodyMeasurements(); // 신체 변화 데이터도 함께 로드
                             },
                             child: Container(
                               margin: const EdgeInsets.symmetric(horizontal: 2),
@@ -1620,6 +1628,9 @@ class _ReportScreenState extends State<ReportScreen> {
                       ),
                     ),
                   ),
+            const SizedBox(height: 32),
+            // 신체 변화 섹션
+            _buildBodyMeasurementSection(),
             const SizedBox(height: 32),
             // 오늘의 식사 섹션
             const Text(
@@ -1856,6 +1867,660 @@ class _ReportScreenState extends State<ReportScreen> {
           );
         },
       );
+    }
+  }
+
+  /// 신체 변화 데이터 로드
+  Future<void> _loadBodyMeasurements() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+
+      // 선택된 날짜의 신체 변화 기록 조회
+      final bodyMeasurementApi = BodyMeasurementApiService.instance;
+      final todayResult = await bodyMeasurementApi.getBodyMeasurementByDate(
+        memberId: user.uid,
+        date: dateStr,
+      );
+
+      if (todayResult['success'] == true) {
+        final measurements = todayResult['measurements'] as List<dynamic>? ?? [];
+        if (measurements.isNotEmpty) {
+          _todayBodyMeasurement = measurements.first as Map<String, dynamic>;
+        } else {
+          _todayBodyMeasurement = null;
+        }
+      }
+
+      // 주간 데이터 조회 (현재 주: 월요일~일요일)
+      // 선택된 날짜가 속한 주의 월요일과 일요일 계산 (시간 제거하여 정확한 날짜만 사용)
+      final selectedDate = _selectedDate;
+      final selectedDateOnly = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+      final weekday = selectedDateOnly.weekday; // 1=월요일, 7=일요일
+      final monday = selectedDateOnly.subtract(Duration(days: weekday - 1));
+      final sunday = monday.add(const Duration(days: 6));
+
+      final mondayStr = DateFormat('yyyy-MM-dd').format(monday);
+      final sundayStr = DateFormat('yyyy-MM-dd').format(sunday);
+
+      final weekResult = await bodyMeasurementApi.getBodyMeasurements(
+        memberId: user.uid,
+        startDate: mondayStr,
+        endDate: sundayStr,
+      );
+
+      if (weekResult['success'] == true) {
+        _bodyMeasurements =
+            (weekResult['measurements'] as List<dynamic>?)?.map((m) => m as Map<String, dynamic>).toList() ?? [];
+      }
+
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      debugPrint('❌ [ReportScreen] 신체 변화 데이터 로드 실패: $e');
+    }
+  }
+
+  /// 신체 변화 섹션 빌드
+  Widget _buildBodyMeasurementSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              '신체 변화',
+              style: TextStyle(
+                color: ColorPalette.text100,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline, color: ColorPalette.primary200),
+              onPressed: _showBodyMeasurementDialog,
+              tooltip: '신체 변화 기록 추가',
+            ),
+          ],
+        ),
+        const SizedBox(height: 15),
+        // 오늘의 신체 변화 기록
+        if (_todayBodyMeasurement != null)
+          _buildTodayBodyMeasurementCard()
+        else
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: ColorPalette.bg200,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: ColorPalette.bg300),
+            ),
+            child: Center(
+              child: Text(
+                '${_selectedDate.month}월 ${_selectedDate.day}일의 신체 변화 기록이 없습니다.',
+                style: const TextStyle(
+                  color: ColorPalette.text200,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
+          ),
+        const SizedBox(height: 16),
+        // 주간 체중/혈당 추이 그래프
+        if (_bodyMeasurements.isNotEmpty) _buildBodyMeasurementChart(),
+      ],
+    );
+  }
+
+  /// 오늘의 신체 변화 카드
+  Widget _buildTodayBodyMeasurementCard() {
+    final weight = _todayBodyMeasurement!['weight_kg'] as double?;
+    final fasting = _todayBodyMeasurement!['blood_sugar_fasting'] as int?;
+    final postprandial = _todayBodyMeasurement!['blood_sugar_postprandial'] as int?;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: ColorPalette.primary100.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ColorPalette.primary100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${_selectedDate.month}월 ${_selectedDate.day}일',
+                style: const TextStyle(
+                  color: ColorPalette.text100,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit, size: 18, color: ColorPalette.primary200),
+                onPressed: _showBodyMeasurementDialog,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              if (weight != null) ...[
+                Expanded(
+                  child: _buildMeasurementItem('체중', '${weight.toStringAsFixed(1)}kg', Icons.monitor_weight),
+                ),
+                const SizedBox(width: 12),
+              ],
+              if (fasting != null) ...[
+                Expanded(
+                  child: _buildMeasurementItem('공복혈당', '${fasting}mg/dL', Icons.bloodtype),
+                ),
+                const SizedBox(width: 12),
+              ],
+              if (postprandial != null)
+                Expanded(
+                  child: _buildMeasurementItem('식후혈당', '${postprandial}mg/dL', Icons.bloodtype),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 측정 항목 위젯
+  Widget _buildMeasurementItem(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: ColorPalette.primary200),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: ColorPalette.text200,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: ColorPalette.text100,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 신체 변화 차트 (주간 추이)
+  Widget _buildBodyMeasurementChart() {
+    // 현재 주의 월요일 계산 (X축 기준점) - 시간을 00:00:00으로 정규화
+    final selectedDate = _selectedDate;
+    final weekday = selectedDate.weekday;
+    final monday = DateTime(
+      selectedDate.year,
+      selectedDate.month,
+      selectedDate.day,
+    ).subtract(Duration(days: weekday - 1));
+
+    // 날짜만 비교하는 헬퍼 함수
+    int getDaysFromMonday(DateTime date) {
+      final dateOnly = DateTime(date.year, date.month, date.day);
+      final mondayOnly = DateTime(monday.year, monday.month, monday.day);
+      return dateOnly.difference(mondayOnly).inDays;
+    }
+
+    // 체중 데이터 추출 (X축: 월요일부터의 일수, 0=월요일, 6=일요일)
+    final weightData = _bodyMeasurements.where((m) => m['weight_kg'] != null).map((m) {
+      final date = DateTime.parse(m['measurement_date'] as String);
+      final weight = (m['weight_kg'] as num).toDouble();
+      final daysFromMonday = getDaysFromMonday(date);
+      return FlSpot(daysFromMonday.toDouble(), weight);
+    }).toList();
+
+    // 공복혈당 데이터 추출
+    final fastingData = _bodyMeasurements.where((m) => m['blood_sugar_fasting'] != null).map((m) {
+      final date = DateTime.parse(m['measurement_date'] as String);
+      final sugar = (m['blood_sugar_fasting'] as int).toDouble();
+      final daysFromMonday = getDaysFromMonday(date);
+      return FlSpot(daysFromMonday.toDouble(), sugar);
+    }).toList();
+
+    // 식후혈당 데이터 추출
+    final postprandialData = _bodyMeasurements.where((m) => m['blood_sugar_postprandial'] != null).map((m) {
+      final date = DateTime.parse(m['measurement_date'] as String);
+      final sugar = (m['blood_sugar_postprandial'] as int).toDouble();
+      final daysFromMonday = getDaysFromMonday(date);
+      return FlSpot(daysFromMonday.toDouble(), sugar);
+    }).toList();
+
+    // 데이터가 없으면 그래프 숨김
+    if (weightData.isEmpty && fastingData.isEmpty && postprandialData.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // 데이터가 1개만 있어도 그래프 표시 (단일 점으로 표시됨)
+
+    // Y축 최소/최대값 계산
+    double minY = 0;
+    double maxY = 100;
+    if (weightData.isNotEmpty) {
+      final weights = weightData.map((spot) => spot.y).toList();
+      final weightMin = weights.reduce((a, b) => a < b ? a : b);
+      final weightMax = weights.reduce((a, b) => a > b ? a : b);
+      minY = (weightMin - 5).clamp(0, double.infinity);
+      maxY = (weightMax + 5);
+    }
+    if (fastingData.isNotEmpty || postprandialData.isNotEmpty) {
+      final allSugars = <double>[];
+      if (fastingData.isNotEmpty) {
+        allSugars.addAll(fastingData.map((spot) => spot.y));
+      }
+      if (postprandialData.isNotEmpty) {
+        allSugars.addAll(postprandialData.map((spot) => spot.y));
+      }
+      if (allSugars.isNotEmpty) {
+        final sugarMin = allSugars.reduce((a, b) => a < b ? a : b);
+        final sugarMax = allSugars.reduce((a, b) => a > b ? a : b);
+        if (weightData.isEmpty) {
+          minY = (sugarMin - 20).clamp(0, double.infinity);
+          maxY = (sugarMax + 20);
+        } else {
+          // 체중과 혈당이 함께 있을 때는 별도 Y축이 필요하지만, 간단하게 표시
+          minY = minY < (sugarMin - 20) ? minY : (sugarMin - 20).clamp(0, double.infinity);
+          maxY = maxY > (sugarMax + 20) ? maxY : (sugarMax + 20);
+        }
+      }
+    }
+
+    // X축 날짜 레이블은 bottomTitles에서 직접 생성
+
+    return Column(
+      children: [
+        Container(
+          height: 200,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: ColorPalette.bg300),
+          ),
+          child: LineChart(
+            LineChartData(
+              minX: 0,
+              maxX: 6, // 월요일(0) ~ 일요일(6)
+              minY: minY,
+              maxY: maxY,
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: (maxY - minY) / 4,
+                getDrawingHorizontalLine: (value) {
+                  return FlLine(
+                    color: ColorPalette.bg300,
+                    strokeWidth: 1,
+                  );
+                },
+              ),
+              titlesData: FlTitlesData(
+                show: true,
+                rightTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                topTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, meta) {
+                      final dayIndex = value.toInt();
+                      if (dayIndex >= 0 && dayIndex < 7) {
+                        // 월요일 기준으로 정확한 날짜 계산 (시간 제거)
+                        final mondayOnly = DateTime(monday.year, monday.month, monday.day);
+                        final date = mondayOnly.add(Duration(days: dayIndex));
+                        final dayOfWeek = ['월', '화', '수', '목', '금', '토', '일'][dayIndex];
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            '${date.month}/${date.day}\n$dayOfWeek',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: ColorPalette.text200,
+                              fontSize: 9,
+                            ),
+                          ),
+                        );
+                      }
+                      return const Text('');
+                    },
+                    reservedSize: 40,
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 50,
+                    getTitlesWidget: (value, meta) {
+                      return Text(
+                        value.toInt().toString(),
+                        style: const TextStyle(
+                          color: ColorPalette.text200,
+                          fontSize: 10,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: Border.all(color: ColorPalette.bg300),
+              ),
+              lineBarsData: [
+                if (weightData.isNotEmpty)
+                  LineChartBarData(
+                    spots: weightData,
+                    isCurved: true,
+                    color: ColorPalette.primary200,
+                    barWidth: 3,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, barData, index) {
+                        return FlDotCirclePainter(
+                          radius: 4,
+                          color: ColorPalette.primary200,
+                          strokeWidth: 2,
+                          strokeColor: Colors.white,
+                        );
+                      },
+                    ),
+                    belowBarData: BarAreaData(show: false),
+                  ),
+                if (fastingData.isNotEmpty)
+                  LineChartBarData(
+                    spots: fastingData,
+                    isCurved: true,
+                    color: Colors.orange,
+                    barWidth: 3,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, barData, index) {
+                        return FlDotCirclePainter(
+                          radius: 4,
+                          color: Colors.orange,
+                          strokeWidth: 2,
+                          strokeColor: Colors.white,
+                        );
+                      },
+                    ),
+                    belowBarData: BarAreaData(show: false),
+                  ),
+                if (postprandialData.isNotEmpty)
+                  LineChartBarData(
+                    spots: postprandialData,
+                    isCurved: true,
+                    color: Colors.red,
+                    barWidth: 3,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, barData, index) {
+                        return FlDotCirclePainter(
+                          radius: 4,
+                          color: Colors.red,
+                          strokeWidth: 2,
+                          strokeColor: Colors.white,
+                        );
+                      },
+                    ),
+                    belowBarData: BarAreaData(show: false),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        // 범례 추가
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 16,
+          runSpacing: 8,
+          alignment: WrapAlignment.center,
+          children: [
+            if (weightData.isNotEmpty)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: ColorPalette.primary200,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Text(
+                    '체중',
+                    style: TextStyle(
+                      color: ColorPalette.text200,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            if (fastingData.isNotEmpty)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: const BoxDecoration(
+                      color: Colors.orange,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Text(
+                    '공복혈당',
+                    style: TextStyle(
+                      color: ColorPalette.text200,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            if (postprandialData.isNotEmpty)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Text(
+                    '식후혈당',
+                    style: TextStyle(
+                      color: ColorPalette.text200,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// 신체 변화 입력 다이얼로그
+  Future<void> _showBodyMeasurementDialog() async {
+    final weightController = TextEditingController();
+    final fastingController = TextEditingController();
+    final postprandialController = TextEditingController();
+    final memoController = TextEditingController();
+
+    // 기존 데이터가 있으면 입력
+    if (_todayBodyMeasurement != null) {
+      if (_todayBodyMeasurement!['weight_kg'] != null) {
+        weightController.text = (_todayBodyMeasurement!['weight_kg'] as double).toStringAsFixed(1);
+      }
+      if (_todayBodyMeasurement!['blood_sugar_fasting'] != null) {
+        fastingController.text = (_todayBodyMeasurement!['blood_sugar_fasting'].toString());
+      }
+      if (_todayBodyMeasurement!['blood_sugar_postprandial'] != null) {
+        postprandialController.text = (_todayBodyMeasurement!['blood_sugar_postprandial'].toString());
+      }
+      if (_todayBodyMeasurement!['memo'] != null) {
+        memoController.text = _todayBodyMeasurement!['memo'] as String;
+      }
+    }
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('신체 변화 기록'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: weightController,
+                decoration: const InputDecoration(
+                  labelText: '체중 (kg)',
+                  hintText: '예: 65.5',
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: fastingController,
+                decoration: const InputDecoration(
+                  labelText: '공복 혈당 (mg/dL)',
+                  hintText: '예: 95',
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: postprandialController,
+                decoration: const InputDecoration(
+                  labelText: '식후 혈당 (mg/dL)',
+                  hintText: '예: 140',
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: memoController,
+                decoration: const InputDecoration(
+                  labelText: '메모 (선택)',
+                  hintText: '예: 아침 측정',
+                ),
+                maxLines: 2,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      await _saveBodyMeasurement(
+        weightKg: weightController.text.isNotEmpty ? double.tryParse(weightController.text) : null,
+        bloodSugarFasting: fastingController.text.isNotEmpty ? int.tryParse(fastingController.text) : null,
+        bloodSugarPostprandial: postprandialController.text.isNotEmpty
+            ? int.tryParse(postprandialController.text)
+            : null,
+        memo: memoController.text.isNotEmpty ? memoController.text : null,
+      );
+    }
+
+    weightController.dispose();
+    fastingController.dispose();
+    postprandialController.dispose();
+    memoController.dispose();
+  }
+
+  /// 신체 변화 저장
+  Future<void> _saveBodyMeasurement({
+    double? weightKg,
+    int? bloodSugarFasting,
+    int? bloodSugarPostprandial,
+    String? memo,
+  }) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+
+      final bodyMeasurementApi = BodyMeasurementApiService.instance;
+      await bodyMeasurementApi.saveBodyMeasurement(
+        memberId: user.uid,
+        measurementDate: dateStr,
+        weightKg: weightKg,
+        bloodSugarFasting: bloodSugarFasting,
+        bloodSugarPostprandial: bloodSugarPostprandial,
+        memo: memo,
+      );
+
+      // 데이터 다시 로드
+      await _loadBodyMeasurements();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('신체 변화 기록이 저장되었습니다.')),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ [ReportScreen] 신체 변화 저장 실패: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('저장 실패: $e')),
+        );
+      }
     }
   }
 }

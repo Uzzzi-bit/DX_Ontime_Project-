@@ -651,6 +651,24 @@ class Recommendation(models.Model):
         db_column='reason',
         help_text="추천 이유 설명",
     )
+    recommendation_date = models.DateField(
+        null=True,
+        blank=True,
+        db_column='recommendation_date',
+        help_text="추천받은 날짜 (YYYY-MM-DD)",
+    )
+    banner_message = models.TextField(
+        null=True,
+        blank=True,
+        db_column='banner_message',
+        help_text="AI 추천 배너 메시지",
+    )
+    recipes_data = models.JSONField(
+        null=True,
+        blank=True,
+        db_column='recipes_data',
+        help_text="AI 추천 레시피 전체 데이터 (JSON 형식)",
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         db_column='created_at',
@@ -661,11 +679,80 @@ class Recommendation(models.Model):
         managed = True
         indexes = [
             models.Index(fields=['member', 'created_at']),
+            models.Index(fields=['member', 'recommendation_date']),  # 날짜별 조회용 인덱스 추가
             models.Index(fields=['meal']),
         ]
 
     def __str__(self):
         return f"{self.member.nickname} - {self.recommended_food}"
+
+
+class BodyMeasurement(models.Model):
+    """
+    신체 변화 측정 기록 (체중, 혈당 등)
+    """
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name='body_measurements',
+    )
+    
+    measurement_date = models.DateField(
+        help_text="측정 날짜",
+    )
+    
+    # 체중 (kg)
+    weight_kg = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="체중 (kg)",
+    )
+    
+    # 혈당 (mg/dL)
+    blood_sugar_fasting = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="공복 혈당 (mg/dL)",
+    )
+    blood_sugar_postprandial = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="식후 혈당 (mg/dL)",
+    )
+    
+    # 메모
+    memo = models.TextField(
+        null=True,
+        blank=True,
+        help_text="추가 메모",
+    )
+    
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+    )
+    
+    class Meta:
+        db_table = 'member_body_measurement'
+        ordering = ['-measurement_date', '-created_at']
+        # 같은 날짜에 여러 기록을 허용 (아침/저녁 등)
+        indexes = [
+            models.Index(fields=['member', 'measurement_date']),
+        ]
+    
+    def __str__(self):
+        parts = []
+        if self.weight_kg:
+            parts.append(f"체중: {self.weight_kg}kg")
+        if self.blood_sugar_fasting:
+            parts.append(f"공복혈당: {self.blood_sugar_fasting}mg/dL")
+        if self.blood_sugar_postprandial:
+            parts.append(f"식후혈당: {self.blood_sugar_postprandial}mg/dL")
+        return f"{self.measurement_date} - {', '.join(parts) if parts else '기록 없음'}"
 
 
 class Notification(models.Model):
