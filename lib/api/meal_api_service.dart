@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../api_config.dart';
 
@@ -217,6 +219,45 @@ class MealApiService {
       }
     } catch (e) {
       throw Exception('식사 기록 삭제 중 오류: $e');
+    }
+  }
+
+  /// 식사 기록의 음식 목록 업데이트 (선택한 음식만 삭제)
+  /// PUT /api/meals/<member_id>/<date>/<meal_time>/
+  /// body: { "foods": ["apple", "banana"] }  // 남은 음식 목록
+  Future<Map<String, dynamic>> updateMealFoods({
+    required String memberId,
+    required String date,
+    required String mealTime,
+    required List<String> foods,
+  }) async {
+    try {
+      debugPrint('🔄 [MealApiService] updateMealFoods 호출');
+      debugPrint('   memberId: $memberId');
+      debugPrint('   date: $date');
+      debugPrint('   mealTime: $mealTime');
+      debugPrint('   foods: $foods');
+      debugPrint('   foods 개수: ${foods.length}');
+
+      final response = await http.put(
+        Uri.parse('$apiBaseUrl/api/meals/$memberId/$date/$mealTime/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'foods': foods,
+        }),
+      ).timeout(const Duration(seconds: 90), onTimeout: () => throw TimeoutException('식사 기록 업데이트 서버 응답 시간이 초과되었습니다.'));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      } else {
+        throw Exception('식사 기록 업데이트 실패: ${response.statusCode} ${response.body}');
+      }
+    } on TimeoutException {
+      throw TimeoutException('식사 기록 업데이트 서버 응답 시간이 초과되었습니다. 서버가 처리 중일 수 있으니 잠시 후 다시 시도해주세요.');
+    } on SocketException {
+      throw SocketException('식사 기록 업데이트 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.');
+    } catch (e) {
+      throw Exception('식사 기록 업데이트 중 오류: $e');
     }
   }
 }

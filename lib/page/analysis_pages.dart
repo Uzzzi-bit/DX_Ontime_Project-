@@ -57,6 +57,30 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     super.dispose();
   }
 
+  // 두 리스트가 같은지 비교하는 헬퍼 함수 (순서 무관, 중복 고려)
+  bool _listEquals(List<String> list1, List<String> list2) {
+    if (list1.length != list2.length) return false;
+
+    // 각 음식의 개수를 세어서 비교
+    final map1 = <String, int>{};
+    final map2 = <String, int>{};
+
+    for (final item in list1) {
+      map1[item] = (map1[item] ?? 0) + 1;
+    }
+    for (final item in list2) {
+      map2[item] = (map2[item] ?? 0) + 1;
+    }
+
+    if (map1.length != map2.length) return false;
+
+    for (final entry in map1.entries) {
+      if (map2[entry.key] != entry.value) return false;
+    }
+
+    return true;
+  }
+
   Future<void> _handleImageSelection(ImageSource source) async {
     try {
       final picked = await _picker.pickImage(source: source);
@@ -356,24 +380,86 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         return;
       }
 
-      // 삭제된 음식이 있으면 해당 meal 삭제
-      if (_deletedFoods.isNotEmpty) {
-        debugPrint('🔄 [AnalysisScreen] 삭제된 음식이 있어 기존 meal 삭제 중...');
+      // 편집 모드에서 음식 목록이 변경된 경우 (삭제 또는 추가) updateMealFoods API 사용
+      final foodsChanged =
+          isEditMode && (existingFoods.length != _foodItems.length || !_listEquals(existingFoods, _foodItems));
+
+      if (foodsChanged && isEditMode) {
+        debugPrint('🔄 [AnalysisScreen] 음식 목록이 변경되어 업데이트 중...');
+        debugPrint('   기존 음식: ${existingFoods.join(", ")}');
+        debugPrint('   현재 음식: ${_foodItems.join(", ")}');
+        debugPrint('   삭제할 음식: ${_deletedFoods.join(", ")}');
+        debugPrint('   새로 추가된 음식: ${newFoods.join(", ")}');
+
+        // 삭제 중 화면으로 이동 (삭제하는 음식 이름 표시)
+        setState(() {
+          _currentStep = _AnalysisStep.deleting;
+        });
+
         try {
-          await mealApiService.deleteMealsByDateAndType(
+          // updateMealFoods API로 선택한 음식만 삭제하고 남은 음식은 유지
+          debugPrint('🔄 [AnalysisScreen] 선택한 음식만 삭제: ${_deletedFoods.join(", ")}');
+
+          final result = await mealApiService.updateMealFoods(
             memberId: user.uid,
             date: mealDateStr,
             mealTime: mealTime,
+            foods: _foodItems, // 남은 모든 음식 목록 (삭제된 음식 제외)
           );
-          debugPrint('✅ [AnalysisScreen] 기존 meal 삭제 완료');
+
+          debugPrint('✅ [AnalysisScreen] 선택한 음식 삭제 완료');
+
+          // 삭제 완료 후 약간의 지연 (삭제 중 화면이 보이도록)
+          await Future.delayed(const Duration(milliseconds: 500));
+
+          // 삭제된 음식 목록 초기화
+          final deletedFoodsCopy = List<String>.from(_deletedFoods);
+          _deletedFoods.clear();
+
+          // 새로 추가된 음식이 없으면 여기서 종료
+          if (newFoods.isEmpty) {
+            debugPrint('⚠️ [AnalysisScreen] 새로 추가된 음식이 없습니다. (기존 음식만 유지)');
+            if (mounted) {
+              if (widget.onAnalysisComplete != null) {
+                widget.onAnalysisComplete!({
+                  'imageUrl': _uploadedImageUrl,
+                  'menuText': _foodItems.join(', '),
+                  'mealType': widget.mealType ?? '점심',
+                  'selectedDate': mealDate,
+                  'foods': _foodItems,
+                  'total_nutrition': result['total_nutrition'] as Map<String, dynamic>? ?? <String, dynamic>{},
+                });
+              }
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${deletedFoodsCopy.join(", ")}이(가) 삭제되었습니다.')),
+              );
+              Navigator.pop(context);
+            }
+            return;
+          }
+
+          // 삭제 완료 후 영양소 분석 단계로 이동 (새로 추가된 음식 분석)
+          setState(() {
+            _currentStep = _AnalysisStep.nutrientAnalysis;
+          });
         } catch (e) {
-          debugPrint('⚠️ [AnalysisScreen] 기존 meal 삭제 실패 (계속 진행): $e');
+          debugPrint('❌ [AnalysisScreen] 선택한 음식 삭제 실패: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('삭제 중 오류가 발생했습니다: $e')),
+            );
+            setState(() {
+              _currentStep = _AnalysisStep.reviewFoods;
+            });
+          }
+          return;
         }
       }
 
       // 새로 추가된 음식만 분석하여 저장
       // (기존 음식은 이미 DB에 저장되어 있으므로 새로 분석할 필요 없음)
-      if (newFoods.isEmpty) {
+      if (newFoods.isEmpty && !foodsChanged) {
         debugPrint('⚠️ [AnalysisScreen] 새로 추가된 음식이 없습니다. (기존 음식만 유지)');
         // 새로 추가된 음식이 없으면 기존 meal만 유지하고 종료
         if (mounted) {
@@ -437,9 +523,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              newFoods.length > 0
-                  ? '${newFoods.join(", ")}이(가) 추가되었습니다.'
-                  : '분석이 완료되었습니다.',
+              newFoods.length > 0 ? '${newFoods.join(", ")}이(가) 추가되었습니다.' : '분석이 완료되었습니다.',
             ),
           ),
         );
