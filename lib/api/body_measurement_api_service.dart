@@ -17,6 +17,7 @@ class BodyMeasurementApiService {
   /// [bloodSugarFasting] 공복 혈당 (mg/dL, 선택)
   /// [bloodSugarPostprandial] 식후 혈당 (mg/dL, 선택)
   /// [memo] 메모 (선택)
+  /// [measurementId] 기존 기록 ID (업데이트 시 사용)
   Future<Map<String, dynamic>> saveBodyMeasurement({
     required String memberId,
     required String measurementDate,
@@ -24,6 +25,7 @@ class BodyMeasurementApiService {
     int? bloodSugarFasting,
     int? bloodSugarPostprandial,
     String? memo,
+    int? measurementId,
   }) async {
     try {
       final body = <String, dynamic>{
@@ -44,13 +46,24 @@ class BodyMeasurementApiService {
         body['memo'] = memo;
       }
 
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/api/body-measurements/'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 30));
+      http.Response response;
+      if (measurementId != null) {
+        // 업데이트: PUT 요청
+        response = await http.put(
+          Uri.parse('$apiBaseUrl/api/body-measurements/$measurementId/'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        ).timeout(const Duration(seconds: 30));
+      } else {
+        // 생성: POST 요청
+        response = await http.post(
+          Uri.parse('$apiBaseUrl/api/body-measurements/'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        ).timeout(const Duration(seconds: 30));
+      }
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 201 || response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       } else {
         throw Exception('신체 변화 기록 저장 실패: ${response.statusCode} ${response.body}');
@@ -121,6 +134,26 @@ class BodyMeasurementApiService {
       }
     } catch (e) {
       throw Exception('신체 변화 기록 조회 중 오류: $e');
+    }
+  }
+
+  /// 신체 변화 측정 기록 삭제
+  /// 
+  /// [measurementId] 삭제할 기록 ID
+  Future<void> deleteBodyMeasurement({
+    required int measurementId,
+  }) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$apiBaseUrl/api/body-measurements/$measurementId/'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        throw Exception('신체 변화 기록 삭제 실패: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('신체 변화 기록 삭제 중 오류: $e');
     }
   }
 }

@@ -124,7 +124,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
   // 신체 변화 관련 상태 변수
   List<Map<String, dynamic>> _bodyMeasurements = []; // 신체 변화 측정 기록 (주간/월간)
-  Map<String, dynamic>? _todayBodyMeasurement; // 선택된 날짜의 신체 변화 기록
+  List<Map<String, dynamic>> _todayBodyMeasurements = []; // 선택된 날짜의 신체 변화 기록 (여러 개 가능: 아침/점심/저녁)
 
   @override
   void initState() {
@@ -1883,7 +1883,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
 
-      // 선택된 날짜의 신체 변화 기록 조회
+      // 선택된 날짜의 신체 변화 기록 조회 (여러 개 가능)
       final bodyMeasurementApi = BodyMeasurementApiService.instance;
       final todayResult = await bodyMeasurementApi.getBodyMeasurementByDate(
         memberId: user.uid,
@@ -1892,11 +1892,9 @@ class _ReportScreenState extends State<ReportScreen> {
 
       if (todayResult['success'] == true) {
         final measurements = todayResult['measurements'] as List<dynamic>? ?? [];
-        if (measurements.isNotEmpty) {
-          _todayBodyMeasurement = measurements.first as Map<String, dynamic>;
-        } else {
-          _todayBodyMeasurement = null;
-        }
+        _todayBodyMeasurements = measurements.map((m) => m as Map<String, dynamic>).toList();
+      } else {
+        _todayBodyMeasurements = [];
       }
 
       // 주간 데이터 조회 (현재 주: 월요일~일요일)
@@ -1953,9 +1951,14 @@ class _ReportScreenState extends State<ReportScreen> {
           ],
         ),
         const SizedBox(height: 15),
-        // 오늘의 신체 변화 기록
-        if (_todayBodyMeasurement != null)
-          _buildTodayBodyMeasurementCard()
+        // 오늘의 신체 변화 기록 (아침/점심/저녁 구분)
+        if (_todayBodyMeasurements.isNotEmpty)
+          ..._todayBodyMeasurements.map(
+            (measurement) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildBodyMeasurementCard(measurement),
+            ),
+          )
         else
           Container(
             width: double.infinity,
@@ -1983,11 +1986,25 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  /// 오늘의 신체 변화 카드
-  Widget _buildTodayBodyMeasurementCard() {
-    final weight = _todayBodyMeasurement!['weight_kg'] as double?;
-    final fasting = _todayBodyMeasurement!['blood_sugar_fasting'] as int?;
-    final postprandial = _todayBodyMeasurement!['blood_sugar_postprandial'] as int?;
+  /// 신체 변화 카드 (단일 기록)
+  Widget _buildBodyMeasurementCard(Map<String, dynamic> measurement) {
+    final weight = measurement['weight_kg'] as double?;
+    final fasting = measurement['blood_sugar_fasting'] as int?;
+    final postprandial = measurement['blood_sugar_postprandial'] as int?;
+    final memo = measurement['memo'] as String? ?? '';
+
+    // 메모에서 시간대 추출 (아침/점심/저녁)
+    String mealTime = '';
+    if (memo.contains('아침')) {
+      mealTime = '아침';
+    } else if (memo.contains('점심')) {
+      mealTime = '점심';
+    } else if (memo.contains('저녁')) {
+      mealTime = '저녁';
+    }
+
+    // 시간대가 없으면 메모 전체 표시, 있으면 시간대만 표시
+    final displayTitle = mealTime.isNotEmpty ? mealTime : (memo.isNotEmpty ? memo : '신체 변화');
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -2003,7 +2020,7 @@ class _ReportScreenState extends State<ReportScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${_selectedDate.month}월 ${_selectedDate.day}일',
+                displayTitle,
                 style: const TextStyle(
                   color: ColorPalette.text100,
                   fontSize: 14,
@@ -2012,7 +2029,7 @@ class _ReportScreenState extends State<ReportScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.edit, size: 18, color: ColorPalette.primary200),
-                onPressed: _showBodyMeasurementDialog,
+                onPressed: () => _showBodyMeasurementDialog(existingMeasurement: measurement),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
@@ -2390,102 +2407,200 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   /// 신체 변화 입력 다이얼로그
-  Future<void> _showBodyMeasurementDialog() async {
+  Future<void> _showBodyMeasurementDialog({Map<String, dynamic>? existingMeasurement}) async {
     final weightController = TextEditingController();
     final fastingController = TextEditingController();
     final postprandialController = TextEditingController();
-    final memoController = TextEditingController();
+    String selectedMealTime = ''; // 아침/점심/저녁
 
     // 기존 데이터가 있으면 입력
-    if (_todayBodyMeasurement != null) {
-      if (_todayBodyMeasurement!['weight_kg'] != null) {
-        weightController.text = (_todayBodyMeasurement!['weight_kg'] as double).toStringAsFixed(1);
+    if (existingMeasurement != null) {
+      if (existingMeasurement['weight_kg'] != null) {
+        weightController.text = (existingMeasurement['weight_kg'] as double).toStringAsFixed(1);
       }
-      if (_todayBodyMeasurement!['blood_sugar_fasting'] != null) {
-        fastingController.text = (_todayBodyMeasurement!['blood_sugar_fasting'].toString());
+      if (existingMeasurement['blood_sugar_fasting'] != null) {
+        fastingController.text = (existingMeasurement['blood_sugar_fasting'].toString());
       }
-      if (_todayBodyMeasurement!['blood_sugar_postprandial'] != null) {
-        postprandialController.text = (_todayBodyMeasurement!['blood_sugar_postprandial'].toString());
+      if (existingMeasurement['blood_sugar_postprandial'] != null) {
+        postprandialController.text = (existingMeasurement['blood_sugar_postprandial'].toString());
       }
-      if (_todayBodyMeasurement!['memo'] != null) {
-        memoController.text = _todayBodyMeasurement!['memo'] as String;
+      // 메모에서 시간대 추출
+      final memo = existingMeasurement['memo'] as String? ?? '';
+      if (memo.contains('아침')) {
+        selectedMealTime = '아침';
+      } else if (memo.contains('점심')) {
+        selectedMealTime = '점심';
+      } else if (memo.contains('저녁')) {
+        selectedMealTime = '저녁';
       }
     }
 
-    final result = await showDialog<bool>(
+    final result = await showDialog<Map<String, dynamic>?>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('신체 변화 기록'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: weightController,
-                decoration: const InputDecoration(
-                  labelText: '체중 (kg)',
-                  hintText: '예: 65.5',
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('신체 변화 기록'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 식사 시간 선택
+                    const Text(
+                      '식사 시간',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: ColorPalette.text100,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ChoiceChip(
+                            label: const Text('아침'),
+                            selected: selectedMealTime == '아침',
+                            onSelected: (selected) {
+                              setState(() {
+                                selectedMealTime = selected ? '아침' : '';
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ChoiceChip(
+                            label: const Text('점심'),
+                            selected: selectedMealTime == '점심',
+                            onSelected: (selected) {
+                              setState(() {
+                                selectedMealTime = selected ? '점심' : '';
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ChoiceChip(
+                            label: const Text('저녁'),
+                            selected: selectedMealTime == '저녁',
+                            onSelected: (selected) {
+                              setState(() {
+                                selectedMealTime = selected ? '저녁' : '';
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: weightController,
+                      decoration: const InputDecoration(
+                        labelText: '체중 (kg)',
+                        hintText: '예: 65.5',
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: fastingController,
+                      decoration: const InputDecoration(
+                        labelText: '공복 혈당 (mg/dL)',
+                        hintText: '예: 95',
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: postprandialController,
+                      decoration: const InputDecoration(
+                        labelText: '식후 혈당 (mg/dL)',
+                        hintText: '예: 140',
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ],
                 ),
-                keyboardType: TextInputType.number,
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: fastingController,
-                decoration: const InputDecoration(
-                  labelText: '공복 혈당 (mg/dL)',
-                  hintText: '예: 95',
+              actions: [
+                if (existingMeasurement != null)
+                  TextButton(
+                    onPressed: () async {
+                      // 삭제 확인
+                      final deleteConfirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('삭제 확인'),
+                          content: const Text('이 기록을 삭제하시겠습니까?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('취소'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('삭제', style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (deleteConfirm == true) {
+                        Navigator.pop(context, {
+                          'action': 'delete',
+                          'measurement_id': existingMeasurement['measurement_id'],
+                        });
+                      }
+                    },
+                    child: const Text('삭제', style: TextStyle(color: Colors.red)),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, null),
+                  child: const Text('취소'),
                 ),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: postprandialController,
-                decoration: const InputDecoration(
-                  labelText: '식후 혈당 (mg/dL)',
-                  hintText: '예: 140',
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context, {
+                      'action': 'save',
+                      'weight': weightController.text,
+                      'fasting': fastingController.text,
+                      'postprandial': postprandialController.text,
+                      'mealTime': selectedMealTime,
+                    });
+                  },
+                  child: const Text('저장'),
                 ),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: memoController,
-                decoration: const InputDecoration(
-                  labelText: '메모 (선택)',
-                  hintText: '예: 아침 측정',
-                ),
-                maxLines: 2,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('저장'),
-          ),
-        ],
-      ),
+              ],
+            );
+          },
+        );
+      },
     );
 
-    if (result == true) {
-      await _saveBodyMeasurement(
-        weightKg: weightController.text.isNotEmpty ? double.tryParse(weightController.text) : null,
-        bloodSugarFasting: fastingController.text.isNotEmpty ? int.tryParse(fastingController.text) : null,
-        bloodSugarPostprandial: postprandialController.text.isNotEmpty
-            ? int.tryParse(postprandialController.text)
-            : null,
-        memo: memoController.text.isNotEmpty ? memoController.text : null,
-      );
+    if (result != null) {
+      if (result['action'] == 'delete') {
+        // 삭제 처리
+        await _deleteBodyMeasurement(result['measurement_id'] as int);
+      } else if (result['action'] == 'save') {
+        // 저장 처리
+        final memo = result['mealTime'] as String? ?? '';
+        await _saveBodyMeasurement(
+          weightKg: result['weight'].toString().isNotEmpty ? double.tryParse(result['weight']) : null,
+          bloodSugarFasting: result['fasting'].toString().isNotEmpty ? int.tryParse(result['fasting']) : null,
+          bloodSugarPostprandial: result['postprandial'].toString().isNotEmpty
+              ? int.tryParse(result['postprandial'])
+              : null,
+          memo: memo.isNotEmpty ? memo : null,
+          measurementId: existingMeasurement?['measurement_id'] as int?,
+        );
+      }
     }
 
     weightController.dispose();
     fastingController.dispose();
     postprandialController.dispose();
-    memoController.dispose();
   }
 
   /// 신체 변화 저장
@@ -2494,6 +2609,7 @@ class _ReportScreenState extends State<ReportScreen> {
     int? bloodSugarFasting,
     int? bloodSugarPostprandial,
     String? memo,
+    int? measurementId,
   }) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -2509,6 +2625,7 @@ class _ReportScreenState extends State<ReportScreen> {
         bloodSugarFasting: bloodSugarFasting,
         bloodSugarPostprandial: bloodSugarPostprandial,
         memo: memo,
+        measurementId: measurementId, // 기존 기록 업데이트 시 사용
       );
 
       // 데이터 다시 로드
@@ -2524,6 +2641,33 @@ class _ReportScreenState extends State<ReportScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('저장 실패: $e')),
+        );
+      }
+    }
+  }
+
+  /// 신체 변화 삭제
+  Future<void> _deleteBodyMeasurement(int measurementId) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final bodyMeasurementApi = BodyMeasurementApiService.instance;
+      await bodyMeasurementApi.deleteBodyMeasurement(measurementId: measurementId);
+
+      // 데이터 다시 로드
+      await _loadBodyMeasurements();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('신체 변화 기록이 삭제되었습니다.')),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ [ReportScreen] 신체 변화 삭제 실패: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('삭제 실패: $e')),
         );
       }
     }
