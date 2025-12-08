@@ -1710,21 +1710,22 @@ class _ReportScreenState extends State<ReportScreen> {
         children: [
           // TODO: [DB] 저장된 사진은 서버 URL 또는 로컬 경로에서 가져오기
           // Image.asset 대신 Image.network 또는 Image.file 사용
-          if (meal.hasRecord && meal.imagePath != null)
-            Container(
-              width: 80,
-              height: 100,
-              margin: const EdgeInsets.only(right: 16),
-              decoration: BoxDecoration(
-                color: ColorPalette.bg200,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: ColorPalette.bg300),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: _buildMealImage(meal.imagePath!),
-              ),
-            ),
+          // 이미지 표시 숨김 (기능은 유지 - DB 저장, 분석 등은 정상 작동)
+          // if (meal.hasRecord && meal.imagePath != null)
+          //   Container(
+          //     width: 80,
+          //     height: 100,
+          //     margin: const EdgeInsets.only(right: 16),
+          //     decoration: BoxDecoration(
+          //       color: ColorPalette.bg200,
+          //       borderRadius: BorderRadius.circular(8),
+          //       border: Border.all(color: ColorPalette.bg300),
+          //     ),
+          //     child: ClipRRect(
+          //       borderRadius: BorderRadius.circular(8),
+          //       child: _buildMealImage(meal.imagePath!),
+          //     ),
+          //   ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

@@ -272,6 +272,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       _currentStep = _AnalysisStep.nutrientAnalysis;
     });
 
+    // 기존 음식과 새로 추가된 음식 구분 (try 블록 밖에서 선언하여 catch 블록에서도 접근 가능)
+    List<String> existingFoods = [];
+    List<String> newFoods = [];
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -297,10 +301,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
       // 편집 모드 여부 확인
       final isEditMode = widget.existingFoods != null && widget.existingFoods!.isNotEmpty;
-
-      // 기존 음식과 새로 추가된 음식 구분
-      List<String> existingFoods = [];
-      List<String> newFoods = [];
 
       if (isEditMode && widget.existingFoods != null) {
         // 기존 음식 목록
@@ -532,11 +532,23 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     } catch (e, stackTrace) {
       debugPrint('❌ [AnalysisScreen] 식사 기록 저장 실패: $e');
       debugPrint('   스택 트레이스: $stackTrace');
+      debugPrint('   새로 추가된 음식 개수: ${newFoods.length}');
+      debugPrint('   새로 추가된 음식 목록: ${newFoods.join(", ")}');
+
       if (mounted) {
+        String errorMessage = '분석 중 오류가 발생했습니다.';
+        if (e.toString().contains('연결') || e.toString().contains('서버') || e.toString().contains('Socket')) {
+          errorMessage = '서버에 연결할 수 없습니다.\n서버가 실행 중인지 확인해주세요.';
+        } else {
+          final errorStr = e.toString();
+          errorMessage = '분석 중 오류가 발생했습니다.\n${errorStr.length > 100 ? errorStr.substring(0, 100) + "..." : errorStr}';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('분석 중 오류가 발생했습니다: $e'),
-            duration: const Duration(seconds: 5),
+            content: Text(errorMessage),
+            duration: const Duration(seconds: 7),
+            backgroundColor: Colors.orange,
           ),
         );
         setState(() {
