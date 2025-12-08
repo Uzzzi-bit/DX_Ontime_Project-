@@ -49,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
   UserModel? _userData;
   static const String _momCareModeKey = 'isMomCareMode';
   static const String _hasCalledInitialRecipeApiKey = 'hasCalledInitialRecipeApi'; // 최초 진입 시 레시피 API 호출 여부
+  static const String _momCareModeResetKey = 'momCareModeReset_v2'; // 맘케어 모드 리셋 마이그레이션 플래그 (v2로 업데이트하여 모든 사용자 리셋)
 
   // DB 저장을 위한 변수들
   String? _currentMemberId;
@@ -72,19 +73,22 @@ class _HomeScreenState extends State<HomeScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     // 화면이 다시 나타날 때 맘케어 모드 상태 확인 및 새로고침
-    _checkAndUpdateMomCareMode();
-    // 화면이 다시 나타날 때 영양소 데이터 새로고침
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null && _userData != null && _userData!.pregnancyWeek != null && _userData!.pregnancyWeek! > 0) {
-      _loadTodayNutritionData(user.uid, _userData!.pregnancyWeek);
-      // 오늘 날짜의 추천 레시피도 함께 로드
-      _loadTodayRecommendations(user.uid).then((_) {
-        // 로드 완료 후 목록 업데이트
-        if (mounted) {
-          _updateRecommendedMealsList();
+    _checkAndUpdateMomCareMode().then((_) {
+      // 맘케어 모드가 켜져 있을 때만 데이터 새로고침
+      if (_isMomCareMode) {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null && _userData != null && _userData!.pregnancyWeek != null && _userData!.pregnancyWeek! > 0) {
+          _loadTodayNutritionData(user.uid, _userData!.pregnancyWeek);
+          // 오늘 날짜의 추천 레시피도 함께 로드
+          _loadTodayRecommendations(user.uid).then((_) {
+            // 로드 완료 후 목록 업데이트
+            if (mounted) {
+              _updateRecommendedMealsList();
+            }
+          });
         }
-      });
-    }
+      }
+    });
   }
 
   /// 맘케어 모드 상태를 확인하고 업데이트
@@ -92,11 +96,33 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final currentMode = prefs.getBool(_momCareModeKey) ?? false;
-      if (mounted && _isMomCareMode != currentMode) {
-        setState(() {
-          _isMomCareMode = currentMode;
-        });
-        debugPrint('✅ [HomeScreen] 맘케어 모드 상태 업데이트: $_isMomCareMode');
+      if (mounted) {
+        final previousMode = _isMomCareMode;
+        if (_isMomCareMode != currentMode) {
+          setState(() {
+            _isMomCareMode = currentMode;
+          });
+          debugPrint('✅ [HomeScreen] 맘케어 모드 상태 업데이트: $previousMode -> $_isMomCareMode');
+
+          // 맘케어 모드가 꺼져 있다가 켜진 경우 데이터 로드
+          if (!previousMode && currentMode) {
+            debugPrint('🔄 [HomeScreen] 맘케어 모드가 켜짐 - 데이터 로드 시작');
+            final user = FirebaseAuth.instance.currentUser;
+            if (user != null &&
+                _userData != null &&
+                _userData!.pregnancyWeek != null &&
+                _userData!.pregnancyWeek! > 0) {
+              _loadTodayNutritionData(user.uid, _userData!.pregnancyWeek);
+              _loadTodayRecommendations(user.uid).then((_) {
+                if (mounted) {
+                  _updateRecommendedMealsList();
+                }
+              });
+              // 레시피 API 호출
+              _fetchInitialAiRecipes(user.uid, _userData!.pregnancyWeek);
+            }
+          }
+        }
       }
     } catch (e) {
       debugPrint('⚠️ [HomeScreen] 맘케어 모드 상태 확인 실패: $e');
@@ -110,13 +136,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       // Shared Preferences에서 Mom Care Mode 상태 불러오기
-      // 기본값은 false (꺼져있음)
+      // 기본값은 항상 false (꺼져있음) - 사용자가 토글을 켜야만 활성화
       final prefs = await SharedPreferences.getInstance();
-      // 값이 없거나 null이면 false로 설정
-      final isMomCareMode = prefs.getBool(_momCareModeKey) ?? false;
-      // 명시적으로 false로 초기화 (값이 없을 경우)
-      if (!prefs.containsKey(_momCareModeKey)) {
+
+      // 기존 사용자 마이그레이션: 맘케어 모드를 한 번만 false로 리셋
+      // v2로 버전 업데이트하여 모든 기존 사용자도 리셋되도록 함
+      final hasReset = prefs.getBool(_momCareModeResetKey) ?? false;
+      if (!hasReset) {
+        // 기존 사용자의 맘케어 모드를 false로 강제 리셋 (최초 1회만)
         await prefs.setBool(_momCareModeKey, false);
+        await prefs.setBool(_momCareModeResetKey, true);
+        debugPrint('✅ [HomeScreen] 기존 사용자 맘케어 모드 리셋 완료 (v2)');
+      }
+
+      // 명시적으로 false로 초기화 (값이 없거나 null인 경우만)
+      // 마이그레이션 후에는 사용자가 설정한 값을 그대로 사용
+      final isMomCareMode = prefs.getBool(_momCareModeKey) ?? false;
+      if (!prefs.containsKey(_momCareModeKey) || prefs.getBool(_momCareModeKey) == null) {
+        await prefs.setBool(_momCareModeKey, false);
+        debugPrint('✅ [HomeScreen] 맘케어 모드를 false로 초기화 (값이 없음)');
+      } else {
+        debugPrint('✅ [HomeScreen] 맘케어 모드 상태 로드: $isMomCareMode');
       }
 
       // Firebase 사용자 정보 가져오기
@@ -179,18 +219,22 @@ class _HomeScreenState extends State<HomeScreen> {
         });
         debugPrint('홈 화면 데이터 로드 완료: _isMomCareMode=$isMomCareMode, _userData=${userData.nickname}');
 
-        // 오늘 날짜의 영양소 데이터 로드
-        if (user != null) {
+        // 맘케어 모드가 켜져 있을 때만 데이터 로드
+        if (isMomCareMode && user != null) {
+          // 오늘 날짜의 영양소 데이터 로드
           await _loadTodayNutritionData(user.uid, userPregnancyWeek);
           // 오늘 날짜의 추천 레시피 로드
           await _loadTodayRecommendations(user.uid);
 
           // 임산부 모드가 켜져 있고 최초 진입이면 레시피 API 호출
           final hasCalledApi = prefs.getBool(_hasCalledInitialRecipeApiKey) ?? false;
-          if (isMomCareMode && !hasCalledApi) {
+          if (!hasCalledApi) {
             await prefs.setBool(_hasCalledInitialRecipeApiKey, true);
             await _fetchInitialAiRecipes(user.uid, userPregnancyWeek);
           }
+        } else {
+          // 맘케어 모드가 꺼져 있으면 데이터 로드하지 않음
+          debugPrint('⚠️ [HomeScreen] 맘케어 모드가 꺼져 있어 데이터를 로드하지 않습니다.');
         }
 
         // report_pages에서 계산된 값으로 업데이트
@@ -818,86 +862,164 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
 
-        uploadedImageUrl = await _uploadImage(File(_selectedImageFile!.path));
+        try {
+          uploadedImageUrl = await _uploadImage(File(_selectedImageFile!.path));
 
-        // 업로드 완료/실패 후 스낵바 정리
-        messenger.hideCurrentSnackBar();
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              uploadedImageUrl != null ? '이미지 업로드 완료' : '이미지 업로드에 실패했습니다',
+          // 업로드 완료/실패 후 스낵바 정리
+          messenger.hideCurrentSnackBar();
+          if (uploadedImageUrl != null) {
+            messenger.showSnackBar(
+              const SnackBar(
+                content: Text('이미지 업로드 완료'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          } else {
+            messenger.showSnackBar(
+              const SnackBar(
+                content: Text('이미지 업로드에 실패했습니다'),
+                duration: Duration(seconds: 2),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        } catch (e) {
+          debugPrint('❌ [HomeScreen] 이미지 업로드 실패: $e');
+          messenger.hideCurrentSnackBar();
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text(
+                '이미지 업로드 실패: ${e.toString().substring(0, e.toString().length > 50 ? 50 : e.toString().length)}',
+              ),
+              duration: const Duration(seconds: 3),
+              backgroundColor: Colors.red,
             ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-
-        // 이미지 메시지를 DB에 저장
-        if (_currentSessionId != null && _currentMemberId != null) {
-          await _saveMessageToDb(
-            type: 'user',
-            content: query.isEmpty ? '' : query,
-            imagePath: uploadedImageUrl ?? _selectedImageFile!.path,
           );
+          // 이미지 업로드 실패해도 계속 진행 (텍스트만 전송)
+        }
+
+        // 이미지 메시지를 DB에 저장 (업로드 성공한 경우만)
+        if (uploadedImageUrl != null && _currentSessionId != null && _currentMemberId != null) {
+          try {
+            await _saveMessageToDb(
+              type: 'user',
+              content: query.isEmpty ? '' : query,
+              imagePath: uploadedImageUrl,
+            );
+          } catch (e) {
+            debugPrint('⚠️ [HomeScreen] 메시지 DB 저장 실패 (계속 진행): $e');
+          }
         }
       } else if (query.isNotEmpty) {
         // 텍스트만 있는 경우 DB에 저장
         if (_currentSessionId != null && _currentMemberId != null) {
-          await _saveMessageToDb(
-            type: 'user',
-            content: query,
-          );
+          try {
+            await _saveMessageToDb(
+              type: 'user',
+              content: query,
+            );
+          } catch (e) {
+            debugPrint('⚠️ [HomeScreen] 메시지 DB 저장 실패 (계속 진행): $e');
+          }
         }
       }
 
       // AI API 호출
       String aiResponse;
-      // 이미지 파일을 변수에 저장 (나중에 null이 될 수 있으므로)
-      final imageFileToSend = _selectedImageFile;
-      debugPrint('🔍 [HomeScreen] AI API 호출 전 이미지 체크: imageFileToSend != null = ${imageFileToSend != null}');
-      if (imageFileToSend != null) {
-        // 이미지가 있으면 이미지와 함께 전송
-        final queryText = query.isEmpty ? '이 음식 먹어도 되나요?' : query;
-        debugPrint('📤 [HomeScreen] 이미지와 텍스트 함께 전송: query="$queryText", imagePath="${imageFileToSend.path}"');
-        final result = await fetchChatResponse(
-          userMessage: queryText,
-          nickname: _userNickname,
-          week: _chatPregnancyWeek,
-          conditions: _conditions,
-          imageFile: imageFileToSend,
-        );
-        aiResponse = result.message;
-      } else {
-        // 텍스트만 전송
-        debugPrint('📤 [HomeScreen] 텍스트만 전송: query="$query" (이미지 파일 없음)');
-        final result = await fetchChatResponse(
-          userMessage: query,
-          nickname: _userNickname,
-          week: _chatPregnancyWeek,
-          conditions: _conditions,
-        );
-        aiResponse = result.message;
-      }
+      try {
+        // 이미지 파일을 변수에 저장 (나중에 null이 될 수 있으므로)
+        final imageFileToSend = _selectedImageFile;
+        debugPrint('🔍 [HomeScreen] AI API 호출 전 이미지 체크: imageFileToSend != null = ${imageFileToSend != null}');
 
-      // AI 응답을 DB에 저장
-      if (_currentSessionId != null && _currentMemberId != null) {
-        await _saveMessageToDb(
-          type: 'ai',
-          content: aiResponse,
-        );
-      }
+        if (imageFileToSend != null && uploadedImageUrl != null) {
+          // 이미지가 있고 업로드 성공한 경우 이미지와 함께 전송
+          final queryText = query.isEmpty ? '이 음식 먹어도 되나요?' : query;
+          debugPrint('📤 [HomeScreen] 이미지와 텍스트 함께 전송: query="$queryText", imagePath="${imageFileToSend.path}"');
+          final result = await fetchChatResponse(
+            userMessage: queryText,
+            nickname: _userNickname,
+            week: _chatPregnancyWeek,
+            conditions: _conditions,
+            imageFile: imageFileToSend,
+          );
+          aiResponse = result.message;
+        } else if (imageFileToSend != null && uploadedImageUrl == null) {
+          // 이미지 업로드 실패한 경우 텍스트만 전송
+          debugPrint('⚠️ [HomeScreen] 이미지 업로드 실패 - 텍스트만 전송');
+          final queryText = query.isEmpty ? '이 음식 먹어도 되나요?' : query;
+          final result = await fetchChatResponse(
+            userMessage: queryText,
+            nickname: _userNickname,
+            week: _chatPregnancyWeek,
+            conditions: _conditions,
+          );
+          aiResponse = result.message;
+        } else {
+          // 텍스트만 전송
+          debugPrint('📤 [HomeScreen] 텍스트만 전송: query="$query" (이미지 파일 없음)');
+          final result = await fetchChatResponse(
+            userMessage: query,
+            nickname: _userNickname,
+            week: _chatPregnancyWeek,
+            conditions: _conditions,
+          );
+          aiResponse = result.message;
+        }
 
-      // 채팅 화면으로 이동 (이미 처리된 결과와 함께)
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ChatScreen(
-              initialText: query.isEmpty ? null : query,
-              initialImagePath: uploadedImageUrl ?? _selectedImageFile?.path,
-              initialAiResponse: aiResponse, // 이미 처리된 AI 응답 전달
+        // AI 응답을 DB에 저장
+        if (_currentSessionId != null && _currentMemberId != null) {
+          try {
+            await _saveMessageToDb(
+              type: 'ai',
+              content: aiResponse,
+            );
+          } catch (e) {
+            debugPrint('⚠️ [HomeScreen] AI 응답 DB 저장 실패 (계속 진행): $e');
+          }
+        }
+
+        // 채팅 화면으로 이동 (이미 처리된 결과와 함께)
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatScreen(
+                initialText: query.isEmpty ? null : query,
+                initialImagePath: uploadedImageUrl ?? (_selectedImageFile?.path),
+                initialAiResponse: aiResponse, // 이미 처리된 AI 응답 전달
+              ),
             ),
-          ),
-        );
+          );
+        }
+      } catch (e) {
+        debugPrint('❌ [HomeScreen] AI API 호출 실패: $e');
+        // 에러 발생 시에도 채팅 화면으로 이동 (에러 메시지와 함께)
+        if (mounted) {
+          final errorMessage = e.toString().contains('연결') || e.toString().contains('서버')
+              ? 'AI 서버에 연결할 수 없습니다.\n\n서버가 실행 중인지 확인해주세요.'
+              : 'AI 응답을 받는 중 오류가 발생했습니다.\n\n${e.toString()}';
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatScreen(
+                initialText: query.isEmpty ? null : query,
+                initialImagePath: uploadedImageUrl ?? _selectedImageFile?.path,
+                initialAiResponse: errorMessage, // 에러 메시지를 AI 응답으로 전달
+              ),
+            ),
+          );
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'AI 응답 오류: ${e.toString().substring(0, e.toString().length > 50 ? 50 : e.toString().length)}',
+              ),
+              duration: const Duration(seconds: 5),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       debugPrint('❌ [HomeScreen] 이미지 전송 실패: $e');

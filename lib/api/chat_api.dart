@@ -63,6 +63,7 @@ Future<ChatResponse> fetchChatResponse({
 
     http.Response resp;
     try {
+      print('🔄 [ChatAPI] 서버 연결 시도: $uri');
       resp = await http
           .post(
             uri,
@@ -72,13 +73,28 @@ Future<ChatResponse> fetchChatResponse({
             },
             body: jsonEncode(bodyData),
           )
-          .timeout(const Duration(seconds: 60)); // 타임아웃 60초로 증가
-    } on TimeoutException {
-      print("❌ [ChatAPI] 요청 시간 초과");
-      throw Exception('AI 서버 응답 시간이 초과되었습니다. 서버가 정상적으로 작동하는지 확인해주세요.');
+          .timeout(
+            const Duration(seconds: 120), // 타임아웃 120초로 증가 (이미지 처리 시간 고려)
+            onTimeout: () {
+              print("❌ [ChatAPI] 요청 시간 초과 (120초)");
+              throw TimeoutException('AI 서버 응답 시간이 초과되었습니다. 서버가 정상적으로 작동하는지 확인해주세요.');
+            },
+          );
+    } on TimeoutException catch (e) {
+      print("❌ [ChatAPI] 요청 시간 초과: $e");
+      throw Exception('AI 서버 응답 시간이 초과되었습니다. 서버가 정상적으로 작동하는지 확인해주세요.\n(URL: $uri)');
     } on SocketException catch (e) {
       print("❌ [ChatAPI] 네트워크 연결 오류: $e");
       throw Exception('AI 서버에 연결할 수 없습니다. 네트워크 연결과 서버 실행 상태를 확인해주세요.\n(URL: $uri)');
+    } on HttpException catch (e) {
+      print("❌ [ChatAPI] HTTP 오류: $e");
+      throw Exception('AI 서버 HTTP 오류: $e\n(URL: $uri)');
+    } catch (e) {
+      print("❌ [ChatAPI] 예상치 못한 오류: $e");
+      if (e.toString().contains('Timeout') || e.toString().contains('시간 초과')) {
+        throw Exception('AI 서버 응답 시간이 초과되었습니다. 서버가 정상적으로 작동하는지 확인해주세요.\n(URL: $uri)');
+      }
+      throw Exception('AI 서버 연결 오류: $e\n(URL: $uri)');
     }
 
     print('📥 [ChatAPI] 응답 상태 코드: ${resp.statusCode}');

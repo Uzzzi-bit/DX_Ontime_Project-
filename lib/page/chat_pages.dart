@@ -122,8 +122,12 @@ class _ChatScreenState extends State<ChatScreen> {
       // 사용자 건강 정보 로드 (채팅 API 호출용)
       await _loadUserHealthInfo();
 
-      // 이전 세션 로드 (활성 세션이 있으면 사용, 없으면 가장 최근 종료된 세션 사용)
-      await _loadPreviousChat();
+      // 홈 화면에서 이미 처리된 경우 (initialAiResponse가 있으면) 이전 채팅 로드 건너뛰기
+      // 중복 메시지 방지
+      if (widget.initialAiResponse == null) {
+        // 이전 세션 로드 (활성 세션이 있으면 사용, 없으면 가장 최근 종료된 세션 사용)
+        await _loadPreviousChat();
+      }
 
       // 세션이 없으면 새로 생성
       if (_currentSessionId == null) {
@@ -184,47 +188,80 @@ class _ChatScreenState extends State<ChatScreen> {
           // 홈 화면에서 처리되지 않은 경우 (기존 로직)
           debugPrint('🔄 [ChatScreen] 홈 화면에서 처리되지 않음 - 여기서 처리 시작');
 
-          // 초기 메시지를 DB에 저장
-          if (_currentSessionId != null && _currentMemberId != null) {
-            await _saveMessageToDb(
-              type: 'user',
-              content: widget.initialText ?? '',
-              imagePath: widget.initialImagePath,
-            );
-          }
-
-          // 초기 이미지가 있으면 업로드
-          if (widget.initialImagePath != null) {
-            final imgFile = File(widget.initialImagePath!);
-            final imageUrl = await _uploadImage(imgFile);
-            // 이미지 URL을 메시지에 업데이트
-            if (imageUrl != null && mounted) {
-              setState(() {
-                // 마지막 메시지(초기 메시지)의 imagePath를 URL로 업데이트
-                if (_messages.isNotEmpty && _messages.last.isUser) {
-                  _messages[_messages.length - 1] = ChatMessage(
-                    isUser: true,
-                    text: _messages.last.text,
-                    imagePath: imageUrl, // 로컬 경로 대신 URL 사용
-                    timestamp: _messages.last.timestamp,
-                  );
-                }
-              });
+          try {
+            // 초기 메시지를 DB에 저장
+            if (_currentSessionId != null && _currentMemberId != null) {
+              await _saveMessageToDb(
+                type: 'user',
+                content: widget.initialText ?? '',
+                imagePath: widget.initialImagePath,
+              );
             }
 
-            // 이미지 분석 요청 (await로 기다림)
-            await _sendRequestToAI(
-              query: '이 음식 먹어도 되나요?',
-              imageFile: XFile(widget.initialImagePath!),
-            );
-          } else if (widget.initialText != null && widget.initialText!.isNotEmpty) {
-            // 텍스트만 있는 경우 (await로 기다림)
-            await _sendRequestToAI(query: widget.initialText!);
+            // 초기 이미지가 있으면 업로드
+            if (widget.initialImagePath != null) {
+              final imgFile = File(widget.initialImagePath!);
+              final imageUrl = await _uploadImage(imgFile);
+              // 이미지 URL을 메시지에 업데이트
+              if (imageUrl != null && mounted) {
+                setState(() {
+                  // 마지막 메시지(초기 메시지)의 imagePath를 URL로 업데이트
+                  if (_messages.isNotEmpty && _messages.last.isUser) {
+                    _messages[_messages.length - 1] = ChatMessage(
+                      isUser: true,
+                      text: _messages.last.text,
+                      imagePath: imageUrl, // 로컬 경로 대신 URL 사용
+                      timestamp: _messages.last.timestamp,
+                    );
+                  }
+                });
+              }
+
+              // 이미지 분석 요청 (await로 기다림)
+              await _sendRequestToAI(
+                query: '이 음식 먹어도 되나요?',
+                imageFile: XFile(widget.initialImagePath!),
+              );
+            } else if (widget.initialText != null && widget.initialText!.isNotEmpty) {
+              // 텍스트만 있는 경우 (await로 기다림)
+              await _sendRequestToAI(query: widget.initialText!);
+            }
+          } catch (e) {
+            debugPrint('❌ [ChatScreen] 초기 메시지 처리 실패: $e');
+            // 에러가 발생해도 화면은 표시되도록 함
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    '메시지 전송 중 오류가 발생했습니다: ${e.toString().substring(0, e.toString().length > 50 ? 50 : e.toString().length)}',
+                  ),
+                  duration: const Duration(seconds: 5),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
           }
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('❌ [ChatScreen] 초기화 실패: $e');
+      debugPrint('   스택 트레이스: $stackTrace');
+      // 에러가 발생해도 화면은 표시되도록 함
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        // 에러 메시지 표시
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '채팅 초기화 중 오류가 발생했습니다: ${e.toString().substring(0, e.toString().length > 50 ? 50 : e.toString().length)}',
+            ),
+            duration: const Duration(seconds: 5),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
     }
   }
 
