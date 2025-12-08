@@ -237,7 +237,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   Future<void> _startNutrientAnalysis() async {
     // 삭제된 음식 이름 초기화 (새로운 저장 시작)
     _deletedFoods.clear();
-    
+
     setState(() {
       _currentStep = _AnalysisStep.nutrientAnalysis;
     });
@@ -281,11 +281,11 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       debugPrint('   foods 목록: ${_foodItems.join(", ")}');
 
       final mealApiService = MealApiService.instance;
-      
+
       // 편집 모드일 때 또는 음식 목록이 비어있을 때: 기존 meal 삭제 후 현재 화면의 음식 목록만 저장
       // (사용자가 화면에서 삭제한 음식은 저장되지 않음)
       final isEditMode = widget.existingFoods != null && widget.existingFoods!.isNotEmpty;
-      
+
       if (isEditMode || _foodItems.isEmpty) {
         debugPrint('🔄 [AnalysisScreen] 기존 meal 삭제 중... (편집 모드: $isEditMode, 음식 목록 비어있음: ${_foodItems.isEmpty})');
         debugPrint('   화면의 음식 목록: ${_foodItems.join(", ")}');
@@ -304,23 +304,23 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           // 삭제 실패해도 새 meal 저장은 계속 진행
         }
       }
-      
+
       // 음식 목록이 비어있으면 저장하지 않고 DB에서 삭제만 함 (모두 삭제한 경우)
       if (_foodItems.isEmpty) {
         debugPrint('⚠️ [AnalysisScreen] 음식 목록이 비어있어 저장하지 않습니다. (기존 meal 삭제 완료)');
-        
+
         // 삭제된 음식 이름 추적 (편집 모드일 때 기존 음식 목록과 비교)
         final isEditMode = widget.existingFoods != null && widget.existingFoods!.isNotEmpty;
         if (isEditMode && widget.existingFoods != null) {
           // 기존 음식 목록에서 현재 음식 목록을 제외한 것 = 삭제된 음식
           _deletedFoods = widget.existingFoods!.where((food) => !_foodItems.contains(food)).toList();
         }
-        
+
         // 삭제 중 화면으로 이동
         setState(() {
           _currentStep = _AnalysisStep.deleting;
         });
-        
+
         // 삭제 처리
         try {
           await mealApiService.deleteMealsByDateAndType(
@@ -329,10 +329,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             mealTime: mealTime,
           );
           debugPrint('✅ [AnalysisScreen] 기존 meal 삭제 완료');
-          
+
           // 1.5초 후 완료 처리
           await Future.delayed(const Duration(milliseconds: 1500));
-          
+
           if (mounted) {
             // 콜백을 통해 리포트 화면에서 데이터 재로드
             if (widget.onAnalysisComplete != null) {
@@ -345,12 +345,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 'total_nutrition': <String, dynamic>{},
               });
             }
-            
+
             // 삭제된 음식 이름을 메시지에 표시
-            final deletedFoodsText = _deletedFoods.isNotEmpty 
-                ? _deletedFoods.join(', ')
-                : '모든 음식';
-            
+            final deletedFoodsText = _deletedFoods.isNotEmpty ? _deletedFoods.join(', ') : '모든 음식';
+
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('$deletedFoodsText이(가) 삭제되었습니다.')),
             );
@@ -369,7 +367,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         }
         return;
       }
-      
+
       final result = await mealApiService.saveMeal(
         memberId: user.uid,
         mealTime: mealTime,
@@ -555,9 +553,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             const SizedBox(height: 24),
             Text(
               textAlign: TextAlign.center,
-              _deletedFoods.isNotEmpty 
-                  ? '${_deletedFoods.join(', ')}을(를) 삭제 중입니다.'
-                  : '음식을 삭제 중입니다.',
+              _deletedFoods.isNotEmpty ? '${_deletedFoods.join(', ')}을(를) 삭제 중입니다.' : '음식을 삭제 중입니다.',
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -774,7 +770,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   }
 
   Widget _buildActionButton() {
-    final isDisabled = _currentStep == _AnalysisStep.analyzingImage || _currentStep == _AnalysisStep.nutrientAnalysis || _currentStep == _AnalysisStep.deleting;
+    final isDisabled =
+        _currentStep == _AnalysisStep.analyzingImage ||
+        _currentStep == _AnalysisStep.nutrientAnalysis ||
+        _currentStep == _AnalysisStep.deleting;
     final buttonLabel = _currentStep == _AnalysisStep.analyzingImage ? '분석 중...' : '분석하기';
 
     return SizedBox(

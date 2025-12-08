@@ -73,18 +73,18 @@ class _HomeScreenState extends State<HomeScreen> {
     super.didChangeDependencies();
     // 화면이 다시 나타날 때 맘케어 모드 상태 확인 및 새로고침
     _checkAndUpdateMomCareMode();
-        // 화면이 다시 나타날 때 영양소 데이터 새로고침
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null && _userData != null && _userData!.pregnancyWeek != null && _userData!.pregnancyWeek! > 0) {
-          _loadTodayNutritionData(user.uid, _userData!.pregnancyWeek);
-          // 오늘 날짜의 추천 레시피도 함께 로드
-          _loadTodayRecommendations(user.uid).then((_) {
-            // 로드 완료 후 목록 업데이트
-            if (mounted) {
-              _updateRecommendedMealsList();
-            }
-          });
+    // 화면이 다시 나타날 때 영양소 데이터 새로고침
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && _userData != null && _userData!.pregnancyWeek != null && _userData!.pregnancyWeek! > 0) {
+      _loadTodayNutritionData(user.uid, _userData!.pregnancyWeek);
+      // 오늘 날짜의 추천 레시피도 함께 로드
+      _loadTodayRecommendations(user.uid).then((_) {
+        // 로드 완료 후 목록 업데이트
+        if (mounted) {
+          _updateRecommendedMealsList();
         }
+      });
+    }
   }
 
   /// 맘케어 모드 상태를 확인하고 업데이트
@@ -102,7 +102,6 @@ class _HomeScreenState extends State<HomeScreen> {
       debugPrint('⚠️ [HomeScreen] 맘케어 모드 상태 확인 실패: $e');
     }
   }
-
 
   Future<void> _loadInitialData() async {
     setState(() {
@@ -228,10 +227,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<NutrientType, double> _homeNutrientProgress = {}; // 영양소 섭취 비율
   double _homeCurrentCalorie = 0.0;
   double _homeTargetCalorie = 2000.0;
-  
+
   // 오늘 날짜의 추천 레시피
   List<RecipeData>? _todayRecipes;
-  
+
   // 계산된 추천 레시피 목록 (화면 표시용)
   List<_RecommendedMeal> _recommendedMealsList = [];
 
@@ -347,13 +346,13 @@ class _HomeScreenState extends State<HomeScreen> {
         date: dateStr,
       );
 
-      debugPrint('📥 [HomeScreen] 추천 레시피 API 응답: success=${result['success']}, recipes_count=${result['recipes_count'] ?? 0}');
+      debugPrint(
+        '📥 [HomeScreen] 추천 레시피 API 응답: success=${result['success']}, recipes_count=${result['recipes_count'] ?? 0}',
+      );
 
       if (result['success'] == true && result['recipes'] != null) {
         final recipesJson = result['recipes'] as List<dynamic>;
-        final loadedRecipes = recipesJson
-            .map((json) => RecipeData.fromJson(json as Map<String, dynamic>))
-            .toList();
+        final loadedRecipes = recipesJson.map((json) => RecipeData.fromJson(json as Map<String, dynamic>)).toList();
 
         debugPrint('✅ [HomeScreen] 추천 레시피 파싱 완료: ${loadedRecipes.length}개');
         if (loadedRecipes.isNotEmpty) {
@@ -396,10 +395,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void _updateRecommendedMealsList() {
     try {
       // 오늘 날짜의 추천 레시피를 먼저 확인하고, 없으면 전역 상태, 그래도 없으면 목 데이터 사용
-      final recipes = _todayRecipes ?? 
-                      RecipeScreen.getLatestAiRecipes() ?? 
-                      RecipeScreen.getRecommendedRecipes();
-      
+      final recipes = _todayRecipes ?? RecipeScreen.getLatestAiRecipes() ?? RecipeScreen.getRecommendedRecipes();
+
       debugPrint('🔄 [HomeScreen] _updateRecommendedMealsList 호출');
       debugPrint('   _todayRecipes: ${_todayRecipes?.length ?? "null"}개');
       debugPrint('   전역 레시피: ${RecipeScreen.getLatestAiRecipes()?.length ?? "null"}개');
@@ -450,7 +447,7 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: backgroundColors[index % backgroundColors.length],
         );
       }).toList();
-      
+
       debugPrint('✅ [HomeScreen] 추천 레시피 목록 업데이트 완료: ${_recommendedMealsList.length}개');
     } catch (e, stackTrace) {
       debugPrint('❌ [HomeScreen] _updateRecommendedMealsList 에러: $e');

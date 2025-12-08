@@ -63,7 +63,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String _userNickname = '사용자';
   int _pregnancyWeek = 12;
   String _conditions = '없음';
-  
+
   // 날짜 추적 (날짜가 바뀌면 메시지 초기화)
   DateTime? _lastLoadedDate;
 
@@ -84,13 +84,14 @@ class _ChatScreenState extends State<ChatScreen> {
   void _checkDateChange() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    
+
     // 날짜가 바뀌었는지 확인 (년, 월, 일 모두 비교)
     if (_lastLoadedDate != null) {
-      final dateChanged = _lastLoadedDate!.year != today.year || 
-                         _lastLoadedDate!.month != today.month || 
-                         _lastLoadedDate!.day != today.day;
-      
+      final dateChanged =
+          _lastLoadedDate!.year != today.year ||
+          _lastLoadedDate!.month != today.month ||
+          _lastLoadedDate!.day != today.day;
+
       if (dateChanged) {
         debugPrint('📅 [ChatScreen] 날짜가 바뀜 (didChangeDependencies): ${_lastLoadedDate} -> $today, 메시지 초기화');
         if (mounted) {
@@ -146,7 +147,7 @@ class _ChatScreenState extends State<ChatScreen> {
         // 홈 화면에서 이미 처리된 경우 (AI 응답이 이미 있음)
         if (widget.initialAiResponse != null) {
           debugPrint('✅ [ChatScreen] 홈 화면에서 이미 처리된 메시지 - 사용자 메시지와 AI 응답 표시');
-          
+
           // 이미지 URL이 로컬 경로면 업로드된 URL로 업데이트 (이미 홈에서 업로드됨)
           if (widget.initialImagePath != null && !widget.initialImagePath!.startsWith('http')) {
             debugPrint('ℹ️ [ChatScreen] 로컬 경로 감지 - 업로드된 URL로 업데이트 필요: ${widget.initialImagePath}');
@@ -167,20 +168,22 @@ class _ChatScreenState extends State<ChatScreen> {
               });
             }
           }
-          
+
           // AI 응답 메시지 추가
           if (mounted) {
             setState(() {
-              _messages.add(ChatMessage(
-                isUser: false,
-                text: widget.initialAiResponse!,
-              ));
+              _messages.add(
+                ChatMessage(
+                  isUser: false,
+                  text: widget.initialAiResponse!,
+                ),
+              );
             });
           }
         } else {
           // 홈 화면에서 처리되지 않은 경우 (기존 로직)
           debugPrint('🔄 [ChatScreen] 홈 화면에서 처리되지 않음 - 여기서 처리 시작');
-          
+
           // 초기 메시지를 DB에 저장
           if (_currentSessionId != null && _currentMemberId != null) {
             await _saveMessageToDb(
@@ -297,15 +300,16 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      
+
       // 날짜가 바뀌었는지 확인 (년, 월, 일 모두 비교)
       bool dateChanged = false;
       if (_lastLoadedDate != null) {
-        dateChanged = _lastLoadedDate!.year != today.year || 
-                     _lastLoadedDate!.month != today.month || 
-                     _lastLoadedDate!.day != today.day;
+        dateChanged =
+            _lastLoadedDate!.year != today.year ||
+            _lastLoadedDate!.month != today.month ||
+            _lastLoadedDate!.day != today.day;
       }
-      
+
       if (dateChanged) {
         debugPrint('📅 [ChatScreen] 날짜가 바뀜: ${_lastLoadedDate} -> $today, 메시지 초기화');
         if (mounted) {
@@ -316,10 +320,10 @@ class _ChatScreenState extends State<ChatScreen> {
         _lastLoadedDate = today;
         return; // 빈 화면으로 시작
       }
-      
+
       // 날짜가 같으면 오늘 날짜의 메시지 로드
       _lastLoadedDate = today;
-      
+
       final messages = await AiChatApiService.instance.getMessages(sessionId);
       debugPrint('🔄 [ChatScreen] 전체 메시지 ${messages.length}개 로드됨');
 
@@ -354,17 +358,13 @@ class _ChatScreenState extends State<ChatScreen> {
           );
 
           debugPrint('🖼️ [ChatScreen] 이미지 목록 가져옴: ${images.length}개');
-          
+
           // image_pk로 필터링하여 URL 맵 생성
           for (final img in images) {
             // 다양한 필드명 시도 (id, image_id, pk 등)
-            final imgId = img['id'] as int? ?? 
-                         img['image_id'] as int? ?? 
-                         img['pk'] as int?;
+            final imgId = img['id'] as int? ?? img['image_id'] as int? ?? img['pk'] as int?;
             // 다양한 URL 필드명 시도 (image_url, url, imageUrl 등)
-            final imgUrl = img['image_url'] as String? ?? 
-                          img['url'] as String? ?? 
-                          img['imageUrl'] as String?;
+            final imgUrl = img['image_url'] as String? ?? img['url'] as String? ?? img['imageUrl'] as String?;
             debugPrint('🖼️ [ChatScreen] 이미지 확인: id=$imgId, url=$imgUrl, 전체 데이터: $img');
             if (imgId != null && imgUrl != null && imgUrl.isNotEmpty && imagePks.contains(imgId)) {
               imageUrlMap[imgId] = imgUrl;
@@ -378,7 +378,9 @@ class _ChatScreenState extends State<ChatScreen> {
           debugPrint('⚠️ [ChatScreen] 이미지 URL 로드 실패: $e');
         }
       } else {
-        debugPrint('⚠️ [ChatScreen] 이미지 URL 맵 생성 건너뜀: imagePks.isEmpty=${imagePks.isEmpty}, memberId=${_currentMemberId != null}');
+        debugPrint(
+          '⚠️ [ChatScreen] 이미지 URL 맵 생성 건너뜀: imagePks.isEmpty=${imagePks.isEmpty}, memberId=${_currentMemberId != null}',
+        );
       }
 
       if (mounted) {
@@ -411,7 +413,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 timestamp: DateTime.parse(msg['created_at'] as String),
               ),
             );
-            
+
             debugPrint('📝 [ChatScreen] 메시지 추가: type=${msg['type']}, text=$finalText, imagePath=$imagePath');
           }
           debugPrint('✅ [ChatScreen] 총 ${_messages.length}개 메시지 로드 완료');
@@ -447,7 +449,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       // 텍스트가 없고 이미지만 있는 경우 content를 '이미지'로 설정 (DB 저장을 위해)
       final finalContent = (content.isEmpty && imagePk != null) ? '이미지' : content;
-      
+
       debugPrint(
         '🔄 [ChatScreen] 메시지 DB 저장 중: type=$type, content=${finalContent.length > 50 ? finalContent.substring(0, 50) : finalContent}..., imagePk=$imagePk',
       );
@@ -784,7 +786,7 @@ class _ChatScreenState extends State<ChatScreen> {
       try {
         // Firebase 업로드 및 이미지 URL 받기
         uploadedImageUrl = await _uploadImage(File(imageFileToSend.path));
-        
+
         // 이미지 URL을 메시지에 업데이트 (로컬 경로 대신 URL 사용)
         if (uploadedImageUrl != null && mounted) {
           setState(() {
