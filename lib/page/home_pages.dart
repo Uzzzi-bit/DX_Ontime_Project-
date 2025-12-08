@@ -2345,14 +2345,14 @@ class _BabyImageWidget extends StatelessWidget {
   final double currentCalorie;
 
   String _getBabyImagePath() {
-    if (currentCalorie >= 2000) {
-      return 'assets/image/happy_baby.png';
-    } else if (currentCalorie <= 600) {
-      return 'assets/image/cry_baby.png';
-    } else if (currentCalorie >= 2500) {
+    if (currentCalorie >= 2500) {
       return 'assets/image/full_baby.png';
-    } else {
+    } else if (currentCalorie >= 2000) {
+      return 'assets/image/happy_baby.png';
+    } else if (currentCalorie >= 600) {
       return 'assets/image/baby.png';
+    } else {
+      return 'assets/image/cry_baby.png';
     }
   }
 
