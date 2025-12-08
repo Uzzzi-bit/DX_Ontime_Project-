@@ -11,6 +11,7 @@ import '../api/meal_api_service.dart';
 import '../api/recommendation_api_service.dart';
 import '../api/body_measurement_api_service.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:table_calendar/table_calendar.dart';
 import 'recipe_pages.dart';
 import 'analysis_pages.dart';
 import '../model/nutrient_type.dart';
@@ -1054,12 +1055,15 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Future<void> _selectDate() async {
-    final picked = await showDatePicker(
+    // 커스텀 캘린더 다이얼로그 표시 (다이얼로그 내부에서 기록 로드)
+    final picked = await showDialog<DateTime>(
       context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
+      builder: (context) => _CustomCalendarDialog(
+        initialDate: _selectedDate,
+        memberId: FirebaseAuth.instance.currentUser?.uid ?? '',
+      ),
     );
+
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
@@ -1067,6 +1071,7 @@ class _ReportScreenState extends State<ReportScreen> {
         _selectedWeekDate = picked;
       });
       _reloadDailyNutrientsForSelectedDate();
+      _loadBodyMeasurements(); // 신체 변화 데이터도 다시 로드
     }
   }
 
@@ -2522,5 +2527,390 @@ class _ReportScreenState extends State<ReportScreen> {
         );
       }
     }
+  }
+}
+
+/// 커스텀 캘린더 다이얼로그 (기록된 날짜 표시)
+class _CustomCalendarDialog extends StatefulWidget {
+  final DateTime initialDate;
+  final String memberId;
+
+  const _CustomCalendarDialog({
+    required this.initialDate,
+    required this.memberId,
+  });
+
+  @override
+  State<_CustomCalendarDialog> createState() => _CustomCalendarDialogState();
+}
+
+class _CustomCalendarDialogState extends State<_CustomCalendarDialog> {
+  late DateTime _selectedDate;
+  late DateTime _focusedDate;
+  final Set<DateTime> _mealRecordedDates = <DateTime>{}; // 음식 기록이 있는 날짜
+  final Set<DateTime> _bodyRecordedDates = <DateTime>{}; // 신체 변화 기록이 있는 날짜
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = widget.initialDate;
+    _focusedDate = widget.initialDate;
+    _loadRecordedDates(widget.initialDate.year, widget.initialDate.month);
+  }
+
+  /// 해당 월의 모든 날짜에 대해 기록 확인
+  Future<void> _loadRecordedDates(int year, int month) async {
+    setState(() {
+      _isLoading = true;
+      _mealRecordedDates.clear();
+      _bodyRecordedDates.clear();
+    });
+
+    try {
+      // 해당 월의 첫날과 마지막날 계산
+      final firstDay = DateTime(year, month, 1);
+      final lastDay = DateTime(year, month + 1, 0); // 다음 달 0일 = 이번 달 마지막 날
+
+      // 신체 변화 기록 조회 (월 단위)
+      final bodyMeasurementApi = BodyMeasurementApiService.instance;
+      final startDateStr = DateFormat('yyyy-MM-dd').format(firstDay);
+      final endDateStr = DateFormat('yyyy-MM-dd').format(lastDay);
+
+      try {
+        final bodyResult = await bodyMeasurementApi.getBodyMeasurements(
+          memberId: widget.memberId,
+          startDate: startDateStr,
+          endDate: endDateStr,
+        );
+
+        if (bodyResult['success'] == true) {
+          final measurements = bodyResult['measurements'] as List<dynamic>? ?? [];
+          for (final measurement in measurements) {
+            final dateStr = measurement['measurement_date'] as String?;
+            if (dateStr != null) {
+              try {
+                final date = DateTime.parse(dateStr);
+                _bodyRecordedDates.add(DateTime(date.year, date.month, date.day));
+              } catch (e) {
+                debugPrint('⚠️ [CustomCalendarDialog] 날짜 파싱 실패: $dateStr');
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ [CustomCalendarDialog] 신체 변화 기록 조회 실패: $e');
+      }
+
+      // 음식 기록 조회 (각 날짜별로 확인)
+      final mealApiService = MealApiService.instance;
+      for (int day = 1; day <= lastDay.day; day++) {
+        final date = DateTime(year, month, day);
+        final dateStr = DateFormat('yyyy-MM-dd').format(date);
+        try {
+          final result = await mealApiService.getMeals(
+            memberId: widget.memberId,
+            date: dateStr,
+          );
+          if (result['success'] == true) {
+            final meals = result['meals'] as List;
+            if (meals.isNotEmpty) {
+              _mealRecordedDates.add(date);
+            }
+          }
+        } catch (e) {
+          debugPrint('⚠️ [CustomCalendarDialog] 음식 기록 조회 실패 ($dateStr): $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ [CustomCalendarDialog] 기록 로드 실패: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  /// 날짜에 기록이 있는지 확인하고 색상 정보 반환
+  /// null: 기록 없음, List<Color>: 기록이 있는 색상 목록
+  List<Color>? _getRecordColors(DateTime date) {
+    final dateOnly = DateTime(date.year, date.month, date.day);
+    final hasMeal = _mealRecordedDates.any((recorded) {
+      final recordedOnly = DateTime(recorded.year, recorded.month, recorded.day);
+      return dateOnly.isAtSameMomentAs(recordedOnly);
+    });
+    final hasBody = _bodyRecordedDates.any((recorded) {
+      final recordedOnly = DateTime(recorded.year, recorded.month, recorded.day);
+      return dateOnly.isAtSameMomentAs(recordedOnly);
+    });
+
+    final colors = <Color>[];
+    if (hasMeal) {
+      colors.add(Colors.blue); // 음식 분석만 - 파란색
+    }
+    if (hasBody) {
+      colors.add(Colors.red); // 혈당만 - 빨간색
+    }
+
+    return colors.isNotEmpty ? colors : null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 헤더
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '날짜 선택',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: ColorPalette.text100,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: ColorPalette.text200),
+                  onPressed: () => Navigator.of(context).pop(),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // 캘린더
+            TableCalendar(
+              firstDay: DateTime(2020),
+              lastDay: DateTime(2030),
+              focusedDay: _focusedDate,
+              selectedDayPredicate: (day) {
+                return isSameDay(_selectedDate, day);
+              },
+              onDaySelected: (selectedDay, focusedDay) {
+                setState(() {
+                  _selectedDate = selectedDay;
+                  _focusedDate = focusedDay;
+                });
+              },
+              onPageChanged: (focusedDay) {
+                setState(() {
+                  _focusedDate = focusedDay;
+                });
+                // 월이 변경되면 해당 월의 기록 다시 로드
+                if (focusedDay.year != _focusedDate.year || focusedDay.month != _focusedDate.month) {
+                  _loadRecordedDates(focusedDay.year, focusedDay.month);
+                }
+              },
+              calendarFormat: CalendarFormat.month,
+              startingDayOfWeek: StartingDayOfWeek.monday,
+              calendarStyle: CalendarStyle(
+                outsideDaysVisible: false,
+                selectedDecoration: BoxDecoration(
+                  color: ColorPalette.primary200,
+                  shape: BoxShape.circle,
+                ),
+                todayDecoration: BoxDecoration(
+                  color: ColorPalette.primary200.withOpacity(0.5),
+                  shape: BoxShape.circle,
+                ),
+                markerDecoration: BoxDecoration(
+                  color: Colors.orange,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              // 선택된 날짜의 색상을 기록에 맞게 표시
+              calendarBuilders: CalendarBuilders(
+                selectedBuilder: (context, date, focused) {
+                  // 선택된 날짜의 배경색을 기록에 맞게 변경
+                  final colors = _getRecordColors(date);
+                  if (colors != null && colors.isNotEmpty) {
+                    // 기록이 있으면 해당 색상으로 표시
+                    Color bgColor;
+                    if (colors.length == 2) {
+                      // 둘 다 있으면 첫 번째 색상(파란색) 사용
+                      bgColor = colors[0];
+                    } else {
+                      bgColor = colors[0];
+                    }
+                    return Container(
+                      margin: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: bgColor,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${date.day}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                  // 기록이 없으면 기본 선택 색상 사용
+                  return null;
+                },
+                markerBuilder: (context, date, events) {
+                  // 모든 날짜에 도형 표시 (선택된 날짜 포함)
+                  final colors = _getRecordColors(date);
+                  if (colors == null || colors.isEmpty) {
+                    return null;
+                  }
+
+                  // 하나만 있으면 하나의 원, 둘 다 있으면 두 개의 원 표시
+                  if (colors.length == 1) {
+                    return Positioned(
+                      bottom: 1,
+                      child: Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: colors[0],
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    );
+                  } else {
+                    // 둘 다 있으면 두 개의 원을 나란히 표시
+                    return Positioned(
+                      bottom: 1,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: colors[0],
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: colors[1],
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                },
+              ),
+              headerStyle: HeaderStyle(
+                formatButtonVisible: false,
+                titleCentered: true,
+                leftChevronIcon: const Icon(Icons.chevron_left, color: ColorPalette.text100),
+                rightChevronIcon: const Icon(Icons.chevron_right, color: ColorPalette.text100),
+                titleTextStyle: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: ColorPalette.text100,
+                ),
+              ),
+              // 기록된 날짜에 표시
+              eventLoader: (day) {
+                final colors = _getRecordColors(day);
+                if (colors != null && colors.isNotEmpty) {
+                  return colors; // 색상 목록 반환
+                }
+                return [];
+              },
+            ),
+            const SizedBox(height: 16),
+            // 범례
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 16,
+              runSpacing: 8,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.blue,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      '파란색: 음식 분석',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: ColorPalette.text200,
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      '빨간색: 혈당 검사',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: ColorPalette.text200,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // 버튼
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text(
+                    '취소',
+                    style: TextStyle(color: ColorPalette.text200),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(_selectedDate),
+                  style: TextButton.styleFrom(
+                    backgroundColor: ColorPalette.primary200,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('확인'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
