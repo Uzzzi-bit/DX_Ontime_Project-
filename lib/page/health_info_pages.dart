@@ -38,11 +38,11 @@ class _HealthInfoScreenState extends State<HealthInfoScreen> {
     '조개류',
   ];
 
-  final TextEditingController _heightController = TextEditingController(text: '162');
-  final TextEditingController _weightController = TextEditingController(text: '60');
+  final TextEditingController _heightController = TextEditingController(text: '');
+  final TextEditingController _weightController = TextEditingController(text: '');
 
   String? _selectedBirthYear;
-  int _selectedWeek = 20;
+  int _selectedWeek = 0;
   bool _hasGestationalDiabetes = false;
   DateTime? _expectedDueDate = DateTime.now().add(const Duration(days: 120));
   final Set<String> _selectedAllergies = {'우유', '땅콩'};
