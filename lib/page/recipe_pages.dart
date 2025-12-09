@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:convert';
 import '../widget/bottom_bar_widget.dart';
 import '../theme/color_palette.dart';
 import '../api/member_api_service.dart';
@@ -614,6 +615,105 @@ class _RecipeScreenState extends State<RecipeScreen> with WidgetsBindingObserver
   //   }
   // }
 
+  /// 이미지 경로에 따라 적절한 위젯을 반환하는 헬퍼 함수
+  Widget _buildRecipeImage(String imagePath) {
+    if (imagePath.isEmpty) {
+      return const Center(
+        child: Text(
+          '메뉴 사진',
+          style: TextStyle(
+            color: ColorPalette.text100,
+            fontSize: 9.5,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
+    // Data URL 처리 (base64)
+    if (imagePath.startsWith('data:image/')) {
+      try {
+        final base64String = imagePath.split(',')[1];
+        final imageBytes = base64Decode(base64String);
+        return Image.memory(
+          imageBytes,
+          fit: BoxFit.cover,
+          alignment: Alignment.center,
+          errorBuilder: (context, error, stackTrace) {
+            return const Center(
+              child: Text(
+                '메뉴 사진',
+                style: TextStyle(
+                  color: ColorPalette.text100,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            );
+          },
+        );
+      } catch (e) {
+        debugPrint('❌ [RecipeScreen] Data URL 디코딩 실패: $e');
+        return const Center(
+          child: Text(
+            '메뉴 사진',
+            style: TextStyle(
+              color: ColorPalette.text100,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        );
+      }
+    }
+
+    // 네트워크 URL 처리 (http/https)
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return Image.network(
+        imagePath,
+        fit: BoxFit.cover,
+        alignment: Alignment.center,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return const Center(
+            child: Text(
+              '메뉴 사진',
+              style: TextStyle(
+                color: ColorPalette.text100,
+                fontSize: 9.5,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    // Asset 이미지 처리
+    return Image.asset(
+      imagePath,
+      fit: BoxFit.cover,
+      alignment: Alignment.center,
+      errorBuilder: (context, error, stackTrace) {
+        return const Center(
+          child: Text(
+            '메뉴 사진',
+            style: TextStyle(
+              color: ColorPalette.text100,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedRecipe = _recipes[_selectedMenuIndex];
@@ -732,22 +832,7 @@ class _RecipeScreenState extends State<RecipeScreen> with WidgetsBindingObserver
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(11),
-                child: Image.asset(
-                  selectedRecipe.imagePath,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Center(
-                      child: Text(
-                        '메뉴 사진',
-                        style: TextStyle(
-                          color: ColorPalette.text100,
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                child: _buildRecipeImage(selectedRecipe.imagePath),
               ),
             ),
             const SizedBox(height: 16),

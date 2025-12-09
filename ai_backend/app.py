@@ -443,6 +443,26 @@ async def recommend_recipes(req: RecipesRequest):
                 else:
                     print(f"✅ [AI Backend] 레시피 {i+1} 필수 필드 확인 완료: {recipe.get('title', 'N/A')}")
             
+            # 각 레시피에 이미지 URL 추가 및 저장
+            for i, recipe in enumerate(data.get('recipes', [])):
+                if not isinstance(recipe, dict):
+                    continue
+                title = recipe.get('title', '')
+                description = recipe.get('fullTitle', '') or recipe.get('tip', '')
+                if title:
+                    try:
+                        # Firebase Storage에서 이미지 검색하고 있으면 DB에 저장
+                        image_url = await asyncio.to_thread(get_and_save_recipe_image, title, description)
+                        if image_url:
+                            recipe['imagePath'] = image_url
+                            print(f"✅ [AI Backend] 레시피 {i+1} 이미지 설정 완료: {title}")
+                        else:
+                            print(f"⚠️ [AI Backend] 레시피 {i+1} 이미지를 찾을 수 없음: {title}")
+                    except Exception as e:
+                        print(f"⚠️ [AI Backend] 레시피 {i+1} 이미지 처리 중 오류: {e}")
+                        import traceback
+                        traceback.print_exc()
+            
             return data
         except json.JSONDecodeError as e:
             print(f"❌ [AI Backend] JSON 파싱 실패:")
@@ -987,6 +1007,426 @@ async def startup_event():
     else:
         print("⚠️ YOLO 모듈을 사용할 수 없습니다.")
     print("✅ AI 백엔드 서버 준비 완료!")
+
+
+# =========================
+# Firebase Storage에서 레시피 이미지 가져오기
+# =========================
+
+def get_recipe_image_from_firebase(recipe_title: str) -> Optional[str]:
+    """
+    Firebase Storage의 recipe_images 폴더에서 레시피 이름과 매칭되는 이미지를 찾아 URL 반환
+    
+    Args:
+        recipe_title: 레시피 제목 (예: "닭가슴살 표고버섯 들깨찜")
+    
+    Returns:
+        이미지 공개 URL 또는 None
+    """
+    try:
+        import firebase_admin
+        from firebase_admin import credentials, storage
+        
+        # Firebase 초기화
+        cred_path = os.environ.get("FIREBASE_CREDENTIAL_PATH", 
+                                   os.path.join(BASE_DIR, "pregnantapp-492e6-firebase-adminsdk-fbsvc-c119f7fdda.json"))
+        
+        if not os.path.exists(cred_path):
+            print(f"⚠️ [firebase] 서비스 계정 파일을 찾을 수 없습니다: {cred_path}")
+            return None
+        
+        # Firebase 앱이 초기화되지 않았으면 초기화
+        try:
+            firebase_admin.get_app()
+        except ValueError:
+            # 초기화되지 않음
+            with open(cred_path, 'r', encoding='utf-8') as f:
+                cred_data = json.load(f)
+                project_id = cred_data.get('project_id', '')
+            
+            bucket_name = os.environ.get("FIREBASE_BUCKET", f"{project_id}.firebasestorage.app")
+            cred = credentials.Certificate(cred_path)
+            firebase_admin.initialize_app(cred, {"storageBucket": bucket_name})
+            print(f"✅ [firebase] 초기화 완료: {bucket_name}")
+        
+        # 버킷 가져오기
+        bucket_name = os.environ.get("FIREBASE_BUCKET", "")
+        if not bucket_name:
+            with open(cred_path, 'r', encoding='utf-8') as f:
+                cred_data = json.load(f)
+                project_id = cred_data.get('project_id', '')
+            bucket_name = f"{project_id}.firebasestorage.app"
+        
+        bucket = storage.bucket(bucket_name)
+        
+        # 레시피 이름을 파일명으로 변환 (여러 변형 시도)
+        recipe_title_clean = recipe_title.strip()
+        
+        # 시도할 파일명 패턴들
+        filename_patterns = [
+            f"{recipe_title_clean}.png",
+            f"{recipe_title_clean}.jpg",
+            f"{recipe_title_clean}.jpeg",
+            f"{recipe_title_clean.replace(' ', '_')}.png",
+            f"{recipe_title_clean.replace(' ', '_')}.jpg",
+            f"{recipe_title_clean.replace(' ', '_')}.jpeg",
+            f"{recipe_title_clean.replace(' ', '')}.png",
+            f"{recipe_title_clean.replace(' ', '')}.jpg",
+        ]
+        
+        # recipe_images 폴더 경로
+        folder_path = "recipe_images"
+        
+        print(f"🔍 [firebase] 레시피 이미지 검색: {recipe_title_clean}")
+        
+        # 각 패턴으로 파일 찾기 시도
+        for filename_pattern in filename_patterns:
+            file_path = f"{folder_path}/{filename_pattern}"
+            try:
+                blob = bucket.blob(file_path)
+                if blob.exists():
+                    # 공개 URL 생성 시도
+                    try:
+                        blob.make_public()
+                        url = blob.public_url
+                        print(f"✅ [firebase] 이미지 찾음: {file_path} -> {url}")
+                        return url
+                    except Exception:
+                        # 공개 설정 실패 시 signed URL 사용
+                        from datetime import timedelta
+                        url = blob.generate_signed_url(expiration=timedelta(days=365))
+                        print(f"✅ [firebase] 이미지 찾음 (signed URL): {file_path}")
+                        return url
+            except Exception as e:
+                continue  # 다음 패턴 시도
+        
+        # 직접 매칭 실패 시 폴더 내 모든 파일 검색 (유사도 매칭)
+        print(f"🔄 [firebase] 직접 매칭 실패, 폴더 내 파일 검색 중...")
+        try:
+            blobs = bucket.list_blobs(prefix=f"{folder_path}/")
+            recipe_title_lower = recipe_title_clean.lower()
+            recipe_words = set(recipe_title_lower.split())
+            
+            best_match = None
+            best_score = 0
+            
+            for blob in blobs:
+                blob_name = blob.name
+                # 파일명만 추출 (경로 제거)
+                filename = blob_name.split('/')[-1]
+                # 확장자 제거
+                filename_no_ext = filename.rsplit('.', 1)[0] if '.' in filename else filename
+                
+                # 정규화: 공백, 언더스코어, 특수문자 제거
+                filename_normalized = filename_no_ext.replace('_', ' ').replace('-', ' ').lower()
+                recipe_normalized = recipe_title_lower.replace('-', ' ')
+                
+                # 방법 1: 완전 포함 여부 확인
+                filename_no_space = filename_normalized.replace(' ', '')
+                recipe_no_space = recipe_normalized.replace(' ', '')
+                
+                if recipe_no_space in filename_no_space or filename_no_space in recipe_no_space:
+                    score = min(len(recipe_no_space), len(filename_no_space)) / max(len(recipe_no_space), len(filename_no_space))
+                    if score > best_score:
+                        best_match = blob
+                        best_score = score
+                        print(f"   📊 포함 매칭 발견 (점수: {score:.2f}): {filename_no_ext}")
+                    continue
+                
+                # 방법 2: 단어 단위 매칭
+                filename_words = set(filename_normalized.split())
+                if filename_words:
+                    # 공통 단어 비율 계산
+                    common_words = recipe_words.intersection(filename_words)
+                    if common_words:
+                        # 공통 단어가 레시피 단어의 50% 이상이면 매칭
+                        word_score = len(common_words) / max(len(recipe_words), len(filename_words))
+                        if word_score >= 0.5:
+                            if word_score > best_score:
+                                best_match = blob
+                                best_score = word_score
+                                print(f"   📊 단어 매칭 발견 (점수: {word_score:.2f}): {filename_no_ext} (공통: {common_words})")
+                
+                # 방법 3: 문자열 유사도 (간단한 편집 거리 기반)
+                # 공통 문자 수 계산
+                recipe_chars = set(recipe_normalized.replace(' ', ''))
+                filename_chars = set(filename_normalized.replace(' ', ''))
+                if recipe_chars and filename_chars:
+                    common_chars = recipe_chars.intersection(filename_chars)
+                    char_score = len(common_chars) / max(len(recipe_chars), len(filename_chars))
+                    if char_score >= 0.6 and char_score > best_score:
+                        best_match = blob
+                        best_score = char_score
+                        print(f"   📊 문자 매칭 발견 (점수: {char_score:.2f}): {filename_no_ext}")
+            
+            # 최고 점수 매칭이 있으면 반환
+            if best_match and best_score >= 0.5:
+                try:
+                    best_match.make_public()
+                    url = best_match.public_url
+                    print(f"✅ [firebase] 유사도 매칭으로 이미지 찾음 (점수: {best_score:.2f}): {best_match.name} -> {url}")
+                    return url
+                except Exception:
+                    from datetime import timedelta
+                    url = best_match.generate_signed_url(expiration=timedelta(days=365))
+                    print(f"✅ [firebase] 유사도 매칭으로 이미지 찾음 (signed URL, 점수: {best_score:.2f}): {best_match.name}")
+                    return url
+            else:
+                print(f"⚠️ [firebase] 유사한 이미지를 찾을 수 없음 (최고 점수: {best_score:.2f})")
+                
+        except Exception as e:
+            print(f"⚠️ [firebase] 폴더 검색 실패: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        print(f"❌ [firebase] 이미지를 찾을 수 없음: {recipe_title_clean}")
+        return None
+        
+    except Exception as e:
+        print(f"❌ [firebase] 이미지 조회 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def generate_recipe_image_bytes(title: str, description: str = "") -> bytes:
+    """Imagen API로 레시피 이미지 생성"""
+    try:
+        from google import genai as new_genai
+        from google.genai import types
+        
+        prompt = f"""음식 사진 생성.
+제목: {title}
+설명/특징: {description[:120] if description else ''}
+스타일: 고해상도, 자연광, 식욕을 돋우는 클로즈업, 한식/가정식 느낌, 노이즈 최소화, 과도한 장식 없음."""
+        
+        print(f"🎨 [image] 이미지 생성 시도: {title}")
+        
+        API_KEY = os.environ.get("GEMINI_API_KEY", "")
+        if not API_KEY:
+            print(f"❌ [image] GEMINI_API_KEY가 설정되지 않았습니다.")
+            return None
+        
+        genai_client = new_genai.Client(api_key=API_KEY)
+        
+        # Imagen 모델 사용
+        model_name = "imagen-4.0-generate-001"
+        
+        try:
+            response = genai_client.models.generate_images(
+                model=model_name,
+                prompt=prompt,
+                config=types.GenerateImagesConfig(
+                    number_of_images=1,
+                )
+            )
+            
+            if response and response.generated_images and len(response.generated_images) > 0:
+                generated_image = response.generated_images[0]
+                
+                # 이미지 데이터를 bytes로 변환
+                image_bytes = None
+                
+                if hasattr(generated_image, "image"):
+                    try:
+                        img = generated_image.image
+                        if img:
+                            buf = io.BytesIO()
+                            img.save(buf, format="JPEG", quality=85)
+                            image_bytes = buf.getvalue()
+                            print(f"✅ [image] 이미지 생성 완료: {len(image_bytes)} bytes")
+                            return image_bytes
+                    except Exception as e:
+                        print(f"⚠️ [image] PIL Image 변환 실패: {e}")
+                
+                if not image_bytes and hasattr(generated_image, "bytes"):
+                    try:
+                        image_bytes = generated_image.bytes
+                        print(f"✅ [image] 이미지 생성 완료: {len(image_bytes)} bytes")
+                        return image_bytes
+                    except Exception as e:
+                        print(f"⚠️ [image] bytes 속성 추출 실패: {e}")
+                
+                if not image_bytes and hasattr(generated_image, "base64_encoded"):
+                    try:
+                        image_bytes = base64.b64decode(generated_image.base64_encoded)
+                        print(f"✅ [image] 이미지 생성 완료: {len(image_bytes)} bytes")
+                        return image_bytes
+                    except Exception as e:
+                        print(f"⚠️ [image] base64 디코딩 실패: {e}")
+        except Exception as e:
+            print(f"❌ [image] Imagen API 호출 실패: {e}")
+            import traceback
+            traceback.print_exc()
+    except ImportError:
+        print(f"❌ [image] google.genai 모듈을 사용할 수 없습니다.")
+    except Exception as e:
+        print(f"❌ [image] 이미지 생성 실패: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return None
+
+
+def upload_image_to_firebase(image_bytes: bytes, filename: str) -> Optional[str]:
+    """Firebase Storage에 이미지 업로드하고 URL 반환"""
+    try:
+        import firebase_admin
+        from firebase_admin import credentials, storage
+        from datetime import timedelta
+        
+        # Firebase 초기화
+        cred_path = os.environ.get("FIREBASE_CREDENTIAL_PATH", 
+                                   os.path.join(BASE_DIR, "pregnantapp-492e6-firebase-adminsdk-fbsvc-c119f7fdda.json"))
+        
+        if not os.path.exists(cred_path):
+            print(f"⚠️ [firebase] 서비스 계정 파일을 찾을 수 없습니다: {cred_path}")
+            return None
+        
+        # Firebase 앱이 초기화되지 않았으면 초기화
+        try:
+            firebase_admin.get_app()
+        except ValueError:
+            with open(cred_path, 'r', encoding='utf-8') as f:
+                cred_data = json.load(f)
+                project_id = cred_data.get('project_id', '')
+            
+            bucket_name = os.environ.get("FIREBASE_BUCKET", f"{project_id}.firebasestorage.app")
+            cred = credentials.Certificate(cred_path)
+            firebase_admin.initialize_app(cred, {"storageBucket": bucket_name})
+        
+        # 버킷 가져오기
+        bucket_name = os.environ.get("FIREBASE_BUCKET", "")
+        if not bucket_name:
+            with open(cred_path, 'r', encoding='utf-8') as f:
+                cred_data = json.load(f)
+                project_id = cred_data.get('project_id', '')
+            bucket_name = f"{project_id}.firebasestorage.app"
+        
+        bucket = storage.bucket(bucket_name)
+        blob = bucket.blob(filename)
+        
+        print(f"🔄 [firebase] 파일 업로드 시작: {filename}")
+        blob.upload_from_string(image_bytes, content_type="image/jpeg")
+        
+        # 공개 URL 생성 시도
+        try:
+            blob.make_public()
+            url = blob.public_url
+            print(f"✅ [firebase] 파일 업로드 완료: {url}")
+            return url
+        except Exception:
+            # 공개 설정 실패 시 signed URL 사용
+            url = blob.generate_signed_url(expiration=timedelta(days=365))
+            print(f"✅ [firebase] 파일 업로드 완료 (signed URL): {filename}")
+            return url
+            
+    except Exception as e:
+        print(f"❌ [firebase] 업로드 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def save_recipe_image_to_db(recipe_title: str, description: str, image_url: str) -> None:
+    """레시피 이미지 URL을 DB에 저장/업데이트"""
+    try:
+        import psycopg2
+        
+        # Django settings에서 DB 정보 가져오기
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        django_backend_path = os.path.join(project_root, 'django_backend')
+        sys.path.insert(0, django_backend_path)
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+        
+        import importlib.util
+        settings_path = os.path.join(django_backend_path, 'config', 'settings.py')
+        spec = importlib.util.spec_from_file_location("settings", settings_path)
+        settings = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(settings)
+        
+        db_config = settings.DATABASES['default']
+        conn = psycopg2.connect(
+            dbname=db_config['NAME'],
+            user=db_config['USER'],
+            password=db_config['PASSWORD'],
+            host=db_config['HOST'],
+            port=db_config['PORT']
+        )
+        
+        with conn.cursor() as cur:
+            # 기존 레시피 확인
+            cur.execute(
+                """
+                SELECT recipe_id
+                  FROM member_recipe
+                 WHERE lower(trim(recipe_name)) = lower(trim(%s))
+                 ORDER BY recipe_id DESC
+                 LIMIT 1
+                """,
+                [recipe_title.strip()],
+            )
+            row = cur.fetchone()
+            
+            from datetime import datetime
+            now = datetime.utcnow()
+            
+            if row:
+                # 업데이트
+                recipe_id = row[0]
+                cur.execute(
+                    """
+                    UPDATE member_recipe
+                       SET main_image_url = %s,
+                           description    = COALESCE(description, %s),
+                           updated_at     = %s
+                     WHERE recipe_id = %s
+                    """,
+                    [image_url, description or "", now, recipe_id],
+                )
+                print(f"✅ [db] 레시피 이미지 URL 업데이트: recipe_id={recipe_id}, title={recipe_title}")
+            else:
+                # 신규 삽입
+                cur.execute("SELECT COALESCE(MAX(recipe_id), 0) + 1 FROM member_recipe")
+                new_id = cur.fetchone()[0]
+                cur.execute(
+                    """
+                    INSERT INTO member_recipe
+                        (recipe_id, recipe_name, description, main_image_url, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    [new_id, recipe_title.strip(), description or "", image_url, now, now],
+                )
+                print(f"✅ [db] 레시피 신규 저장: {recipe_title} (recipe_id={new_id})")
+            
+            conn.commit()
+        conn.close()
+        
+    except Exception as e:
+        print(f"⚠️ [db] DB 저장 실패: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def get_and_save_recipe_image(recipe_title: str, description: str = "") -> Optional[str]:
+    """
+    Firebase Storage에서 레시피 이미지를 찾아서 DB에 저장합니다.
+    이미지가 없으면 생성하지 않고 None 반환.
+    """
+    # Firebase Storage에서 이미지 검색
+    image_url = get_recipe_image_from_firebase(recipe_title)
+    
+    if image_url:
+        # 이미지가 있으면 DB에 저장
+        try:
+            save_recipe_image_to_db(recipe_title, description, image_url)
+            print(f"📦 [image] 기존 이미지 URL을 DB에 저장: {recipe_title}")
+        except Exception as e:
+            print(f"⚠️ [image] DB 저장 실패 (이미지는 있음): {e}")
+        return image_url
+    else:
+        print(f"⚠️ [image] Firebase Storage에 이미지가 없음: {recipe_title} (생성하지 않음)")
+        return None
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
+import 'dart:convert';
 import '../../utils/responsive_helper.dart';
 
 class TodayMealSection extends StatelessWidget {
@@ -81,6 +82,135 @@ class _MealCard extends StatelessWidget {
   final Map<String, dynamic> meal;
   final VoidCallback onTap;
 
+  /// 이미지 경로에 따라 적절한 위젯을 반환하는 헬퍼 함수
+  Widget _buildMealImage(String imagePath, Color backgroundColor, BuildContext context) {
+    if (imagePath.isEmpty) {
+      return Container(
+        width: ResponsiveHelper.width(context, 0.187),
+        height: ResponsiveHelper.width(context, 0.187),
+        decoration: BoxDecoration(
+          color: backgroundColor.withOpacity(0.3),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          Icons.restaurant_menu,
+          size: ResponsiveHelper.fontSize(context, 35),
+          color: const Color(0xFF49454F),
+        ),
+      );
+    }
+
+    // Data URL 처리 (base64)
+    if (imagePath.startsWith('data:image/')) {
+      try {
+        final base64String = imagePath.split(',')[1];
+        final imageBytes = base64Decode(base64String);
+        return Image.memory(
+          imageBytes,
+          width: ResponsiveHelper.width(context, 0.187),
+          height: ResponsiveHelper.width(context, 0.187),
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              width: ResponsiveHelper.width(context, 0.187),
+              height: ResponsiveHelper.width(context, 0.187),
+              decoration: BoxDecoration(
+                color: backgroundColor.withOpacity(0.3),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.restaurant_menu,
+                size: ResponsiveHelper.fontSize(context, 35),
+                color: const Color(0xFF49454F),
+              ),
+            );
+          },
+        );
+      } catch (e) {
+        return Container(
+          width: ResponsiveHelper.width(context, 0.187),
+          height: ResponsiveHelper.width(context, 0.187),
+          decoration: BoxDecoration(
+            color: backgroundColor.withOpacity(0.3),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.restaurant_menu,
+            size: ResponsiveHelper.fontSize(context, 35),
+            color: const Color(0xFF49454F),
+          ),
+        );
+      }
+    }
+
+    // 네트워크 URL 처리 (http/https)
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return Image.network(
+        imagePath,
+        width: ResponsiveHelper.width(context, 0.187),
+        height: ResponsiveHelper.width(context, 0.187),
+        fit: BoxFit.contain,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            width: ResponsiveHelper.width(context, 0.187),
+            height: ResponsiveHelper.width(context, 0.187),
+            decoration: BoxDecoration(
+              color: backgroundColor.withOpacity(0.3),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                    : null,
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            width: ResponsiveHelper.width(context, 0.187),
+            height: ResponsiveHelper.width(context, 0.187),
+            decoration: BoxDecoration(
+              color: backgroundColor.withOpacity(0.3),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.restaurant_menu,
+              size: ResponsiveHelper.fontSize(context, 35),
+              color: const Color(0xFF49454F),
+            ),
+          );
+        },
+      );
+    }
+
+    // Asset 이미지 처리
+    return Image.asset(
+      imagePath,
+      width: ResponsiveHelper.width(context, 0.187),
+      height: ResponsiveHelper.width(context, 0.187),
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          width: ResponsiveHelper.width(context, 0.187),
+          height: ResponsiveHelper.width(context, 0.187),
+          decoration: BoxDecoration(
+            color: backgroundColor.withOpacity(0.3),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.restaurant_menu,
+            size: ResponsiveHelper.fontSize(context, 35),
+            color: const Color(0xFF49454F),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final backgroundColor = Color(meal['backgroundColor'] as int);
@@ -116,26 +246,10 @@ class _MealCard extends StatelessWidget {
               child: Center(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(500),
-                  child: Image.asset(
+                  child: _buildMealImage(
                     meal['imagePath'] as String,
-                    width: ResponsiveHelper.width(context, 0.187),
-                    height: ResponsiveHelper.width(context, 0.187),
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        width: ResponsiveHelper.width(context, 0.187),
-                        height: ResponsiveHelper.width(context, 0.187),
-                        decoration: BoxDecoration(
-                          color: backgroundColor.withOpacity(0.3),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.restaurant_menu,
-                          size: ResponsiveHelper.fontSize(context, 35),
-                          color: const Color(0xFF49454F),
-                        ),
-                      );
-                    },
+                    backgroundColor,
+                    context,
                   ),
                 ),
               ),
