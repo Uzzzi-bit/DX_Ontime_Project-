@@ -354,7 +354,19 @@ async def recommend_recipes(req: RecipesRequest):
         print(f"  - today_sugar: {req.today_sugar}, today_sugar_ratio: {req.today_sugar_ratio}")
         print(f"  - today_omega3: {req.today_omega3}, today_omega3_ratio: {req.today_omega3_ratio}")
         
-        # 프롬프트에 모든 영양소 데이터 전달
+        # DB에서 레시피 목록 가져오기 (제미나이에게 제공할 목록)
+        db_recipes = await asyncio.to_thread(get_all_recipes_from_db)
+        print(f"📦 [AI Backend] DB에서 레시피 {len(db_recipes)}개 로드 완료")
+        
+        # DB 레시피 이름 목록 생성 (프롬프트에 포함)
+        db_recipe_names = [recipe.get('title', '').strip() for recipe in db_recipes if recipe.get('title', '').strip()]
+        db_recipe_list = "\n".join([f"- {name}" for name in db_recipe_names[:100]])  # 최대 100개만 표시
+        if len(db_recipe_names) > 100:
+            db_recipe_list += f"\n... 외 {len(db_recipe_names) - 100}개 레시피"
+        
+        print(f"📋 [AI Backend] DB 레시피 목록 ({len(db_recipe_names)}개) 프롬프트에 포함")
+        
+        # 프롬프트에 모든 영양소 데이터 및 DB 레시피 목록 전달
         prompt = render_template(
         RECIPES_TEMPLATE,
         RULES_JSON=RULES_JSON,
@@ -364,6 +376,7 @@ async def recommend_recipes(req: RecipesRequest):
         bmi=req.bmi,
         conditions=req.conditions or "없음",
         allergies=allergies_str,
+        db_recipe_list=db_recipe_list,  # DB 레시피 목록 추가
         # 기본 영양소
         today_carbs=req.today_carbs,
         today_carbs_ratio=req.today_carbs_ratio,
@@ -1408,25 +1421,177 @@ def save_recipe_image_to_db(recipe_title: str, description: str, image_url: str)
         traceback.print_exc()
 
 
+def get_all_recipes_from_db() -> List[Dict[str, Any]]:
+    """DB에서 모든 레시피를 가져옵니다"""
+    try:
+        import psycopg2
+        
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        django_backend_path = os.path.join(project_root, 'django_backend')
+        sys.path.insert(0, django_backend_path)
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+        
+        import importlib.util
+        settings_path = os.path.join(django_backend_path, 'config', 'settings.py')
+        spec = importlib.util.spec_from_file_location("settings", settings_path)
+        settings = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(settings)
+        
+        db_config = settings.DATABASES['default']
+        conn = psycopg2.connect(
+            dbname=db_config['NAME'],
+            user=db_config['USER'],
+            password=db_config['PASSWORD'],
+            host=db_config['HOST'],
+            port=db_config['PORT']
+        )
+        
+        with conn.cursor() as cur:
+            # 먼저 테이블 구조 확인
+            cur.execute("""
+                SELECT column_name 
+                  FROM information_schema.columns 
+                 WHERE table_name = 'member_recipe'
+                 ORDER BY ordinal_position
+            """)
+            columns = [row[0] for row in cur.fetchall()]
+            
+            # 사용 가능한 컬럼만 선택
+            select_cols = ['recipe_id', 'recipe_name', 'description', 'main_image_url']
+            if 'ingredients' in columns:
+                select_cols.append('ingredients')
+            
+            select_query = f"""
+                SELECT {', '.join(select_cols)}
+                  FROM member_recipe
+                 WHERE recipe_name IS NOT NULL
+                 ORDER BY recipe_id
+            """
+            cur.execute(select_query)
+            rows = cur.fetchall()
+            
+            recipes = []
+            for row in rows:
+                recipe_id = row[0]
+                recipe_name = row[1]
+                description = row[2] if len(row) > 2 else None
+                
+                recipes.append({
+                    'recipe_id': recipe_id,
+                    'title': recipe_name or '',
+                    'description': description or '',
+                })
+            
+            conn.close()
+            print(f"✅ [db] DB에서 레시피 {len(recipes)}개 로드 완료")
+            return recipes
+            
+    except Exception as e:
+        print(f"❌ [db] 레시피 로드 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+
+def extract_recipe_keywords(recipe_title: str) -> List[str]:
+    """레시피 제목에서 검색할 키워드 변형들을 생성합니다 (주요 재료 보존)"""
+    if not recipe_title:
+        return []
+    
+    title = recipe_title.strip()
+    keywords = [title]  # 원본 제목
+    
+    # 주요 재료 키워드 (이것들은 반드시 포함해야 함)
+    main_ingredients = ['연어', '버섯', '닭', '돼지', '소고기', '두부', '달걀', '계란', '시금치', '케일', '고구마', '병아리콩', '정어리']
+    
+    # "&" 또는 "밥" 같은 단어 제거한 버전들
+    # 예: "버섯 시금치 달걀찜 & 무가당 두유 밥" -> "버섯 시금치 달걀찜"
+    if '&' in title:
+        # "&" 앞부분만 추출
+        before_amp = title.split('&')[0].strip()
+        if before_amp:
+            keywords.append(before_amp)
+            # "&" 앞부분에 주요 재료가 모두 있는지 확인
+            has_main_ingredients = any(ing in before_amp for ing in main_ingredients)
+            if has_main_ingredients:
+                keywords.insert(1, before_amp)  # 우선순위 높임
+    
+    # "밥" 제거 (하지만 주요 재료는 유지)
+    if '밥' in title:
+        without_밥 = title.replace('밥', '').replace('  ', ' ').strip()
+        if without_밥:
+            keywords.append(without_밥)
+    
+    # "무가당", "두유", "비타민D" 같은 수식어만 제거 (주요 재료는 유지)
+    modifiers = ['무가당', '두유', '강화', '저당', '저염', '고단백', '비타민D', '비타민', '오메가3']
+    for modifier in modifiers:
+        if modifier in title:
+            without_modifier = title.replace(modifier, '').replace('  ', ' ').strip()
+            if without_modifier:
+                keywords.append(without_modifier)
+    
+    # "오븐에 구운", "오븐" 같은 조리법 키워드 변형
+    if '오븐' in title:
+        # "오븐" 제거한 버전
+        without_oven = title.replace('오븐', '').replace('에 구운', '').replace('  ', ' ').strip()
+        if without_oven:
+            keywords.append(without_oven)
+        # "오븐"만 포함한 버전 (주요 재료 + 오븐)
+        words = title.split()
+        oven_words = [w for w in words if '오븐' in w or '구운' in w or '구이' in w]
+        main_words = [w for w in words if any(ing in w for ing in main_ingredients)]
+        if oven_words and main_words:
+            combined = ' '.join(oven_words + main_words)
+            keywords.append(combined)
+    
+    # 주요 재료만 추출 (2개 이상인 경우)
+    words = title.split()
+    main_words_found = [w for w in words if any(ing in w for ing in main_ingredients)]
+    if len(main_words_found) >= 2:
+        # 주요 재료 2개 이상이면 그것들만으로 키워드 생성
+        main_keywords = ' '.join(main_words_found)
+        keywords.append(main_keywords)
+        # "구이", "찜" 같은 조리법 추가
+        cooking_methods = [w for w in words if any(method in w for method in ['구이', '찜', '볶음', '튀김', '조림'])]
+        if cooking_methods:
+            main_with_method = ' '.join(main_words_found + cooking_methods)
+            keywords.append(main_with_method)
+    
+    # 중복 제거 및 정렬 (긴 것부터, 주요 재료 포함된 것 우선)
+    def sort_key(kw):
+        # 주요 재료 포함 여부로 우선순위 결정
+        has_main = any(ing in kw for ing in main_ingredients)
+        return (not has_main, -len(kw))  # 주요 재료 있는 것 먼저, 긴 것 먼저
+    
+    keywords = sorted(set(keywords), key=sort_key)
+    return keywords
+
+
 def get_and_save_recipe_image(recipe_title: str, description: str = "") -> Optional[str]:
     """
     Firebase Storage에서 레시피 이미지를 찾아서 DB에 저장합니다.
+    비슷한 레시피 이름도 같은 이미지를 찾을 수 있도록 여러 키워드로 시도합니다.
     이미지가 없으면 생성하지 않고 None 반환.
     """
-    # Firebase Storage에서 이미지 검색
-    image_url = get_recipe_image_from_firebase(recipe_title)
+    # 레시피 제목에서 검색할 키워드 변형들 생성
+    search_keywords = extract_recipe_keywords(recipe_title)
     
-    if image_url:
-        # 이미지가 있으면 DB에 저장
-        try:
-            save_recipe_image_to_db(recipe_title, description, image_url)
-            print(f"📦 [image] 기존 이미지 URL을 DB에 저장: {recipe_title}")
-        except Exception as e:
-            print(f"⚠️ [image] DB 저장 실패 (이미지는 있음): {e}")
-        return image_url
-    else:
-        print(f"⚠️ [image] Firebase Storage에 이미지가 없음: {recipe_title} (생성하지 않음)")
-        return None
+    print(f"🔍 [image] 레시피 이미지 검색: '{recipe_title}' (키워드 변형 {len(search_keywords)}개)")
+    
+    # 각 키워드로 이미지 검색 시도
+    for keyword in search_keywords:
+        image_url = get_recipe_image_from_firebase(keyword)
+        if image_url:
+            # 이미지를 찾으면 DB에 저장 (원본 레시피 이름으로)
+            try:
+                save_recipe_image_to_db(recipe_title, description, image_url)
+                print(f"📦 [image] 이미지 찾음: '{keyword}' -> '{recipe_title}' (DB 저장 완료)")
+            except Exception as e:
+                print(f"⚠️ [image] DB 저장 실패 (이미지는 있음): {e}")
+            return image_url
+    
+    print(f"⚠️ [image] Firebase Storage에 이미지가 없음: {recipe_title} (모든 키워드 변형 시도 완료)")
+    return None
 
 
 if __name__ == "__main__":
