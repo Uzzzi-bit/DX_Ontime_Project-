@@ -125,6 +125,8 @@ class _ReportScreenState extends State<ReportScreen> {
   // 레시피 순환 관련 변수
   int _currentRecipeIndex = 0; // 현재 표시할 레시피 인덱스
   Timer? _recipeRotationTimer; // 레시피 순환 타이머
+  late final PageController _recipePageController; // AI 배너 페이징 컨트롤러
+  int _recipeVirtualPage = 0; // 무한 회전용 가상 페이지 인덱스
 
   // 신체 변화 관련 상태 변수
   List<Map<String, dynamic>> _bodyMeasurements = []; // 신체 변화 측정 기록 (주간/월간)
@@ -133,6 +135,7 @@ class _ReportScreenState extends State<ReportScreen> {
   @override
   void initState() {
     super.initState();
+    _recipePageController = PageController(viewportFraction: 0.9, initialPage: 0);
     // 명시적으로 초기화
     final now = DateTime.now();
     _selectedDate = now;
@@ -162,6 +165,7 @@ class _ReportScreenState extends State<ReportScreen> {
   @override
   void dispose() {
     _weekPageController.dispose();
+    _recipePageController.dispose();
     super.dispose();
   }
 
@@ -1010,7 +1014,7 @@ class _ReportScreenState extends State<ReportScreen> {
               _dateBannerMessages[dateStr] = bannerMessage;
             }
             RecipeScreen.setLatestAiRecipes(_aiRecipes);
-            
+
             // 레시피 순환 타이머 시작
             _startRecipeRotation();
           });
@@ -1026,58 +1030,54 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
-  /// 현재 표시할 레시피 메시지 가져오기
-  String _getCurrentRecipeMessage() {
-    if (_aiRecipes.isEmpty) {
-      return _bannerMessageFromAi ??
-          '$_userName님, 다음 식사는 $_lackingNutrient 보충을 위해 $_recommendedFood은(는) 어떤가요? 🥗';
+  /// 특정 인덱스의 레시피 메시지 가져오기
+  String _getRecipeMessageAt(int index) {
+    if (_aiRecipes.isEmpty || index < 0 || index >= _aiRecipes.length) {
+      return _bannerMessageFromAi ?? '$_userName님, 다음 식사는 $_lackingNutrient 보충을 위해 $_recommendedFood은(는) 어떤가요? 🥗';
     }
-    
-    // 현재 인덱스의 레시피 가져오기
-    final currentRecipe = _aiRecipes[_currentRecipeIndex];
+    final currentRecipe = _aiRecipes[index];
     final recipeTitle = currentRecipe.title;
-    
-    // 프롬프트 형식: "{{nickname}}님, {{부족한 영양소}} 보충을 위해 추천된 메뉴 중 '{{레시피 제목}}'은 어떠신가요?"
-    // tags는 건드리지 않고, 첫 번째 레시피의 tags를 사용하여 부족한 영양소 정보 추출
     String nutrientInfo = '';
     if (_aiRecipes.isNotEmpty && _aiRecipes[0].tags.isNotEmpty) {
-      // 첫 번째 레시피의 tags를 사용 (모든 레시피가 동일한 부족 영양소를 가지고 있음)
       nutrientInfo = _aiRecipes[0].tags.join(', ');
     } else {
-      // tags가 없으면 기본값 사용
       nutrientInfo = _lackingNutrient;
     }
-    
-    // 프롬프트 형식에 맞게 메시지 생성
-    final message = '$_userName님, $nutrientInfo 보충을 위해 추천된 메뉴 중 \'$recipeTitle\'은 어떠신가요?';
-    return message;
+    return '$_userName님, $nutrientInfo 보충을 위해 추천된 메뉴 중 \'$recipeTitle\'은 어떠신가요?';
   }
-  
+
   /// 레시피 순환 타이머 시작
   void _startRecipeRotation() {
     // 기존 타이머 취소
     _recipeRotationTimer?.cancel();
-    
+
     // 레시피가 없거나 1개 이하면 타이머 시작하지 않음
     if (_aiRecipes.isEmpty || _aiRecipes.length <= 1) {
       return;
     }
-    
-    // 현재 인덱스를 0으로 초기화
+
+    // 무한 페이징을 위해 큰 페이지로 점프
+    final base = _aiRecipes.length * 1000;
+    _recipeVirtualPage = base;
     _currentRecipeIndex = 0;
-    
-    // 5초마다 레시피 인덱스 변경
+    if (_recipePageController.hasClients) {
+      _recipePageController.jumpToPage(base);
+    }
+
+    // 5초마다 페이지 애니메이션
     _recipeRotationTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
       }
-      
-      // 다음 레시피로 이동 (순환)
-      setState(() {
-        _currentRecipeIndex = (_currentRecipeIndex + 1) % _aiRecipes.length;
-        debugPrint('🔄 [ReportScreen] 레시피 인덱스 변경: $_currentRecipeIndex');
-      });
+      if (_aiRecipes.length <= 1) return;
+      final nextPage = _recipeVirtualPage + 1;
+      _recipePageController.animateToPage(
+        nextPage,
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeInOut,
+      );
+      _recipeVirtualPage = nextPage;
     });
   }
 
@@ -1558,15 +1558,74 @@ class _ReportScreenState extends State<ReportScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      // TODO: [AI] AI가 생성한 추천 메시지는 AI 서버에서 가져오기
-                      Text(
-                        _getCurrentRecipeMessage(),
-                        style: const TextStyle(
-                          color: ColorPalette.text100,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                          height: 1.4,
-                        ),
+                      SizedBox(
+                        height: 72,
+                        child: _aiRecipes.isEmpty
+                            ? Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  _getRecipeMessageAt(0),
+                                  maxLines: 3,
+                                  overflow: TextOverflow.visible,
+                                  style: const TextStyle(
+                                    color: ColorPalette.text100,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              )
+                            : PageView.builder(
+                                controller: _recipePageController,
+                                itemCount: _aiRecipes.isEmpty ? 0 : _aiRecipes.length * 10000,
+                                onPageChanged: (idx) {
+                                  if (_aiRecipes.isEmpty) return;
+                                  final realIdx = idx % _aiRecipes.length;
+                                  setState(() {
+                                    _recipeVirtualPage = idx;
+                                    _currentRecipeIndex = realIdx;
+                                  });
+                                },
+                                itemBuilder: (context, index) {
+                                  if (_aiRecipes.isEmpty) return const SizedBox.shrink();
+                                  final realIdx = index % _aiRecipes.length;
+                                  final message = _getRecipeMessageAt(realIdx);
+                                  final page =
+                                      _recipePageController.hasClients && _recipePageController.position.haveDimensions
+                                      ? _recipePageController.page ?? _recipeVirtualPage.toDouble()
+                                      : _recipeVirtualPage.toDouble();
+                                  final delta = (page - index);
+                                  final rotation = delta * 0.35; // 좌우 틸트
+                                  final scale = (1 - (delta.abs() * 0.08)).clamp(0.85, 1.0);
+                                  final opacity = (1 - delta.abs() * 0.3).clamp(0.6, 1.0);
+                                  return Transform(
+                                    alignment: Alignment.center,
+                                    transform: Matrix4.identity()
+                                      ..setEntry(3, 2, 0.001)
+                                      ..rotateY(rotation),
+                                    child: Opacity(
+                                      opacity: opacity,
+                                      child: Transform.scale(
+                                        scale: scale,
+                                        child: Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            message,
+                                            maxLines: 3,
+                                            overflow: TextOverflow.visible,
+                                            style: const TextStyle(
+                                              color: ColorPalette.text100,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w400,
+                                              height: 1.4,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                       ),
                     ],
                   ),
@@ -2019,7 +2078,7 @@ class _ReportScreenState extends State<ReportScreen> {
         if (_todayBodyMeasurements.isNotEmpty)
           ..._todayBodyMeasurements.map(
             (measurement) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.only(bottom: 16),
               child: _buildBodyMeasurementCard(measurement),
             ),
           )
@@ -2070,12 +2129,36 @@ class _ReportScreenState extends State<ReportScreen> {
     // 시간대가 없으면 메모 전체 표시, 있으면 시간대만 표시
     final displayTitle = mealTime.isNotEmpty ? mealTime : (memo.isNotEmpty ? memo : '신체 변화');
 
+    // 시간대별 배경색 구분
+    Color cardColor;
+    Color borderColor;
+    if (mealTime == '아침') {
+      cardColor = const Color(0xFFE3F2FD).withOpacity(0.8); // 연한 파란색
+      borderColor = const Color(0xFF2196F3);
+    } else if (mealTime == '점심') {
+      cardColor = const Color(0xFFF1F8E9).withOpacity(0.8); // 연한 초록색
+      borderColor = const Color(0xFF8BC34A);
+    } else if (mealTime == '저녁') {
+      cardColor = const Color(0xFFFFF3E0).withOpacity(0.8); // 연한 주황색
+      borderColor = const Color(0xFFFF9800);
+    } else {
+      cardColor = ColorPalette.primary100.withOpacity(0.1);
+      borderColor = ColorPalette.primary100;
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: ColorPalette.primary100.withOpacity(0.1),
+        color: cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ColorPalette.primary100),
+        border: Border.all(color: borderColor, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2083,12 +2166,19 @@ class _ReportScreenState extends State<ReportScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                displayTitle,
-                style: const TextStyle(
-                  color: ColorPalette.text100,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: borderColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  displayTitle,
+                  style: TextStyle(
+                    color: borderColor,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               IconButton(
@@ -2164,77 +2254,116 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  /// 신체 변화 차트 (주간 추이)
+  /// 신체 변화 차트 (당일과 전일만 표시)
   Widget _buildBodyMeasurementChart() {
-    // 현재 주의 월요일 계산 (X축 기준점) - 시간을 00:00:00으로 정규화
+    // 선택된 날짜와 전일만 표시
     final selectedDate = _selectedDate;
-    final weekday = selectedDate.weekday;
-    final monday = DateTime(
+    final previousDate = DateTime(
       selectedDate.year,
       selectedDate.month,
       selectedDate.day,
-    ).subtract(Duration(days: weekday - 1));
+    ).subtract(const Duration(days: 1));
 
-    // 날짜만 비교하는 헬퍼 함수
-    int getDaysFromMonday(DateTime date) {
+    // X축 포인트: 전일/당일의 아침·점심·저녁 6개
+    // 0: 전일 아침, 1: 전일 점심, 2: 전일 저녁, 3: 당일 아침, 4: 당일 점심, 5: 당일 저녁
+    double? getX(DateTime date, String mealTime) {
       final dateOnly = DateTime(date.year, date.month, date.day);
-      final mondayOnly = DateTime(monday.year, monday.month, monday.day);
-      return dateOnly.difference(mondayOnly).inDays;
+      final selectedDateOnly = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+      final previousDateOnly = DateTime(previousDate.year, previousDate.month, previousDate.day);
+      final offset = switch (mealTime) {
+        '아침' => 0.0,
+        '점심' => 1.0,
+        '저녁' => 2.0,
+        _ => null,
+      };
+      if (offset == null) return null;
+      if (dateOnly.isAtSameMomentAs(previousDateOnly)) return 0.0 + offset;
+      if (dateOnly.isAtSameMomentAs(selectedDateOnly)) return 3.0 + offset;
+      return null;
     }
 
-    // 체중 데이터 추출 (X축: 월요일부터의 일수, 0=월요일, 6=일요일)
-    final weightData = _bodyMeasurements.where((m) => m['weight_kg'] != null).map((m) {
-      final date = DateTime.parse(m['measurement_date'] as String);
-      final weight = (m['weight_kg'] as num).toDouble();
-      final daysFromMonday = getDaysFromMonday(date);
-      return FlSpot(daysFromMonday.toDouble(), weight);
-    }).toList();
+    // 메모에서 시간대 추출하는 헬퍼 함수
+    String getMealTime(String? memo) {
+      if (memo == null) return '기타';
+      if (memo.contains('아침')) return '아침';
+      if (memo.contains('점심')) return '점심';
+      if (memo.contains('저녁')) return '저녁';
+      return '기타';
+    }
 
-    // 공복혈당 데이터 추출
-    final fastingData = _bodyMeasurements.where((m) => m['blood_sugar_fasting'] != null).map((m) {
-      final date = DateTime.parse(m['measurement_date'] as String);
-      final sugar = (m['blood_sugar_fasting'] as int).toDouble();
-      final daysFromMonday = getDaysFromMonday(date);
-      return FlSpot(daysFromMonday.toDouble(), sugar);
-    }).toList();
+    // 전일/당일의 아침·점심·저녁 전체를 하나의 시리즈로 추출 (체중/공복/식후 공용)
+    List<FlSpot> extractMetricSpots(
+      List<Map<String, dynamic>> measurements,
+      String dataKey,
+    ) {
+      final filtered = measurements.where((m) {
+        if (m[dataKey] == null) return false;
+        final memo = m['memo'] as String?;
+        final mealTime = getMealTime(memo);
+        if (mealTime == '기타') return false;
+        final date = DateTime.parse(m['measurement_date'] as String);
+        final dateOnly = DateTime(date.year, date.month, date.day);
+        final selectedDateOnly = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+        final previousDateOnly = DateTime(previousDate.year, previousDate.month, previousDate.day);
+        return dateOnly.isAtSameMomentAs(selectedDateOnly) || dateOnly.isAtSameMomentAs(previousDateOnly);
+      });
 
-    // 식후혈당 데이터 추출
-    final postprandialData = _bodyMeasurements.where((m) => m['blood_sugar_postprandial'] != null).map((m) {
-      final date = DateTime.parse(m['measurement_date'] as String);
-      final sugar = (m['blood_sugar_postprandial'] as int).toDouble();
-      final daysFromMonday = getDaysFromMonday(date);
-      return FlSpot(daysFromMonday.toDouble(), sugar);
-    }).toList();
+      final Map<double, double> xToValue = {};
+      for (final m in filtered) {
+        final memo = m['memo'] as String?;
+        final mealTime = getMealTime(memo);
+        final date = DateTime.parse(m['measurement_date'] as String);
+        final x = getX(date, mealTime);
+        if (x == null) continue;
+        if (!xToValue.containsKey(x)) {
+          xToValue[x] = (m[dataKey] as num).toDouble();
+        }
+      }
+
+      final spots = <FlSpot>[];
+      for (final key in xToValue.keys.toList()..sort()) {
+        spots.add(FlSpot(key, xToValue[key]!));
+      }
+      return spots;
+    }
+
+    // 체중/공복/식후 데이터를 하나의 시리즈로 추출
+    final weightDataAll = extractMetricSpots(_bodyMeasurements, 'weight_kg');
+    final fastingDataAll = extractMetricSpots(_bodyMeasurements, 'blood_sugar_fasting');
+    final postprandialDataAll = extractMetricSpots(_bodyMeasurements, 'blood_sugar_postprandial');
+
+    // 모든 데이터를 합쳐서 Y축 범위 계산
+    final allWeightData = weightDataAll;
+    final allFastingData = fastingDataAll;
+    final allPostprandialData = postprandialDataAll;
 
     // 데이터가 없으면 그래프 숨김
-    if (weightData.isEmpty && fastingData.isEmpty && postprandialData.isEmpty) {
+    if (allWeightData.isEmpty && allFastingData.isEmpty && allPostprandialData.isEmpty) {
       return const SizedBox.shrink();
     }
-
-    // 데이터가 1개만 있어도 그래프 표시 (단일 점으로 표시됨)
 
     // Y축 최소/최대값 계산
     double minY = 0;
     double maxY = 100;
-    if (weightData.isNotEmpty) {
-      final weights = weightData.map((spot) => spot.y).toList();
+    if (allWeightData.isNotEmpty) {
+      final weights = allWeightData.map((spot) => spot.y).toList();
       final weightMin = weights.reduce((a, b) => a < b ? a : b);
       final weightMax = weights.reduce((a, b) => a > b ? a : b);
       minY = (weightMin - 5).clamp(0, double.infinity);
       maxY = (weightMax + 5);
     }
-    if (fastingData.isNotEmpty || postprandialData.isNotEmpty) {
+    if (allFastingData.isNotEmpty || allPostprandialData.isNotEmpty) {
       final allSugars = <double>[];
-      if (fastingData.isNotEmpty) {
-        allSugars.addAll(fastingData.map((spot) => spot.y));
+      if (allFastingData.isNotEmpty) {
+        allSugars.addAll(allFastingData.map((spot) => spot.y));
       }
-      if (postprandialData.isNotEmpty) {
-        allSugars.addAll(postprandialData.map((spot) => spot.y));
+      if (allPostprandialData.isNotEmpty) {
+        allSugars.addAll(allPostprandialData.map((spot) => spot.y));
       }
       if (allSugars.isNotEmpty) {
         final sugarMin = allSugars.reduce((a, b) => a < b ? a : b);
         final sugarMax = allSugars.reduce((a, b) => a > b ? a : b);
-        if (weightData.isEmpty) {
+        if (allWeightData.isEmpty) {
           minY = (sugarMin - 20).clamp(0, double.infinity);
           maxY = (sugarMax + 20);
         } else {
@@ -2260,7 +2389,7 @@ class _ReportScreenState extends State<ReportScreen> {
           child: LineChart(
             LineChartData(
               minX: 0,
-              maxX: 6, // 월요일(0) ~ 일요일(6)
+              maxX: 5, // 전일 아침/점심/저녁, 당일 아침/점심/저녁
               minY: minY,
               maxY: maxY,
               gridData: FlGridData(
@@ -2286,27 +2415,40 @@ class _ReportScreenState extends State<ReportScreen> {
                   sideTitles: SideTitles(
                     showTitles: true,
                     getTitlesWidget: (value, meta) {
-                      final dayIndex = value.toInt();
-                      if (dayIndex >= 0 && dayIndex < 7) {
-                        // 월요일 기준으로 정확한 날짜 계산 (시간 제거)
-                        final mondayOnly = DateTime(monday.year, monday.month, monday.day);
-                        final date = mondayOnly.add(Duration(days: dayIndex));
-                        final dayOfWeek = ['월', '화', '수', '목', '금', '토', '일'][dayIndex];
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            '${date.month}/${date.day}\n$dayOfWeek',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: ColorPalette.text200,
-                              fontSize: 9,
-                            ),
-                          ),
-                        );
+                      final v = value.toInt();
+                      DateTime? date;
+                      String meal = '';
+                      if (v >= 0 && v <= 2) {
+                        date = previousDate;
+                        meal = v == 0
+                            ? '아침'
+                            : v == 1
+                            ? '점심'
+                            : '저녁';
+                      } else if (v >= 3 && v <= 5) {
+                        date = selectedDate;
+                        meal = v == 3
+                            ? '아침'
+                            : v == 4
+                            ? '점심'
+                            : '저녁';
                       }
-                      return const Text('');
+                      if (date == null) return const Text('');
+                      final dayOfWeek = ['월', '화', '수', '목', '금', '토', '일'][date.weekday - 1];
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          '${date.month}/${date.day}($dayOfWeek)\n$meal',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: ColorPalette.text100,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
                     },
-                    reservedSize: 40,
+                    reservedSize: 54,
                   ),
                 ),
                 leftTitles: AxisTitles(
@@ -2330,57 +2472,63 @@ class _ReportScreenState extends State<ReportScreen> {
                 border: Border.all(color: ColorPalette.bg300),
               ),
               lineBarsData: [
-                if (weightData.isNotEmpty)
+                // 체중: 전일·당일 아침/점심/저녁을 하나로 연결
+                if (weightDataAll.isNotEmpty)
                   LineChartBarData(
-                    spots: weightData,
-                    isCurved: true,
-                    color: ColorPalette.primary200,
+                    spots: weightDataAll,
+                    isCurved: false,
+                    color: const Color(0xFF2196F3),
                     barWidth: 3,
+                    preventCurveOverShooting: true,
                     dotData: FlDotData(
                       show: true,
                       getDotPainter: (spot, percent, barData, index) {
                         return FlDotCirclePainter(
-                          radius: 4,
-                          color: ColorPalette.primary200,
-                          strokeWidth: 2,
+                          radius: 6,
+                          color: const Color(0xFF2196F3),
+                          strokeWidth: 3,
                           strokeColor: Colors.white,
                         );
                       },
                     ),
                     belowBarData: BarAreaData(show: false),
                   ),
-                if (fastingData.isNotEmpty)
+                // 공복혈당
+                if (fastingDataAll.isNotEmpty)
                   LineChartBarData(
-                    spots: fastingData,
-                    isCurved: true,
+                    spots: fastingDataAll,
+                    isCurved: false,
                     color: Colors.orange,
                     barWidth: 3,
+                    preventCurveOverShooting: true,
                     dotData: FlDotData(
                       show: true,
                       getDotPainter: (spot, percent, barData, index) {
                         return FlDotCirclePainter(
-                          radius: 4,
+                          radius: 6,
                           color: Colors.orange,
-                          strokeWidth: 2,
+                          strokeWidth: 3,
                           strokeColor: Colors.white,
                         );
                       },
                     ),
                     belowBarData: BarAreaData(show: false),
                   ),
-                if (postprandialData.isNotEmpty)
+                // 식후혈당
+                if (postprandialDataAll.isNotEmpty)
                   LineChartBarData(
-                    spots: postprandialData,
-                    isCurved: true,
-                    color: Colors.red,
+                    spots: postprandialDataAll,
+                    isCurved: false,
+                    color: const Color(0xFFD32F2F),
                     barWidth: 3,
+                    preventCurveOverShooting: true,
                     dotData: FlDotData(
                       show: true,
                       getDotPainter: (spot, percent, barData, index) {
                         return FlDotCirclePainter(
-                          radius: 4,
-                          color: Colors.red,
-                          strokeWidth: 2,
+                          radius: 6,
+                          color: const Color(0xFFD32F2F),
+                          strokeWidth: 3,
                           strokeColor: Colors.white,
                         );
                       },
@@ -2391,27 +2539,20 @@ class _ReportScreenState extends State<ReportScreen> {
             ),
           ),
         ),
-        // 범례 추가
+        // 범례 추가 (지표별)
         const SizedBox(height: 12),
         Wrap(
-          spacing: 16,
+          spacing: 12,
           runSpacing: 8,
           alignment: WrapAlignment.center,
           children: [
-            if (weightData.isNotEmpty)
+            if (allWeightData.isNotEmpty)
               Row(
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: ColorPalette.primary200,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Text(
+                children: const [
+                  _LegendDot(color: Color(0xFF2196F3)),
+                  SizedBox(width: 4),
+                  Text(
                     '체중',
                     style: TextStyle(
                       color: ColorPalette.text200,
@@ -2420,20 +2561,13 @@ class _ReportScreenState extends State<ReportScreen> {
                   ),
                 ],
               ),
-            if (fastingData.isNotEmpty)
+            if (allFastingData.isNotEmpty)
               Row(
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: const BoxDecoration(
-                      color: Colors.orange,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Text(
+                children: const [
+                  _LegendDot(color: Colors.orange),
+                  SizedBox(width: 4),
+                  Text(
                     '공복혈당',
                     style: TextStyle(
                       color: ColorPalette.text200,
@@ -2442,20 +2576,13 @@ class _ReportScreenState extends State<ReportScreen> {
                   ),
                 ],
               ),
-            if (postprandialData.isNotEmpty)
+            if (allPostprandialData.isNotEmpty)
               Row(
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Text(
+                children: const [
+                  _LegendDot(color: Color(0xFFD32F2F)),
+                  SizedBox(width: 4),
+                  Text(
                     '식후혈당',
                     style: TextStyle(
                       color: ColorPalette.text200,
@@ -2735,6 +2862,24 @@ class _ReportScreenState extends State<ReportScreen> {
         );
       }
     }
+  }
+}
+
+/// 범례 점 위젯
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  const _LegendDot({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 10,
+      height: 10,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
+    );
   }
 }
 
