@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 import '../theme/color_palette.dart';
 import '../service/storage_service.dart';
 import '../repository/image_repository.dart';
@@ -73,11 +74,36 @@ class _ChatScreenState extends State<ChatScreen> {
     _initializeChat();
   }
 
+  bool _isInitialized = false; // 초기화 완료 플래그
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 화면이 다시 나타날 때 날짜가 바뀌었는지 확인
-    _checkDateChange();
+    
+    // 초기화가 완료된 후에만 실행 (중복 로드 방지)
+    if (!_isInitialized) {
+      return;
+    }
+    
+    // 화면이 다시 나타날 때 메시지가 비어있으면 재로드
+    if (_currentSessionId != null && _messages.isEmpty) {
+      debugPrint('🔄 [ChatScreen] 화면 재진입 - 메시지가 비어있어서 재로드');
+      _loadMessages(_currentSessionId!);
+    } else if (_currentSessionId != null && _messages.isNotEmpty) {
+      // 세션이 있고 메시지가 있으면 날짜만 확인하고 필요시 재로드
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      if (_lastLoadedDate != null) {
+        final dateChanged =
+            _lastLoadedDate!.year != today.year ||
+            _lastLoadedDate!.month != today.month ||
+            _lastLoadedDate!.day != today.day;
+        if (dateChanged) {
+          debugPrint('📅 [ChatScreen] 날짜가 바뀜 (didChangeDependencies): ${_lastLoadedDate} -> $today, 메시지 재로드');
+          _loadMessages(_currentSessionId!);
+        }
+      }
+    }
   }
 
   /// 날짜가 바뀌었는지 확인하고 메시지 초기화
@@ -93,12 +119,16 @@ class _ChatScreenState extends State<ChatScreen> {
           _lastLoadedDate!.day != today.day;
 
       if (dateChanged) {
-        debugPrint('📅 [ChatScreen] 날짜가 바뀜 (didChangeDependencies): ${_lastLoadedDate} -> $today, 메시지 초기화');
+        debugPrint('📅 [ChatScreen] 날짜가 바뀜 (didChangeDependencies): ${_lastLoadedDate} -> $today, 메시지 초기화 후 재로드');
         if (mounted) {
           setState(() {
-            _messages.clear(); // 메시지 초기화 (빈 화면)
+            _messages.clear(); // 메시지 초기화 (이전 날짜 메시지 제거)
             _lastLoadedDate = today;
           });
+          // 날짜가 바뀌었으면 오늘 날짜의 메시지 재로드
+          if (_currentSessionId != null) {
+            _loadMessages(_currentSessionId!);
+          }
         }
       }
     } else {
@@ -122,12 +152,9 @@ class _ChatScreenState extends State<ChatScreen> {
       // 사용자 건강 정보 로드 (채팅 API 호출용)
       await _loadUserHealthInfo();
 
-      // 홈 화면에서 이미 처리된 경우 (initialAiResponse가 있으면) 이전 채팅 로드 건너뛰기
-      // 중복 메시지 방지
-      if (widget.initialAiResponse == null) {
-        // 이전 세션 로드 (활성 세션이 있으면 사용, 없으면 가장 최근 종료된 세션 사용)
-        await _loadPreviousChat();
-      }
+      // 이전 세션 로드 (활성 세션이 있으면 사용, 없으면 가장 최근 종료된 세션 사용)
+      // 홈 화면에서 넘어온 경우에도 이전 채팅을 먼저 로드
+      await _loadPreviousChat();
 
       // 세션이 없으면 새로 생성
       if (_currentSessionId == null) {
@@ -135,22 +162,39 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       // 홈 화면에서 전달받은 초기 메시지 추가
+      // 이전 채팅을 먼저 로드했으므로, 홈에서 넘어온 메시지는 기존 메시지와 중복되지 않도록 확인 후 추가
       if (widget.initialText != null || widget.initialImagePath != null) {
-        final initialMessage = ChatMessage(
-          isUser: true,
-          text: widget.initialText ?? '',
-          imagePath: widget.initialImagePath,
+        // 이미 로드된 메시지와 중복 체크 (같은 텍스트와 이미지가 있는지 확인)
+        final isDuplicate = _messages.any((msg) => 
+          msg.isUser && 
+          msg.text == (widget.initialText ?? '') && 
+          msg.imagePath == widget.initialImagePath
         );
+        
+        if (!isDuplicate) {
+          final initialMessage = ChatMessage(
+            isUser: true,
+            text: widget.initialText ?? '',
+            imagePath: widget.initialImagePath,
+          );
 
-        if (mounted) {
-          setState(() {
-            _messages.add(initialMessage);
-          });
+          if (mounted) {
+            setState(() {
+              _messages.add(initialMessage);
+            });
+          }
         }
 
         // 홈 화면에서 이미 처리된 경우 (AI 응답이 이미 있음)
         if (widget.initialAiResponse != null) {
-          debugPrint('✅ [ChatScreen] 홈 화면에서 이미 처리된 메시지 - 사용자 메시지와 AI 응답 표시');
+          // AI 응답도 중복 체크
+          final isAiDuplicate = _messages.any((msg) => 
+            !msg.isUser && 
+            msg.text == widget.initialAiResponse
+          );
+          
+          if (!isAiDuplicate) {
+            debugPrint('✅ [ChatScreen] 홈 화면에서 이미 처리된 메시지 - 사용자 메시지와 AI 응답 표시');
 
           // 이미지 URL이 로컬 경로면 업로드된 URL로 업데이트 (이미 홈에서 업로드됨)
           if (widget.initialImagePath != null && !widget.initialImagePath!.startsWith('http')) {
@@ -173,16 +217,19 @@ class _ChatScreenState extends State<ChatScreen> {
             }
           }
 
-          // AI 응답 메시지 추가
-          if (mounted) {
-            setState(() {
-              _messages.add(
-                ChatMessage(
-                  isUser: false,
-                  text: widget.initialAiResponse!,
-                ),
-              );
-            });
+            // AI 응답 메시지 추가
+            if (mounted) {
+              setState(() {
+                _messages.add(
+                  ChatMessage(
+                    isUser: false,
+                    text: widget.initialAiResponse!,
+                  ),
+                );
+              });
+            }
+          } else {
+            debugPrint('ℹ️ [ChatScreen] AI 응답이 이미 메시지 목록에 있어서 추가하지 않음');
           }
         } else {
           // 홈 화면에서 처리되지 않은 경우 (기존 로직)
@@ -262,6 +309,9 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         );
       }
+    } finally {
+      // 초기화 완료 플래그 설정
+      _isInitialized = true;
     }
   }
 
@@ -348,17 +398,16 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       if (dateChanged) {
-        debugPrint('📅 [ChatScreen] 날짜가 바뀜: ${_lastLoadedDate} -> $today, 메시지 초기화');
+        debugPrint('📅 [ChatScreen] 날짜가 바뀜: ${_lastLoadedDate} -> $today, 메시지 초기화 후 오늘 메시지 로드');
         if (mounted) {
           setState(() {
-            _messages.clear(); // 메시지 초기화 (빈 화면)
+            _messages.clear(); // 메시지 초기화 (이전 날짜 메시지 제거)
           });
         }
-        _lastLoadedDate = today;
-        return; // 빈 화면으로 시작
+        // 날짜가 바뀌었어도 오늘 날짜의 메시지는 로드해야 함 (return 하지 않음)
       }
 
-      // 날짜가 같으면 오늘 날짜의 메시지 로드
+      // 오늘 날짜의 메시지 로드 (날짜가 바뀌었든 안 바뀌었든)
       _lastLoadedDate = today;
 
       final messages = await AiChatApiService.instance.getMessages(sessionId);
@@ -369,9 +418,46 @@ class _ChatScreenState extends State<ChatScreen> {
       final todayEnd = todayStart.add(const Duration(days: 1));
 
       final todayMessages = messages.where((msg) {
-        final createdAt = DateTime.parse(msg['created_at'] as String);
-        // 오늘 날짜인지 확인 (시간 포함 비교)
-        return createdAt.isAfter(todayStart) && createdAt.isBefore(todayEnd);
+        final timeStr = msg['created_at'] as String;
+        DateTime createdAt;
+        try {
+          // DB에서 오는 시간은 항상 UTC로 저장되어 있다고 가정
+          DateTime parsed;
+          
+          // +00:00 형식을 Z로 변환하여 UTC로 명시적으로 파싱
+          String utcTimeStr = timeStr;
+          if (timeStr.contains('+00:00')) {
+            utcTimeStr = timeStr.replaceAll('+00:00', 'Z');
+          } else if (timeStr.contains('-00:00')) {
+            utcTimeStr = timeStr.replaceAll('-00:00', 'Z');
+          } else if (!timeStr.endsWith('Z') && !timeStr.contains('+') && !timeStr.contains('-', timeStr.length - 6)) {
+            // 시간대 정보가 없으면 Z를 추가
+            utcTimeStr = '${timeStr}Z';
+          }
+          
+          // UTC로 파싱
+          parsed = DateTime.parse(utcTimeStr);
+          
+          // UTC 시간을 로컬 시간으로 변환 (한국 시간대 UTC+9)
+          // toLocal()이 제대로 작동하지 않을 수 있으므로 UTC면 직접 9시간 추가
+          if (parsed.isUtc) {
+            // UTC 시간에 9시간 추가 (한국 시간대)
+            createdAt = parsed.add(const Duration(hours: 9));
+            debugPrint('🕐 [ChatScreen] UTC 시간에 +9시간 추가: UTC=$parsed -> 로컬=$createdAt');
+          } else {
+            // 이미 로컬 시간이면 그대로 사용 (이전 기록이 이미 로컬 시간으로 저장된 경우)
+            createdAt = parsed;
+            debugPrint('🕐 [ChatScreen] 이미 로컬 시간으로 저장된 기록: $createdAt');
+          }
+          
+          debugPrint('🕐 [ChatScreen] 메시지 시간 변환: 원본=$timeStr -> 변환된 문자열=$utcTimeStr -> UTC=$parsed (isUtc=${parsed.isUtc}) -> 로컬=$createdAt');
+        } catch (e) {
+          debugPrint('⚠️ [ChatScreen] 시간 파싱 실패: $timeStr, 오류: $e');
+          createdAt = DateTime.now();
+        }
+        
+        // 오늘 날짜인지 확인 (경계값 포함: >= todayStart && < todayEnd)
+        return (createdAt.isAfter(todayStart) || createdAt.isAtSameMomentAs(todayStart)) && createdAt.isBefore(todayEnd);
       }).toList();
 
       debugPrint('🔄 [ChatScreen] 오늘 날짜 메시지 ${todayMessages.length}개 필터링됨 (당일 전체 표시)');
@@ -442,12 +528,49 @@ class _ChatScreenState extends State<ChatScreen> {
             // content가 '이미지'이거나 빈 문자열이고 이미지가 있으면 텍스트는 표시하지 않음
             final finalText = (imagePath != null && (content == '이미지' || content.isEmpty)) ? '' : content;
 
+            final timeStr = msg['created_at'] as String;
+            DateTime messageTime;
+            
+            // DB에서 오는 시간은 항상 UTC로 저장되어 있다고 가정
+            try {
+              // +00:00 형식을 Z로 변환하여 UTC로 명시적으로 파싱
+              String utcTimeStr = timeStr;
+              if (timeStr.contains('+00:00')) {
+                utcTimeStr = timeStr.replaceAll('+00:00', 'Z');
+              } else if (timeStr.contains('-00:00')) {
+                utcTimeStr = timeStr.replaceAll('-00:00', 'Z');
+              } else if (!timeStr.endsWith('Z') && !timeStr.contains('+') && !(timeStr.contains('-') && timeStr.length > 19)) {
+                // 시간대 정보가 없으면 Z를 추가
+                utcTimeStr = '${timeStr}Z';
+              }
+              
+              // UTC로 파싱
+              final parsed = DateTime.parse(utcTimeStr);
+              
+              // UTC 시간을 로컬 시간으로 변환 (한국 시간대 UTC+9)
+              // toLocal()이 제대로 작동하지 않을 수 있으므로 UTC면 직접 9시간 추가
+              if (parsed.isUtc) {
+                // UTC 시간에 9시간 추가 (한국 시간대)
+                messageTime = parsed.add(const Duration(hours: 9));
+                debugPrint('🕐 [ChatScreen] UTC 시간에 +9시간 추가: UTC=$parsed -> 로컬=$messageTime');
+              } else {
+                // 이미 로컬 시간이면 그대로 사용 (이전 기록이 이미 로컬 시간으로 저장된 경우)
+                messageTime = parsed;
+                debugPrint('🕐 [ChatScreen] 이미 로컬 시간으로 저장된 기록: $messageTime');
+              }
+              
+              debugPrint('🕐 [ChatScreen] 메시지 시간 변환: 원본=$timeStr -> 변환된 문자열=$utcTimeStr -> UTC=$parsed (isUtc=${parsed.isUtc}) -> 로컬=$messageTime');
+            } catch (e) {
+              debugPrint('⚠️ [ChatScreen] 시간 파싱 실패: $timeStr, 오류: $e');
+              messageTime = DateTime.now();
+            }
+            
             _messages.add(
               ChatMessage(
                 isUser: msg['type'] == 'user',
                 text: finalText,
                 imagePath: imagePath,
-                timestamp: DateTime.parse(msg['created_at'] as String),
+                timestamp: messageTime,
               ),
             );
 
@@ -647,6 +770,11 @@ class _ChatScreenState extends State<ChatScreen> {
         type: 'ai',
         content: result.message,
       );
+      
+      // DB에 저장된 메시지를 다시 로드하여 시간이 올바르게 표시되도록 함
+      if (_currentSessionId != null) {
+        await _loadMessages(_currentSessionId!);
+      }
     } catch (e) {
       debugPrint('❌ [ChatScreen] AI 응답 실패: $e');
       if (!mounted) return;
@@ -854,6 +982,11 @@ class _ChatScreenState extends State<ChatScreen> {
         type: 'user',
         content: messageText,
       );
+    }
+    
+    // DB에 저장된 메시지를 다시 로드하여 시간이 올바르게 표시되도록 함
+    if (_currentSessionId != null) {
+      await _loadMessages(_currentSessionId!);
     }
 
     // AI에게 전송 (텍스트와 이미지 함께)
@@ -1077,11 +1210,12 @@ class _ChatScreenState extends State<ChatScreen> {
     if (message.isUser) {
       return _buildUserMessage(message);
     } else {
-      return _buildAIMessage(message.text);
+      return _buildAIMessage(message.text, timestamp: message.timestamp);
     }
   }
 
   Widget _buildUserMessage(ChatMessage message) {
+    final timeText = DateFormat('HH:mm').format(message.timestamp);
     return Align(
       alignment: Alignment.centerRight,
       child: Padding(
@@ -1119,6 +1253,18 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
               ),
+            // 시간 표시
+            Padding(
+              padding: const EdgeInsets.only(top: 4, right: 4),
+              child: Text(
+                timeText,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: ColorPalette.text300,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -1176,59 +1322,78 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Widget _buildAIMessage(String text, {bool isLoading = false}) {
+  Widget _buildAIMessage(String text, {bool isLoading = false, DateTime? timestamp}) {
+    final timeText = timestamp != null ? DateFormat('HH:mm').format(timestamp) : '';
     return Align(
       alignment: Alignment.centerLeft,
       child: Padding(
         padding: const EdgeInsets.only(bottom: 16),
-        child: Row(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 33,
-              height: 33,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0xFFBCE7F0),
-              ),
-              child: const Icon(
-                Icons.smart_toy,
-                color: Color(0xFF0F0F0F),
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Flexible(
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 280),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14), // 내부 여백 증가
-                decoration: BoxDecoration(
-                  color: Colors.white, // 흰색 배경을 바깥 컨테이너에 적용 (UI 버그 수정)
-                  borderRadius: const BorderRadius.only(
-                    topRight: Radius.circular(25),
-                    bottomLeft: Radius.circular(25),
-                    bottomRight: Radius.circular(25),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 33,
+                  height: 33,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0xFFBCE7F0),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
+                  child: const Icon(
+                    Icons.smart_toy,
+                    color: Color(0xFF0F0F0F),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 280),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14), // 내부 여백 증가
+                    decoration: BoxDecoration(
+                      color: Colors.white, // 흰색 배경을 바깥 컨테이너에 적용 (UI 버그 수정)
+                      borderRadius: const BorderRadius.only(
+                        topRight: Radius.circular(25),
+                        bottomLeft: Radius.circular(25),
+                        bottomRight: Radius.circular(25),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                  ],
+                    child: Text(
+                      text,
+                      style: TextStyle(
+                        fontSize: 15, // 폰트 사이즈 살짝 키움 (가독성)
+                        fontWeight: FontWeight.w400, // 굵기 살짝 조정
+                        color: isLoading ? ColorPalette.text300 : ColorPalette.text100,
+                        letterSpacing: 0.5,
+                        height: 1.4, // 줄간격 조정
+                      ),
+                    ),
+                  ),
                 ),
+              ],
+            ),
+            // 시간 표시
+            if (timeText.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, left: 45),
                 child: Text(
-                  text,
-                  style: TextStyle(
-                    fontSize: 15, // 폰트 사이즈 살짝 키움 (가독성)
-                    fontWeight: FontWeight.w400, // 굵기 살짝 조정
-                    color: isLoading ? ColorPalette.text300 : ColorPalette.text100,
-                    letterSpacing: 0.5,
-                    height: 1.4, // 줄간격 조정
+                  timeText,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: ColorPalette.text300,
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
               ),
-            ),
           ],
         ),
       ),
