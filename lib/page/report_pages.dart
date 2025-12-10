@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bounceable/flutter_bounceable.dart';
 import 'package:intl/intl.dart';
@@ -121,6 +122,9 @@ class _ReportScreenState extends State<ReportScreen> {
   // 날짜별 레시피 및 배너 메시지 저장 (날짜를 키로 사용)
   final Map<String, String> _dateBannerMessages = {};
   final Map<String, List<RecipeData>> _dateAiRecipes = {};
+  // 레시피 순환 관련 변수
+  int _currentRecipeIndex = 0; // 현재 표시할 레시피 인덱스
+  Timer? _recipeRotationTimer; // 레시피 순환 타이머
 
   // 신체 변화 관련 상태 변수
   List<Map<String, dynamic>> _bodyMeasurements = []; // 신체 변화 측정 기록 (주간/월간)
@@ -943,6 +947,9 @@ class _ReportScreenState extends State<ReportScreen> {
           RecipeScreen.setLatestAiRecipes(_aiRecipes);
           debugPrint('✅ [ReportScreen] AI 레시피 ${_aiRecipes.length}개 수신 완료 및 날짜별 맵에 저장: $dateStr');
 
+          // 레시피 순환 타이머 시작
+          _startRecipeRotation();
+
           // DB에 레시피 저장 (비동기로 실행, 실패해도 화면은 업데이트)
           _saveRecommendationsToDb(user.uid, dateStr, aiResp.bannerMessage, _aiRecipes);
         } else {
@@ -1003,6 +1010,9 @@ class _ReportScreenState extends State<ReportScreen> {
               _dateBannerMessages[dateStr] = bannerMessage;
             }
             RecipeScreen.setLatestAiRecipes(_aiRecipes);
+            
+            // 레시피 순환 타이머 시작
+            _startRecipeRotation();
           });
           debugPrint('✅ [ReportScreen] DB에서 레시피 로드 완료: $dateStr, 레시피 ${recipes.length}개 (날짜별 맵에 저장)');
         }
@@ -1014,6 +1024,61 @@ class _ReportScreenState extends State<ReportScreen> {
       debugPrint('⚠️ [ReportScreen] DB에서 레시피 로드 실패: $e');
       // 로드 실패해도 기본값 사용
     }
+  }
+
+  /// 현재 표시할 레시피 메시지 가져오기
+  String _getCurrentRecipeMessage() {
+    if (_aiRecipes.isEmpty) {
+      return _bannerMessageFromAi ??
+          '$_userName님, 다음 식사는 $_lackingNutrient 보충을 위해 $_recommendedFood은(는) 어떤가요? 🥗';
+    }
+    
+    // 현재 인덱스의 레시피 가져오기
+    final currentRecipe = _aiRecipes[_currentRecipeIndex];
+    final recipeTitle = currentRecipe.title;
+    
+    // 프롬프트 형식: "{{nickname}}님, {{부족한 영양소}} 보충을 위해 추천된 메뉴 중 '{{레시피 제목}}'은 어떠신가요?"
+    // tags는 건드리지 않고, 첫 번째 레시피의 tags를 사용하여 부족한 영양소 정보 추출
+    String nutrientInfo = '';
+    if (_aiRecipes.isNotEmpty && _aiRecipes[0].tags.isNotEmpty) {
+      // 첫 번째 레시피의 tags를 사용 (모든 레시피가 동일한 부족 영양소를 가지고 있음)
+      nutrientInfo = _aiRecipes[0].tags.join(', ');
+    } else {
+      // tags가 없으면 기본값 사용
+      nutrientInfo = _lackingNutrient;
+    }
+    
+    // 프롬프트 형식에 맞게 메시지 생성
+    final message = '$_userName님, $nutrientInfo 보충을 위해 추천된 메뉴 중 \'$recipeTitle\'은 어떠신가요?';
+    return message;
+  }
+  
+  /// 레시피 순환 타이머 시작
+  void _startRecipeRotation() {
+    // 기존 타이머 취소
+    _recipeRotationTimer?.cancel();
+    
+    // 레시피가 없거나 1개 이하면 타이머 시작하지 않음
+    if (_aiRecipes.isEmpty || _aiRecipes.length <= 1) {
+      return;
+    }
+    
+    // 현재 인덱스를 0으로 초기화
+    _currentRecipeIndex = 0;
+    
+    // 5초마다 레시피 인덱스 변경
+    _recipeRotationTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      
+      // 다음 레시피로 이동 (순환)
+      setState(() {
+        _currentRecipeIndex = (_currentRecipeIndex + 1) % _aiRecipes.length;
+        debugPrint('🔄 [ReportScreen] 레시피 인덱스 변경: $_currentRecipeIndex');
+      });
+    });
   }
 
   List<DateTime> _getWeekDates(DateTime date) {
@@ -1495,8 +1560,7 @@ class _ReportScreenState extends State<ReportScreen> {
                       const SizedBox(height: 8),
                       // TODO: [AI] AI가 생성한 추천 메시지는 AI 서버에서 가져오기
                       Text(
-                        _bannerMessageFromAi ??
-                            '$_userName님, 다음 식사는 $_lackingNutrient 보충을 위해 $_recommendedFood은(는) 어떤가요? 🥗',
+                        _getCurrentRecipeMessage(),
                         style: const TextStyle(
                           color: ColorPalette.text100,
                           fontSize: 14,
